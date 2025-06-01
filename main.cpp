@@ -86,12 +86,13 @@ class Transform {
   public:
     float yaw;
     float pitch;
+    float3 position;
 
     float3 to_world_point(float3 p) {
       float3 ihat, jhat, khat;
       get_basis_vectors(ihat, jhat, khat);
 
-      return transform_vector(ihat, jhat, khat, p);
+      return transform_vector(ihat, jhat, khat, p) + position;
     }
 
     void get_basis_vectors(float3 &ihat, float3 &jhat, float3 &khat) {
@@ -199,9 +200,10 @@ bool point_in_triangle(const float2& a, const float2& b, const float2& c, const 
  */
 float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
   float3 vertex_world = transform.to_world_point(vertex);
+  float fov = 1.0472; // 60 degrees in radians
 
-  float screen_height_world = 5;
-  float pixels_per_world_unit = dim.y / screen_height_world;
+  float screen_height_world = tan(fov / 2) * 2;
+  float pixels_per_world_unit = dim.y / screen_height_world / vertex_world.z;
 
   float2 screen_pos;
   screen_pos.x = vertex_world.x * pixels_per_world_unit;
@@ -370,6 +372,7 @@ void create_test_image(RenderState &state) {
   // rotate the cube
   model.transform.yaw = 0.6f;
   model.transform.pitch = 0.3f;
+  model.transform.position = float3(0, 0, 5); // Position the cube in front of the camera 
   
   render_model(model, state);
 }
