@@ -1,5 +1,10 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+#include <vector>
+#include <string>
+
 #include <time.h>
 #include <stdio.h>
 
@@ -65,6 +70,22 @@ struct float2 {
 };
 
 
+struct Model {
+  vector<float3> vertices; // List of vertices
+  vector<float3> cols; // List of vertex colors
+};
+
+
+struct RenderState {
+  int width, height; // Dimensions of the render target
+  float3* pixels; // Pointer to pixel data
+
+  float2 dim() const {
+    return float2(static_cast<float>(width), static_cast<float>(height));
+  }
+};
+
+
 /**
  * Generates a random float3 with each component in the range [0, 255].
  * @return A random float3.
@@ -87,6 +108,57 @@ float2 random_float2(float maxX, float maxY) {
   float x = static_cast<float>(rand()) / RAND_MAX * maxX;
   float y = static_cast<float>(rand()) / RAND_MAX * maxY;
   return float2(x, y);
+}
+
+
+/**
+ * Reads vertices and face indices from an OBJ file.
+ * Only supports 'v' (vertex) and 'f' (face) lines.
+ * Returns a vector of float3 containing all vertices used in faces (in face order).
+ */
+vector<float3> read_obj_vertices(const string& filename) {
+  ifstream file(filename);
+
+  vector<float3> vertices;
+  vector<float3> out_vertices;
+  string line;
+
+  if (!file) {
+    cerr << "Failed to open OBJ file: " << filename << endl;
+    return out_vertices;
+  }
+
+  // Read the file line by line
+  while (getline(file, line)) {
+    if (line.empty()) continue;
+
+    istringstream iss(line);
+    string prefix;
+    iss >> prefix;
+    
+    if (prefix == "v") {
+      float x, y, z;
+      iss >> x >> y >> z;
+
+      vertices.push_back(float3(x, y, z));
+    } else if (prefix == "f") {
+      int idx[4], count = 0;
+      string vert;
+
+      // OBJ indices are 1-based
+      while (iss >> vert && count < 4) {
+        size_t slash = vert.find('/');
+        int v_idx = stoi(slash == string::npos ? vert : vert.substr(0, slash));
+
+        if (v_idx < 0) v_idx = vertices.size() + v_idx + 1;
+        out_vertices.push_back(vertices[v_idx - 1]);
+        count++;
+      }
+    }
+  }
+
+  file.close();
+  return out_vertices;
 }
 
 
@@ -114,39 +186,76 @@ bool point_in_triangle(const float2& a, const float2& b, const float2& c, const 
 
 
 /**
+ * Converts 
+ */
+float2 vertex_to_screen(const float3 &vertex, float2 dim) {
+  float screen_height_world = 5;
+  float pixels_per_world_unit = dim.y / screen_height_world;
+
+  float2 screen_pos;
+  screen_pos.x = vertex.x * pixels_per_world_unit;
+  screen_pos.y = vertex.y * pixels_per_world_unit;
+
+  return (dim / 2) + screen_pos;
+}
+
+
+void render(Model &model, RenderState &state) {
+  // Clear the pixel buffer
+  for (int i = 0; i < state.width * state.height; ++i) {
+    state.pixels[i] = float3(0, 0, 0); // Set to black
+  }
+
+  // Render each triangle in the model
+  for (size_t i = 0; i < model.vertices.size(); i += 3) {
+    float2 a = vertex_to_screen(model.vertices[i], state.dim());
+    float2 b = vertex_to_screen(model.vertices[i + 1], state.dim());
+    float2 c = vertex_to_screen(model.vertices[i + 2], state.dim());
+
+    // Draw the triangle
+    for (int y = 0; y < state.height; ++y) {
+      for (int x = 0; x < state.width; ++x) {
+        if (point_in_triangle(a, b, c, float2(x, y))) {
+          state.pixels[x + state.width * y] = model.cols[i / 3]; // Use color from the first vertex of the triangle
+        }
+      }
+    }
+  }
+}
+
+
+/**
  * Creates a test image with a gradient pattern.
  * @param pixels Pointer to an array of float3 representing pixel colors.
  * @param width The width of the image.
  * @param height The height of the image.
  */
-void create_test_image(float3* pixels, int width, int height) {
-  const int triangle_count = 30, num_points = triangle_count * 3;
-  float2* points = new float2[num_points];
-  float3* triangle_cols = new float3[triangle_count];
+void create_test_image(RenderState &state) {
+  vector<float3> cube = read_obj_vertices("cube.obj");
+  if (cube.empty()) {
+    cerr << "Failed to read vertices from cube.obj" << endl;
+    return;
+  }
 
-  float2 half_size(width / 2, height / 2);
+  int num_triangles = cube.size() / 3;
+  float3 triangle_cols[num_triangles];
 
   srand(time(NULL));
 
   // Generate the triangles and their colors
-  for (int i = 0; i < triangle_count; ++i) {
-    points[i] = random_float2(width, height);
-    triangle_cols[i / 3] = random_colour();
+  for (int i = 0; i < num_triangles; ++i) {
+    triangle_cols[i] = random_colour();
   }
 
-  // render each traingle to the texture
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      for (int i = 0; i < num_points; ++i) {
-        float2 a = points[i];
-        float2 b = points[i + 1];
-        float2 c = points[i + 2];
+  Model model;
+  model.vertices = cube;
 
-        if (point_in_triangle(a, b, c, float2(x, y)))
-          pixels[x + width * y] = triangle_cols[i / 3];
-      }
-    }
+  model.cols.resize(num_triangles);
+  for (int i = 0; i < num_triangles; ++i) {
+    model.cols[i] = triangle_cols[i];
   }
+  
+  render(model, state);
 }
 
 
@@ -213,17 +322,19 @@ void write_bytes_to_bmp(string filename, const float3* pixels, int width, int he
 
 
 int main(void) {
-  int width = 160, height = 128;
-  float3* pixels = new float3[width * height];
-  if (!pixels) {
+  RenderState state;
+  state.width = 160;
+  state.height = 128;
+  state.pixels = new float3[state.width * state.height];
+  if (!state.pixels) {
     cerr << "Memory allocation failed." << endl;
     return EXIT_FAILURE;
   }
 
-  create_test_image(pixels, width, height);
-  write_bytes_to_bmp("test_image.bmp", pixels, width, height);
+  create_test_image(state);
+  write_bytes_to_bmp("test_image.bmp", state.pixels, state.width, state.height);
   cout << "BMP image created successfully: test_image.bmp" << endl;
 
-  delete[] pixels;
+  delete[] state.pixels;
   return EXIT_SUCCESS;
 }
