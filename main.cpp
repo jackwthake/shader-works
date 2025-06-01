@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <math.h>
 
 #include <time.h>
 #include <stdio.h>
@@ -49,6 +50,14 @@ struct float2 {
   float2() : x(0), y(0) {}
   float2(float x, float y) : x(x), y(y) {}
 
+  static float2 get_purpendicular(float2 vec) {
+    return float2(vec.y, -vec.x);
+  }
+
+  static float dot(float2 a, float2 b) {
+    return a.x * b.x + a.y * b.y;
+  }
+
   float2 operator+(const float2& other) const {
     return float2(x + other.x, y + other.y);
   }
@@ -70,9 +79,34 @@ struct float2 {
 };
 
 
+class Transform {
+  public:
+    float yaw;
+
+    float3 to_world_point(float3 p) {
+      float3 ihat, jhat, khat;
+      get_basis_vectors(ihat, jhat, khat);
+
+      return transform_vector(ihat, jhat, khat, p);
+    }
+
+    void get_basis_vectors(float3 &ihat, float3 &jhat, float3 &khat) {
+      ihat = float3(cos(this->yaw), 0, sin(this->yaw));
+      jhat = float3(0, 1, 0);
+      khat = float3(-sin(yaw), 0, cos(yaw));
+    }
+
+    float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 v) {
+      return ihat * v.x + jhat * v.y + khat * v.z;
+    }
+};
+
+
 struct Model {
   vector<float3> vertices; // List of vertices
   vector<float3> cols; // List of vertex colors
+
+  Transform transform;
 };
 
 
@@ -84,6 +118,7 @@ struct RenderState {
     return float2(static_cast<float>(width), static_cast<float>(height));
   }
 };
+
 
 
 /**
@@ -108,6 +143,14 @@ float2 random_float2(float maxX, float maxY) {
   float x = static_cast<float>(rand()) / RAND_MAX * maxX;
   float y = static_cast<float>(rand()) / RAND_MAX * maxY;
   return float2(x, y);
+}
+
+
+bool point_on_rightside(float2 a, float2 b, float2 p) {
+  float2 ap = p - a;
+  float2 abPerp = float2::get_purpendicular(b - a);
+
+  return float2::dot(ap, abPerp) >= 0;
 }
 
 
@@ -166,35 +209,26 @@ vector<float3> read_obj_vertices(const string& filename) {
  * Helper function to check if a point is inside a triangle using barycentric coordinates.
  */
 bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p) {
-  float2 v0 = c - a;
-  float2 v1 = b - a;
-  float2 v2 = p - a;
+  bool side_ab = point_on_rightside(a, b, p);
+  bool side_bc = point_on_rightside(b, c, p);
+  bool side_ca = point_on_rightside(c, a, p);
 
-  float d00 = v0.x * v0.x + v0.y * v0.y;
-  float d01 = v0.x * v1.x + v0.y * v1.y;
-  float d11 = v1.x * v1.x + v1.y * v1.y;
-  float d20 = v2.x * v0.x + v2.y * v0.y;
-  float d21 = v2.x * v1.x + v2.y * v1.y;
-
-  float denom = d00 * d11 - d01 * d01;
-  if (denom == 0.0f) return false;
-  float v = (d11 * d20 - d01 * d21) / denom;
-  float w = (d00 * d21 - d01 * d20) / denom;
-  float u = 1.0f - v - w;
-  return (u >= 0) && (v >= 0) && (w >= 0);
+  return side_ab && side_bc && side_ca;
 }
 
 
 /**
  * Converts 
  */
-float2 vertex_to_screen(const float3 &vertex, float2 dim) {
+float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
+  float3 vertex_world = transform.to_world_point(vertex);
+
   float screen_height_world = 5;
   float pixels_per_world_unit = dim.y / screen_height_world;
 
   float2 screen_pos;
-  screen_pos.x = vertex.x * pixels_per_world_unit;
-  screen_pos.y = vertex.y * pixels_per_world_unit;
+  screen_pos.x = vertex_world.x * pixels_per_world_unit;
+  screen_pos.y = vertex_world.y * pixels_per_world_unit;
 
   return (dim / 2) + screen_pos;
 }
@@ -208,9 +242,9 @@ void render(Model &model, RenderState &state) {
 
   // Render each triangle in the model
   for (size_t i = 0; i < model.vertices.size(); i += 3) {
-    float2 a = vertex_to_screen(model.vertices[i], state.dim());
-    float2 b = vertex_to_screen(model.vertices[i + 1], state.dim());
-    float2 c = vertex_to_screen(model.vertices[i + 2], state.dim());
+    float2 a = vertex_to_screen(model.vertices[i], model.transform, state.dim());
+    float2 b = vertex_to_screen(model.vertices[i + 1], model.transform, state.dim());
+    float2 c = vertex_to_screen(model.vertices[i + 2], model.transform, state.dim());
 
     // Draw the triangle
     for (int y = 0; y < state.height; ++y) {
@@ -231,29 +265,20 @@ void render(Model &model, RenderState &state) {
  * @param height The height of the image.
  */
 void create_test_image(RenderState &state) {
-  vector<float3> cube = read_obj_vertices("cube.obj");
-  if (cube.empty()) {
-    cerr << "Failed to read vertices from cube.obj" << endl;
-    return;
-  }
+  Model model;
 
-  int num_triangles = cube.size() / 3;
-  float3 triangle_cols[num_triangles];
-
-  srand(time(NULL));
+  // load vertices
+  model.vertices = read_obj_vertices("cube.obj");
+  int num_triangles = model.vertices.size() / 3;
 
   // Generate the triangles and their colors
-  for (int i = 0; i < num_triangles; ++i) {
-    triangle_cols[i] = random_colour();
-  }
-
-  Model model;
-  model.vertices = cube;
-
   model.cols.resize(num_triangles);
-  for (int i = 0; i < num_triangles; ++i) {
-    model.cols[i] = triangle_cols[i];
+  for (int i = 0; i < model.vertices.size() / 3; ++i) {
+    model.cols[i] = random_colour();
   }
+
+  // rotate the cube
+  model.transform.yaw = 0.6f;
   
   render(model, state);
 }
@@ -322,6 +347,8 @@ void write_bytes_to_bmp(string filename, const float3* pixels, int width, int he
 
 
 int main(void) {
+  srand(time(NULL));
+
   RenderState state;
   state.width = 160;
   state.height = 128;
