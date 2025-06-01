@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <time.h>
+#include <stdio.h>
 
 using namespace std;
 
@@ -64,6 +66,31 @@ struct float2 {
 
 
 /**
+ * Generates a random float3 with each component in the range [0, 255].
+ * @return A random float3.
+ */
+float3 random_colour() {
+  float x = static_cast<float>(rand()) / RAND_MAX * 255.0f;
+  float y = static_cast<float>(rand()) / RAND_MAX * 255.0f;
+  float z = static_cast<float>(rand()) / RAND_MAX * 255.0f;
+  return float3(x, y, z);
+}
+
+
+/**
+ * Generates a random float2 within the specified max bounds, min is always 0.
+ * @param maxX Maximum x value.
+ * @param maxY Maximum y value.
+ * @return A random float2.
+ */
+float2 random_float2(float maxX, float maxY) {
+  float x = static_cast<float>(rand()) / RAND_MAX * maxX;
+  float y = static_cast<float>(rand()) / RAND_MAX * maxY;
+  return float2(x, y);
+}
+
+
+/**
  * Helper function to check if a point is inside a triangle using barycentric coordinates.
  */
 bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p) {
@@ -93,15 +120,31 @@ bool point_in_triangle(const float2& a, const float2& b, const float2& c, const 
  * @param height The height of the image.
  */
 void create_test_image(float3* pixels, int width, int height) {
-  float2 a(0.2f * width, 0.2f * height);
-  float2 b(0.7f * width, 0.4f * height);
-  float2 c(0.4f * width, 0.8f * height);
+  const int triangle_count = 30, num_points = triangle_count * 3;
+  float2* points = new float2[num_points];
+  float3* triangle_cols = new float3[triangle_count];
 
+  float2 half_size(width / 2, height / 2);
+
+  srand(time(NULL));
+
+  // Generate the triangles and their colors
+  for (int i = 0; i < triangle_count; ++i) {
+    points[i] = random_float2(width, height);
+    triangle_cols[i / 3] = random_colour();
+  }
+
+  // render each traingle to the texture
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
-      float2 p(x, y);
-      bool inside = point_in_triangle(a, b, c, p);
-      inside ? pixels[y * width + x] = float3(0.0f, 0.0f, 1.0f) : float3();
+      for (int i = 0; i < num_points; ++i) {
+        float2 a = points[i];
+        float2 b = points[i + 1];
+        float2 c = points[i + 2];
+
+        if (point_in_triangle(a, b, c, float2(x, y)))
+          pixels[x + width * y] = triangle_cols[i / 3];
+      }
     }
   }
 }
