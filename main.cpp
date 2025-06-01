@@ -20,6 +20,10 @@ struct float3 {
   float3() : x(0), y(0), z(0) {}
   float3(float x, float y, float z) : x(x), y(y), z(z) {}
 
+  static float dot(float3 a, float3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
+
   float3 operator+(const float3& other) const {
     return float3(x + other.x, y + other.y, z + other.z);
   }
@@ -49,6 +53,7 @@ struct float2 {
 
   float2() : x(0), y(0) {}
   float2(float x, float y) : x(x), y(y) {}
+  float2(const float3& v) : x(v.x), y(v.y) {}
 
   static float2 get_purpendicular(float2 vec) {
     return float2(vec.y, -vec.x);
@@ -125,7 +130,11 @@ struct Model {
 
 struct RenderState {
   int width, height; // Dimensions of the render target
-  float3* pixels; // Pointer to pixel data
+  float fov = 1.0472; // Field of view in radians (60 degrees)
+  float max_depth = 500.0f; // Maximum depth for rendering
+
+  float3 *pixels; // Pointer to pixel data
+  float *depth_buffer;
 
   float2 dim() const {
     return float2(static_cast<float>(width), static_cast<float>(height));
@@ -160,17 +169,15 @@ float2 random_float2(float maxX, float maxY) {
 
 
 /**
- * Helper function to check if a point is on the right side of a line segment.
- * @param a The first point of the line segment.
- * @param b The second point of the line segment.
- * @param p The point to check.
- * @return True if the point is on the right side, false otherwise.
+ * Calculates the signed area of a triangle defined by three points.
+ * The sign indicates the orientation of the triangle (positive for counter-clockwise, negative for clockwise).
+ * @param a The first vertex of the triangle.
+ * @param b The second vertex of the triangle.
+ * @param c The third vertex of the triangle.
+ * @return The signed area of the triangle.
  */
-bool point_on_rightside(float2 a, float2 b, float2 p) {
-  float2 ap = p - a;
-  float2 abPerp = float2::get_purpendicular(b - a);
-
-  return float2::dot(ap, abPerp) >= 0;
+float signed_triangle_area(const float2& a, const float2& b, const float2& c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 
@@ -182,12 +189,20 @@ bool point_on_rightside(float2 a, float2 b, float2 p) {
  * @param p The point to check.
  * @return True if the point is inside the triangle, false otherwise.
  */
-bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p) {
-  bool side_ab = point_on_rightside(a, b, p);
-  bool side_bc = point_on_rightside(b, c, p);
-  bool side_ca = point_on_rightside(c, a, p);
+bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p, float3 &weights) {
+  float area_abp = signed_triangle_area(a, b, p);
+  float area_bcp = signed_triangle_area(b, c, p);
+  float area_cap = signed_triangle_area(c, a, p);
+  bool in_triangle = (area_abp >= 0 && area_bcp >= 0 && area_cap >= 0) ||
+                 (area_abp <= 0 && area_bcp <= 0 && area_cap <= 0);
 
-  return side_ab && side_bc && side_ca;
+  float inv_area_sum = 1.0f / (area_abp + area_bcp + area_cap);
+  float weight_a = area_bcp * inv_area_sum;
+  float weight_b = area_cap * inv_area_sum;
+  float weight_c = area_abp * inv_area_sum;
+  weights = float3(weight_a, weight_b, weight_c);
+
+  return in_triangle;
 }
 
 
@@ -198,7 +213,7 @@ bool point_in_triangle(const float2& a, const float2& b, const float2& c, const 
  * @param dim The dimensions of the screen (width, height).
  * @return The screen coordinates of the vertex as a float2.
  */
-float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
+float3 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
   float3 vertex_world = transform.to_world_point(vertex);
   float fov = 1.0472; // 60 degrees in radians
 
@@ -209,7 +224,9 @@ float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
   screen_pos.x = vertex_world.x * pixels_per_world_unit;
   screen_pos.y = vertex_world.y * pixels_per_world_unit;
 
-  return (dim / 2) + screen_pos;
+  float2 vertex_screen = (dim / 2) + screen_pos;
+
+  return float3(vertex_screen.x, vertex_screen.y, vertex_world.z);
 }
 
 
@@ -334,15 +351,24 @@ void write_bytes_to_bmp(string filename, const float3* pixels, int width, int he
 void render_model(Model &model, RenderState &state) {
   // Render each triangle in the model
   for (size_t i = 0; i < model.vertices.size(); i += 3) {
-    float2 a = vertex_to_screen(model.vertices[i], model.transform, state.dim());
-    float2 b = vertex_to_screen(model.vertices[i + 1], model.transform, state.dim());
-    float2 c = vertex_to_screen(model.vertices[i + 2], model.transform, state.dim());
+    float3 a = vertex_to_screen(model.vertices[i], model.transform, state.dim());
+    float3 b = vertex_to_screen(model.vertices[i + 1], model.transform, state.dim());
+    float3 c = vertex_to_screen(model.vertices[i + 2], model.transform, state.dim());
 
     // Draw the triangle
     for (int y = 0; y < state.height; ++y) {
       for (int x = 0; x < state.width; ++x) {
-        if (point_in_triangle(a, b, c, float2(x, y))) {
+
+        float2 p(x, y);
+        float3 weights;
+
+        if (point_in_triangle(a, b, c, float2(x, y), weights)) {
+          float3 depths(a.z, b.z, c.z);
+          float depth = float3::dot(depths, weights);
+          if (depth < 0 || depth > state.max_depth) continue; // Skip if depth is out of bounds
+
           state.pixels[x + state.width * y] = model.cols[i / 3]; // Use color from the first vertex of the triangle
+          state.depth_buffer[x + state.width * y] = depth;
         }
       }
     }
@@ -360,7 +386,7 @@ void create_test_image(RenderState &state) {
   Model model;
 
   // load vertices
-  model.vertices = read_obj("cube.obj");
+  model.vertices = read_obj("subie.obj");
   int num_triangles = model.vertices.size() / 3;
 
   // Generate the triangles and their colors
@@ -369,9 +395,9 @@ void create_test_image(RenderState &state) {
     model.cols[i] = random_colour();
   }
 
-  // rotate the cube
-  model.transform.yaw = 0.6f;
-  model.transform.pitch = 0.3f;
+  // rotate the model
+  model.transform.yaw = 1.5f;
+  model.transform.pitch = 3.f;
   model.transform.position = float3(0, 0, 5); // Position the cube in front of the camera 
   
   render_model(model, state);
@@ -382,11 +408,20 @@ int main(void) {
   srand(time(NULL));
 
   RenderState state;
+  
   state.width = 160;
   state.height = 128;
+
   state.pixels = new float3[state.width * state.height];
   if (!state.pixels) {
     cerr << "Memory allocation failed." << endl;
+    return EXIT_FAILURE;
+  }
+
+  state.depth_buffer = new float[state.width * state.height];
+  if (!state.depth_buffer) {
+    cerr << "Memory allocation for depth buffer failed." << endl;
+    delete[] state.pixels;
     return EXIT_FAILURE;
   }
 
