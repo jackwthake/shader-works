@@ -79,6 +79,9 @@ struct float2 {
 };
 
 
+/**
+ * A class to represent a transformation in 3D space.
+ */
 class Transform {
   public:
     float yaw;
@@ -146,6 +149,13 @@ float2 random_float2(float maxX, float maxY) {
 }
 
 
+/**
+ * Helper function to check if a point is on the right side of a line segment.
+ * @param a The first point of the line segment.
+ * @param b The second point of the line segment.
+ * @param p The point to check.
+ * @return True if the point is on the right side, false otherwise.
+ */
 bool point_on_rightside(float2 a, float2 b, float2 p) {
   float2 ap = p - a;
   float2 abPerp = float2::get_purpendicular(b - a);
@@ -155,11 +165,49 @@ bool point_on_rightside(float2 a, float2 b, float2 p) {
 
 
 /**
+ * Helper function to check if a point is inside a triangle using barycentric coordinates.
+ * @param a The first vertex of the triangle.
+ * @param b The second vertex of the triangle.
+ * @param c The third vertex of the triangle.
+ * @param p The point to check.
+ * @return True if the point is inside the triangle, false otherwise.
+ */
+bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p) {
+  bool side_ab = point_on_rightside(a, b, p);
+  bool side_bc = point_on_rightside(b, c, p);
+  bool side_ca = point_on_rightside(c, a, p);
+
+  return side_ab && side_bc && side_ca;
+}
+
+
+/**
+ * Converts world coordinates of a vertex to screen coordinates.
+ * @param vertex The vertex in world coordinates.
+ * @param transform The transformation to apply to the vertex.
+ * @param dim The dimensions of the screen (width, height).
+ * @return The screen coordinates of the vertex as a float2.
+ */
+float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
+  float3 vertex_world = transform.to_world_point(vertex);
+
+  float screen_height_world = 5;
+  float pixels_per_world_unit = dim.y / screen_height_world;
+
+  float2 screen_pos;
+  screen_pos.x = vertex_world.x * pixels_per_world_unit;
+  screen_pos.y = vertex_world.y * pixels_per_world_unit;
+
+  return (dim / 2) + screen_pos;
+}
+
+
+/**
  * Reads vertices and face indices from an OBJ file.
  * Only supports 'v' (vertex) and 'f' (face) lines.
  * Returns a vector of float3 containing all vertices used in faces (in face order).
  */
-vector<float3> read_obj_vertices(const string& filename) {
+vector<float3> read_obj(const string& filename) {
   ifstream file(filename);
 
   vector<float3> vertices;
@@ -202,85 +250,6 @@ vector<float3> read_obj_vertices(const string& filename) {
 
   file.close();
   return out_vertices;
-}
-
-
-/**
- * Helper function to check if a point is inside a triangle using barycentric coordinates.
- */
-bool point_in_triangle(const float2& a, const float2& b, const float2& c, const float2& p) {
-  bool side_ab = point_on_rightside(a, b, p);
-  bool side_bc = point_on_rightside(b, c, p);
-  bool side_ca = point_on_rightside(c, a, p);
-
-  return side_ab && side_bc && side_ca;
-}
-
-
-/**
- * Converts 
- */
-float2 vertex_to_screen(const float3 &vertex, Transform transform, float2 dim) {
-  float3 vertex_world = transform.to_world_point(vertex);
-
-  float screen_height_world = 5;
-  float pixels_per_world_unit = dim.y / screen_height_world;
-
-  float2 screen_pos;
-  screen_pos.x = vertex_world.x * pixels_per_world_unit;
-  screen_pos.y = vertex_world.y * pixels_per_world_unit;
-
-  return (dim / 2) + screen_pos;
-}
-
-
-void render(Model &model, RenderState &state) {
-  // Clear the pixel buffer
-  for (int i = 0; i < state.width * state.height; ++i) {
-    state.pixels[i] = float3(0, 0, 0); // Set to black
-  }
-
-  // Render each triangle in the model
-  for (size_t i = 0; i < model.vertices.size(); i += 3) {
-    float2 a = vertex_to_screen(model.vertices[i], model.transform, state.dim());
-    float2 b = vertex_to_screen(model.vertices[i + 1], model.transform, state.dim());
-    float2 c = vertex_to_screen(model.vertices[i + 2], model.transform, state.dim());
-
-    // Draw the triangle
-    for (int y = 0; y < state.height; ++y) {
-      for (int x = 0; x < state.width; ++x) {
-        if (point_in_triangle(a, b, c, float2(x, y))) {
-          state.pixels[x + state.width * y] = model.cols[i / 3]; // Use color from the first vertex of the triangle
-        }
-      }
-    }
-  }
-}
-
-
-/**
- * Creates a test image with a gradient pattern.
- * @param pixels Pointer to an array of float3 representing pixel colors.
- * @param width The width of the image.
- * @param height The height of the image.
- */
-void create_test_image(RenderState &state) {
-  Model model;
-
-  // load vertices
-  model.vertices = read_obj_vertices("cube.obj");
-  int num_triangles = model.vertices.size() / 3;
-
-  // Generate the triangles and their colors
-  model.cols.resize(num_triangles);
-  for (int i = 0; i < model.vertices.size() / 3; ++i) {
-    model.cols[i] = random_colour();
-  }
-
-  // rotate the cube
-  model.transform.yaw = 0.6f;
-  
-  render(model, state);
 }
 
 
@@ -343,6 +312,56 @@ void write_bytes_to_bmp(string filename, const float3* pixels, int width, int he
   }
 
   file.close();
+}
+
+
+/**
+ * Renders a model to the pixel buffer in the RenderState.
+ * @param model The model to render.
+ * @param state The render state containing pixel buffer and dimensions.
+ */
+void render_model(Model &model, RenderState &state) {
+  // Render each triangle in the model
+  for (size_t i = 0; i < model.vertices.size(); i += 3) {
+    float2 a = vertex_to_screen(model.vertices[i], model.transform, state.dim());
+    float2 b = vertex_to_screen(model.vertices[i + 1], model.transform, state.dim());
+    float2 c = vertex_to_screen(model.vertices[i + 2], model.transform, state.dim());
+
+    // Draw the triangle
+    for (int y = 0; y < state.height; ++y) {
+      for (int x = 0; x < state.width; ++x) {
+        if (point_in_triangle(a, b, c, float2(x, y))) {
+          state.pixels[x + state.width * y] = model.cols[i / 3]; // Use color from the first vertex of the triangle
+        }
+      }
+    }
+  }
+}
+
+
+/**
+ * Creates a test image with a gradient pattern.
+ * @param pixels Pointer to an array of float3 representing pixel colors.
+ * @param width The width of the image.
+ * @param height The height of the image.
+ */
+void create_test_image(RenderState &state) {
+  Model model;
+
+  // load vertices
+  model.vertices = read_obj("cube.obj");
+  int num_triangles = model.vertices.size() / 3;
+
+  // Generate the triangles and their colors
+  model.cols.resize(num_triangles);
+  for (int i = 0; i < model.vertices.size() / 3; ++i) {
+    model.cols[i] = random_colour();
+  }
+
+  // rotate the cube
+  model.transform.yaw = 0.6f;
+  
+  render_model(model, state);
 }
 
 
