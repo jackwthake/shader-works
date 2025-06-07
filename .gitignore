@@ -2,3 +2,4 @@ main
 .vscode/
 .DS_Store
 main.dsYM/
+.pio/

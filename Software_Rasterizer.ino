@@ -5,7 +5,7 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
 
-#include "helpers.h"
+#include "src/util/helpers.h"
 
 #define TFT_CS        44 // PyBadge/PyGamer display control pins: chip select
 #define TFT_RST       46 // Display reset
