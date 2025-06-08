@@ -35,4 +35,7 @@ struct float2 {
   float2 operator/(float scalar) const;
 };
 
+float2 random_float2(float maxX, float maxY);
+float3 random_color();
+
 #endif

@@ -63,7 +63,7 @@ float2 float2::operator/(float scalar) const {
  * Generates a random float3 with each component in the range [0, 255].
  * @return A random float3.
  */
-float3 random_colour() {
+float3 random_color() {
   float x = static_cast<float>(rand()) / RAND_MAX * 255.0f;
   float y = static_cast<float>(rand()) / RAND_MAX * 255.0f;
   float z = static_cast<float>(rand()) / RAND_MAX * 255.0f;

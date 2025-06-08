@@ -1,69 +1,18 @@
 #include <Arduino.h>
 
-#define USE_SPI_DMA
-#include <Adafruit_GFX.h>    // Not used, but required for ST7735
-#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-#include <SPI.h>
-
+#include "src/const.h"
 #include "src/util/helpers.h"
+#include "src/renderer.h"
+#include "src/util/model.h"
 
-#define TFT_CS        44 // PyBadge/PyGamer display control pins: chip select
-#define TFT_RST       46 // Display reset
-#define TFT_DC        45 // Display data/command select
-#define TFT_BACKLIGHT 47 // Display backlight pin
-
-struct Device {
-  static constexpr int width = 160, height = 128;
-  static constexpr int screen_buffer_len = width * height;
-  Adafruit_ST7735 *tft;
-
-  uint16_t *front_buffer;
-  uint16_t *back_buffer;
-} device;
-
-const unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
+Device device;
 
 unsigned long now, last_tick = 0, tick_count = 0, frame_count = 0, last_report = 0;
 float delta_time = 0.0;
 bool first_frame = true;
 
 
-// Draw a filled triangle into a framebuffer (1D array of uint16_t)
-// framebuffer: pointer to framebuffer (size width*height)
-// width, height: dimensions of framebuffer
-// (x0, y0), (x1, y1), (x2, y2): triangle vertices
-// color: 16-bit color value
-void draw_fill_triangle(uint16_t* framebuffer,
-                          int x0, int y0, int x1, int y1, int x2, int y2, uint16_t color) {
-    // Sort vertices by y (y0 <= y1 <= y2)
-    if (y0 > y1) { _swap_int(y0, y1); _swap_int(x0, x1); }
-    if (y1 > y2) { _swap_int(y1, y2); _swap_int(x1, x2); }
-    if (y0 > y1) { _swap_int(y0, y1); _swap_int(x0, x1); }
-
-    auto edge_interp = [](int x0, int y0, int x1, int y1, int y) -> int {
-        if (y1 == y0) return x0;
-        return x0 + (x1 - x0) * (y - y0) / (y1 - y0);
-    };
-
-    // Fill from y0 to y2
-    for (int y = y0; y <= y2; ++y) {
-        if (y < 0 || y >= device.height) continue;
-        int xa, xb;
-        if (y < y1) {
-            xa = edge_interp(x0, y0, x1, y1, y);
-            xb = edge_interp(x0, y0, x2, y2, y);
-        } else {
-            xa = edge_interp(x1, y1, x2, y2, y);
-            xb = edge_interp(x0, y0, x2, y2, y);
-        }
-        if (xa > xb) _swap_int(xa, xb);
-        xa = max(xa, 0);
-        xb = min(xb, device.width - 1);
-        for (int x = xa; x <= xb; ++x) {
-            framebuffer[y * device.width + x] = color;
-        }
-    }
-}
+Model cube;
 
 
 /**
@@ -102,17 +51,55 @@ void setup() {
     log_panic("Failed to allocate framebuffer memory.\n");
   }
 
+  device.depth_buffer = new float[device.screen_buffer_len];
+  if (!device.depth_buffer) {
+    log_panic("Failed to allocate depth buffer memory.\n");
+  }
+
   tft_init();
   log("Initialized.\n");
+
+
+  // Initialize the cube model
+  cube.vertices = read_obj(
+      "v 1.000000 -1.000000 -1.000000\n"
+      "v 1.000000 -1.000000 1.000000\n"
+      "v -1.000000 -1.000000 1.000000\n"
+      "v -1.000000 -1.000000 -1.000000\n"
+      "v 1.000000 1.000000 -0.999999\n"
+      "v 0.999999 1.000000 1.000001\n"
+      "v -1.000000 1.000000 1.000000\n"
+      "v -1.000000 1.000000 -1.000000\n"
+      "f 2/1/1 3/2/1 4/3/1\n"
+      "f 8/1/2 7/4/2 6/5/2\n"
+      "f 5/6/3 6/7/3 2/8/3\n"
+      "f 6/8/4 7/5/4 3/4/4\n"
+      "f 3/9/5 7/10/5 8/11/5\n"
+      "f 1/12/6 4/13/6 8/11/6\n"
+      "f 1/4/1 2/1/1 4/3/1\n"
+      "f 5/14/2 8/1/2 6/5/2\n"
+      "f 1/12/3 5/6/3 2/8/3\n"
+      "f 2/12/4 6/8/4 3/4/4\n"
+      "f 4/13/5 3/9/5 8/11/5\n"
+      "f 5/6/6 1/12/6 8/11/6\n");
+
+  cube.cols = {
+      random_color(), random_color(), random_color(), random_color(),
+      random_color(), random_color(), random_color(), random_color(),
+      random_color(), random_color(), random_color(), random_color()
+  };
+
+  cube.transform.yaw = 1.5f;
+  cube.transform.pitch = 3.f;
+  cube.transform.position = { 0, 0, 5 };
 }
 
 
-int x = device.width / 2;
-int y = device.height / 2;
 void render_frame() {
   memset(device.back_buffer, 0x00, device.screen_buffer_len * sizeof(uint16_t));
+  memset(device.depth_buffer, device.max_depth, device.screen_buffer_len * sizeof(float));
 
-  draw_fill_triangle(device.back_buffer, x, y, x + 30, y, x + 15, y + 30, rgb_to_565(255, 0, 255));
+  render_model(device.back_buffer, cube);
 
   if (!first_frame) { // finish up the previous frame
     device.tft->dmaWait();
@@ -129,6 +116,7 @@ void render_frame() {
   device.tft->writePixels(device.back_buffer, device.width * device.height, false);
 }
 
+
 void loop() {
   now = millis();
 
@@ -138,8 +126,8 @@ void loop() {
     delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
     last_tick += tick_interval;
 
-    x = (cos(millis() / 10 * delta_time) * 50) + (device.width / 2);
-    y = (sin(millis() / 10 * delta_time) * 30) + (device.height / 2);
+    cube.transform.yaw += 1.f * delta_time; // Rotate cube
+    cube.transform.pitch += 1.5f * delta_time; // Rotate cube
 
     tick_count++;
     ticks_processed++;
@@ -156,5 +144,5 @@ void loop() {
 
   /* Update back buffer, swap buffers and blit framebuffer to screen */
   render_frame();
-  frame_count++;
+  ++frame_count;
 }
