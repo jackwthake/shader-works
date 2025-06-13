@@ -5,11 +5,21 @@
 #include "src/renderer.h"
 #include "src/util/model.h"
 
-Device device;
-
 unsigned long now, last_tick = 0, tick_count = 0, frame_count = 0, last_report = 0;
 float delta_time = 0.0;
 bool first_frame = true;
+
+
+Adafruit_ST7735 *Device::tft = new Adafruit_ST7735(&SPI1, Device::TFT_CS, Device::TFT_DC, Device::TFT_RST);
+
+uint16_t *Device::back_buffer = new uint16_t[Device::screen_buffer_len];
+uint16_t *Device::front_buffer = new uint16_t[Device::screen_buffer_len];
+float *Device::depth_buffer = new float[Device::screen_buffer_len];
+
+Adafruit_FlashTransport_QSPI *Device::flash_transport = new Adafruit_FlashTransport_QSPI();
+Adafruit_SPIFlash *Device::flash = new Adafruit_SPIFlash(Device::flash_transport);
+FatFileSystem Device::file_sys = FatFileSystem();
+
 
 static std::string cube_obj = "v 1.000000 -1.000000 -1.000000\n"
                       "v 1.000000 -1.000000 1.000000\n"
@@ -40,33 +50,29 @@ Model cube, cube2;
  * Sets up the backlight, initializes the display, and sets the rotation.
  */
 void tft_init(void) {
-  pinMode(TFT_BACKLIGHT, OUTPUT);
-  digitalWrite(TFT_BACKLIGHT, HIGH);
+  pinMode(Device::TFT_BACKLIGHT, OUTPUT);
+  digitalWrite(Device::TFT_BACKLIGHT, HIGH);
 
-  device.tft = new Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
-  if (!device.tft) {
+  if (!Device::tft) {
     log_panic("Failed to initialize ST7735 display driver.\n");
   }
 
   log("Initialized ST7735 display driver.\n");
 
-  device.tft->initR(INITR_BLACKTAB);
-  device.tft->setRotation(1);
-  device.tft->fillScreen(0xFF);
+  Device::tft->initR(INITR_BLACKTAB);
+  Device::tft->setRotation(1);
+  Device::tft->fillScreen(0x00);
 
-  pinMode(TFT_CS, OUTPUT);
-  digitalWrite(TFT_CS, HIGH);
+  pinMode(Device::TFT_CS, OUTPUT);
+  digitalWrite(Device::TFT_CS, HIGH);
 
-  device.back_buffer = new uint16_t[device.screen_buffer_len];
-  device.front_buffer = new uint16_t[device.screen_buffer_len];
-  if (!device.front_buffer || !device.back_buffer) {
+  if (!Device::front_buffer || !Device::back_buffer) {
     log_panic("Failed to allocate framebuffer memory.\n");
   }
 
   log("Screen Buffer Allocated successfully.\n");
 
-  device.depth_buffer = new float[device.screen_buffer_len];
-  if (!device.depth_buffer) {
+  if (!Device::depth_buffer) {
     log_panic("Failed to allocate depth buffer memory.\n");
   }
 
@@ -76,38 +82,30 @@ void tft_init(void) {
 
 
 void spi_flash_init() {
-  device.flash_transport = Adafruit_FlashTransport_QSPI();
-  device.flash = Adafruit_SPIFlash(&device.flash_transport);
+  if (!Device::flash_transport || !Device::flash) {
+    log_panic("Failed to initialize memory for QSPI flash transport or filesystem.\n");
+  }
 
-  if (device.flash.begin()) {
+  log("Initialized memory for QSPI flash transport and filesystem.\n");
+
+  if (Device::flash->begin()) {
       log("QSPI filesystem found\n");
-      log("QSPI flash chip JEDEC ID: %#04x\n", device.flash.getJEDECID());
-      log("QSPI flash chip size: %lu bytes\n", device.flash.size());
+      log("QSPI flash chip JEDEC ID: %#04x\n", Device::flash->getJEDECID());
+      log("QSPI flash chip size: %lu bytes\n", Device::flash->size());
 
       // First call begin to mount the filesystem.  Check that it returns true
       // to make sure the filesystem was mounted.
-      if (device.file_sys.begin(&device.flash)) {
+      if (!Device::file_sys.begin(Device::flash)) {
         log_panic("Failed to mount QSPI filesystem.\n");
       }
 
       log("QSPI filesystem mounted successfully.\n");
-
-      File root = device.file_sys.open("/");
-      while (true) {
-        File entry = root.openNextFile();
-        if (!entry) break;
-        log("File: %s\n", entry.name());
-        entry.close();
-      }
-      
-      root.close();
-    }
 }
 
 
 void setup() {
   Serial.begin(9600);
-  delay(75);
+  delay(250); // Wait for serial to initialize
 
   tft_init();
 
@@ -141,25 +139,25 @@ void setup() {
 
 
 void render_frame() {
-  memset(device.back_buffer, 0x00, device.screen_buffer_len * sizeof(uint16_t));
-  memset(device.depth_buffer, device.max_depth, device.screen_buffer_len * sizeof(float));
+  memset(Device::back_buffer, 0x00, Device::screen_buffer_len * sizeof(uint16_t));
+  memset(Device::depth_buffer, Device::max_depth, Device::screen_buffer_len * sizeof(float));
 
-  render_model(device.back_buffer, cube);
-  render_model(device.back_buffer, cube2);
+  render_model(Device::back_buffer, cube);
+  render_model(Device::back_buffer, cube2);
 
   if (!first_frame) { // finish up the previous frame
-    device.tft->dmaWait();
-    device.tft->endWrite();
+    Device::tft->dmaWait();
+    Device::tft->endWrite();
 
-    _swap_ptr(device.front_buffer, device.back_buffer);
+    _swap_ptr(Device::front_buffer, Device::back_buffer);
   } else {
     first_frame = false;
   }
 
   // Blit the framebuffer to the screen
-  device.tft->setAddrWindow(0, 0, device.width, device.height);
-  device.tft->startWrite();
-  device.tft->writePixels(device.back_buffer, device.width * device.height, false);
+  Device::tft->setAddrWindow(0, 0, Device::width, Device::height);
+  Device::tft->startWrite();
+  Device::tft->writePixels(Device::back_buffer, Device::width * Device::height, false);
 }
 
 
@@ -168,9 +166,9 @@ void loop() {
 
   // Process all pending ticks to maintain a fixed timestep
   int ticks_processed = 0;
-  while ((now - last_tick) >= tick_interval && ticks_processed < 5) { // Limit catch-up to avoid spiral of death
-    delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
-    last_tick += tick_interval;
+  while ((now - last_tick) >= Device::tick_interval && ticks_processed < 5) { // Limit catch-up to avoid spiral of death
+    delta_time = Device::tick_interval / 1000.0f; // fixed delta time in seconds
+    last_tick += Device::tick_interval;
 
     cube.transform.yaw += 1.f * delta_time; // Rotate cube
     cube.transform.pitch += 1.5f * delta_time; // Rotate cube

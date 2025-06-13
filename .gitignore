@@ -3,3 +3,4 @@ main
 .DS_Store
 main.dsYM/
 .pio/
+bin/
