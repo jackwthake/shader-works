@@ -1,6 +1,10 @@
-#ifndef __VEC_H__
-#define __VEC_H__
+#ifndef MATHS_H
+#define MATHS_H
 
+
+/**
+ * A simple 3D vector structure to represent 2D coordinates or vectors.
+ */
 struct float3 {
   float x, y, z;
 
@@ -24,7 +28,7 @@ struct float2 {
 
   float2() : x(0), y(0) {}
   float2(float x, float y) : x(x), y(y) {}
-  float2(const float3& v) : x(v.x), y(v.y) {}
+  float2(const class float3& v) : x(v.x), y(v.y) {}
 
   static float2 get_purpendicular(float2 vec);
   static float dot(float2 a, float2 b);
@@ -35,7 +39,18 @@ struct float2 {
   float2 operator/(float scalar) const;
 };
 
+class Transform {
+  public:
+    float yaw;
+    float pitch;
+    float3 position;
+
+  float3 to_world_point(float3 p);
+  void get_basis_vectors(float3 &ihat, float3 &jhat, float3 &khat);
+  float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 v);
+};
+
 float2 random_float2(float maxX, float maxY);
 float3 random_color();
 
-#endif
+#endif // MATHS_H

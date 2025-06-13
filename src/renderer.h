@@ -4,8 +4,7 @@
 #include <vector>
 #include <stdint.h>
 
-#include "util/vec.h"
-#include "util/transform.h"
+#include "util/maths.h"
 
 struct Model {
   std::vector<float3> vertices; // List of vertices

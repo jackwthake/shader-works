@@ -4,7 +4,7 @@
 
 #include "const.h"
 #include "util/helpers.h"
-#include "util/vec.h"
+#include "util/maths.h"
 
 using namespace std;
 

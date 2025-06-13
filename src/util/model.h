@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "vec.h"
+#include "maths.h"
 
 std::vector<float3> read_obj(const std::string& content);
 

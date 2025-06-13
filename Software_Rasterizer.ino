@@ -100,6 +100,7 @@ void spi_flash_init() {
       }
 
       log("QSPI filesystem mounted successfully.\n");
+    }
 }
 
 
