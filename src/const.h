@@ -8,6 +8,7 @@
 #include <Adafruit_GFX.h>    // Not used, but required for ST7735
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 
+#include <SdFat_Adafruit_Fork.h>
 #include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
 namespace Device  {
@@ -16,12 +17,11 @@ namespace Device  {
   constexpr float max_depth = 100.0f; // Maximum depth value for the depth buffer
   constexpr unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
   
-  
   extern Adafruit_ST7735 *tft;
 
-  extern Adafruit_FlashTransport_QSPI *flash_transport;
-  extern Adafruit_SPIFlash *flash;
-  extern FatFileSystem file_sys;
+  extern Adafruit_FlashTransport_QSPI flash_transport;
+  extern Adafruit_SPIFlash flash;
+  extern FatVolume file_sys;
 
   extern uint16_t *front_buffer;
   extern uint16_t *back_buffer;

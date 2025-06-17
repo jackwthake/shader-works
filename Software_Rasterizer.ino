@@ -5,43 +5,32 @@
 #include "src/renderer.h"
 #include "src/util/model.h"
 
-unsigned long now, last_tick = 0, tick_count = 0, frame_count = 0, last_report = 0;
-float delta_time = 0.0;
-bool first_frame = true;
 
-
+/**
+ * Initialize critical components of the device.
+ */
 Adafruit_ST7735 *Device::tft = new Adafruit_ST7735(&SPI1, Device::TFT_CS, Device::TFT_DC, Device::TFT_RST);
 
 uint16_t *Device::back_buffer = new uint16_t[Device::screen_buffer_len];
 uint16_t *Device::front_buffer = new uint16_t[Device::screen_buffer_len];
 float *Device::depth_buffer = new float[Device::screen_buffer_len];
 
-Adafruit_FlashTransport_QSPI *Device::flash_transport = new Adafruit_FlashTransport_QSPI();
-Adafruit_SPIFlash *Device::flash = new Adafruit_SPIFlash(Device::flash_transport);
-FatFileSystem Device::file_sys = FatFileSystem();
+Adafruit_FlashTransport_QSPI Device::flash_transport;
+Adafruit_SPIFlash Device::flash(&Device::flash_transport);
+FatVolume Device::file_sys = FatFileSystem();
 
 
-static std::string cube_obj = "v 1.000000 -1.000000 -1.000000\n"
-                      "v 1.000000 -1.000000 1.000000\n"
-                      "v -1.000000 -1.000000 1.000000\n"
-                      "v -1.000000 -1.000000 -1.000000\n"
-                      "v 1.000000 1.000000 -0.999999\n"
-                      "v 0.999999 1.000000 1.000001\n"
-                      "v -1.000000 1.000000 1.000000\n"
-                      "v -1.000000 1.000000 -1.000000\n"
-                      "f 2/1/1 3/2/1 4/3/1\n"
-                      "f 8/1/2 7/4/2 6/5/2\n"
-                      "f 5/6/3 6/7/3 2/8/3\n"
-                      "f 6/8/4 7/5/4 3/4/4\n"
-                      "f 3/9/5 7/10/5 8/11/5\n"
-                      "f 1/12/6 4/13/6 8/11/6\n"
-                      "f 1/4/1 2/1/1 4/3/1\n"
-                      "f 5/14/2 8/1/2 6/5/2\n"
-                      "f 1/12/3 5/6/3 2/8/3\n"
-                      "f 2/12/4 6/8/4 3/4/4\n"
-                      "f 4/13/5 3/9/5 8/11/5\n"
-                      "f 5/6/6 1/12/6 8/11/6\n";
+// TODO: Maybe move these to Device namespace?
+unsigned long now, last_tick = 0, tick_count = 0, frame_count = 0, last_report = 0;
+float delta_time = 0.0;
+bool first_frame = true;
 
+
+/**
+ * Global vars for test model
+ */
+std::string cube_obj;
+std::vector<float3> cube_vertices;
 Model cube, cube2;
 
 
@@ -82,31 +71,33 @@ void tft_init(void) {
 
 
 void spi_flash_init() {
-  if (!Device::flash_transport || !Device::flash) {
-    log_panic("Failed to initialize memory for QSPI flash transport or filesystem.\n");
-  }
-
-  log("Initialized memory for QSPI flash transport and filesystem.\n");
-
-  if (Device::flash->begin()) {
+  if (Device::flash.begin()) {
       log("QSPI filesystem found\n");
-      log("QSPI flash chip JEDEC ID: %#04x\n", Device::flash->getJEDECID());
-      log("QSPI flash chip size: %lu bytes\n", Device::flash->size());
+      log("QSPI flash chip JEDEC ID: %#04x\n", Device::flash.getJEDECID());
+      log("QSPI flash chip size: %lu bytes\n", Device::flash.size());
 
       // First call begin to mount the filesystem.  Check that it returns true
       // to make sure the filesystem was mounted.
-      if (!Device::file_sys.begin(Device::flash)) {
+      if (!Device::file_sys.begin(&Device::flash)) {
         log_panic("Failed to mount QSPI filesystem.\n");
       }
 
       log("QSPI filesystem mounted successfully.\n");
     }
+
+    // Load the cube model from the filesystem
+    log("Loading cube model from filesystem...\n");
+    File32 f = Device::file_sys.open("cube.obj", O_RDONLY);
+    cube_obj = f.readString().c_str();
+    cube_vertices = read_obj(cube_obj);
 }
 
 
 void setup() {
-  Serial.begin(9600);
-  delay(250); // Wait for serial to initialize
+  Serial.begin(115200);
+  while (!Serial) {
+    delay(50);
+  }
 
   tft_init();
 
@@ -116,8 +107,8 @@ void setup() {
 
 
   // Initialize the cube model
-  cube.vertices = read_obj(cube_obj);
-  cube2.vertices = read_obj(cube_obj);
+  cube.vertices = cube_vertices;
+  cube2.vertices = cube_vertices;
 
   cube.cols = {
       random_color(), random_color(), random_color(), random_color(),
@@ -183,8 +174,8 @@ void loop() {
 
   // Tickrate and framerate reporting
   if (now - last_report >= 1000) { // Every 1 second
-    log("TPS: %lu ticks/sec\n", tick_count);
-    log("FPS: %lu frames/sec\n", frame_count);
+    // log("TPS: %lu ticks/sec\n", tick_count);
+    // log("FPS: %lu frames/sec\n", frame_count);
     tick_count = 0;
     frame_count = 0;
     last_report = now;

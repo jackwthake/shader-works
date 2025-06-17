@@ -121,9 +121,6 @@ void setup() {
 
   // File system setup, write files to flash
   write_files_to_flash();
-
-  File cube = fatfs.open("cube.obj", O_RDONLY);
-  Serial.println(cube.readString());
 }
 
 void loop() {
