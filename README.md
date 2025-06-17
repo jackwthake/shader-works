@@ -51,8 +51,7 @@ arduino-cli lib install "Adafruit SPIFlash@^5.1.1"
 ```
 
 ## Building and Uploading
-
-A Python script (`build.py`) is provided to simplify the build and upload process.
+A Python script (`build.py`) is provided to simplify the build and upload process of both the main ```Software_Rasterizer.ino``` Sketch and the ```flash_format.ino``` sketch.
 
 ### Basic Usage
 
@@ -72,6 +71,33 @@ A Python script (`build.py`) is provided to simplify the build and upload proces
    ```sh
    python3 build.py --all --port <PORT>
    ```
+
+### Flash Format and Resource Generation
+In order for the main sketch to load the necessary resources, you must compile and upload the ```flash_format.ino``` sketch found in ```flash_format/``` before uploading the main sketch.
+
+1. **Generate Resource Files**
+  ```sh
+  cd flash_format
+  python3 res_copy.py
+  ```
+  This creates the necessary `files.h` header with embedded resources.
+
+2. **Compile and Upload Flash Format**
+  ```sh
+  ./build.py --all --port <PORT>
+  ```
+  Once uploaded the board will wait for a serial connection with a baud rate of ```115200``` before writing the necessary files to the onboard flash.
+
+  NOTE: This sketch only needs to be uploaded uppon first installation, or uppon any modification to the files in the ```res/``` directory.
+
+### Compiling and Uploading Main Sketch (Software_Rasterizer.ino)
+
+After formatting the flash and generating resources, you can build and upload the main sketch:
+
+```sh
+cd ../
+./build.py --all --port <PORT>
+```
 
 ### Finding Your Board's Port
 
