@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# res_copy.py
+# This script copies files from the RES_DIR and bakes them into 
+# a C header file (files.h) in the OUTFILE_DIR.
+
+
 import os
 
 RES_DIR = os.path.abspath("../res");
@@ -20,6 +25,7 @@ def fmt_file(text):
 # {
 #   name = "path/to/file.txt",
 #   data = "file content with \\n at the end of each line"
+#   size = 1234
 # }
 def add_file(file_path, outfile):
   with open(file_path, "r") as f:

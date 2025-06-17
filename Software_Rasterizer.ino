@@ -21,9 +21,10 @@ FatVolume Device::file_sys = FatFileSystem();
 
 
 // TODO: Maybe move these to Device namespace?
-unsigned long now, last_tick = 0, tick_count = 0, frame_count = 0, last_report = 0;
+//       Or Maybe some struct
+unsigned long now, last_tick;
 float delta_time = 0.0;
-bool first_frame = true;
+bool log_debug_to_screen = true;
 
 
 /**
@@ -43,46 +44,52 @@ void tft_init(void) {
   digitalWrite(Device::TFT_BACKLIGHT, HIGH);
 
   if (!Device::tft) {
-    log_panic("Failed to initialize ST7735 display driver.\n");
+    log_panic("Failed to init ST7735 driver.\n");
   }
 
-  log("Initialized ST7735 display driver.\n");
+  log("Initialized ST7735 driver.\n");
 
   Device::tft->initR(INITR_BLACKTAB);
   Device::tft->setRotation(1);
-  Device::tft->fillScreen(0x00);
-
+  
   pinMode(Device::TFT_CS, OUTPUT);
   digitalWrite(Device::TFT_CS, HIGH);
+  
+  Device::tft->fillScreen(0x00);
+  Device::tft->setCursor(0, 0);
 
   if (!Device::front_buffer || !Device::back_buffer) {
-    log_panic("Failed to allocate framebuffer memory.\n");
+    log_panic("Failed to alloc framebuffer memory.\n");
   }
 
-  log("Screen Buffer Allocated successfully.\n");
+  log("framebuffer Alloc successful\n");
 
   if (!Device::depth_buffer) {
-    log_panic("Failed to allocate depth buffer memory.\n");
+    log_panic("Failed to alloc depth buffer memory.\n");
   }
 
-  log("Depth Buffer Allocated successfully.\n");
+  log("Depth Buffer Alloc successful.\n");
   log("Screen Initialized.\n");
 }
 
 
+
+/**
+ * Initialize onboard QSPI flash chip, mount filesystem, load model
+ */
 void spi_flash_init() {
   if (Device::flash.begin()) {
-      log("QSPI filesystem found\n");
-      log("QSPI flash chip JEDEC ID: %#04x\n", Device::flash.getJEDECID());
-      log("QSPI flash chip size: %lu bytes\n", Device::flash.size());
+      log("Filesystem found\n");
+      log("Flash chip JEDEC ID: %#04x\n", Device::flash.getJEDECID());
+      log("Flash chip size: %lu bytes\n", Device::flash.size());
 
       // First call begin to mount the filesystem.  Check that it returns true
       // to make sure the filesystem was mounted.
       if (!Device::file_sys.begin(&Device::flash)) {
-        log_panic("Failed to mount QSPI filesystem.\n");
+        log_panic("Failed to mount Filesystem.\n");
       }
 
-      log("QSPI filesystem mounted successfully.\n");
+      log("Filesystem mounted successfully.\n");
     }
 
     // Load the cube model from the filesystem
@@ -95,12 +102,15 @@ void spi_flash_init() {
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) {
+
+  // Pause for a serial connection
+  unsigned timeout = 0;
+  while (!Serial && timeout++ < 50) {
     delay(50);
   }
 
+  // Initialise hardware
   tft_init();
-
   spi_flash_init();
   
   log("Initialized.\n");
@@ -127,9 +137,16 @@ void setup() {
   cube.transform.position = { 0, 0, 5 };
 
   cube2.transform.position = {-2, -2, 8};
+
+  delay(500);
+  last_tick = millis();
+  log_debug_to_screen = false;
 }
 
 
+/**
+ * Manages the double buffering rendering strategy
+ */
 void render_frame() {
   memset(Device::back_buffer, 0x00, Device::screen_buffer_len * sizeof(uint16_t));
   memset(Device::depth_buffer, Device::max_depth, Device::screen_buffer_len * sizeof(float));
@@ -137,19 +154,9 @@ void render_frame() {
   render_model(Device::back_buffer, cube);
   render_model(Device::back_buffer, cube2);
 
-  if (!first_frame) { // finish up the previous frame
-    Device::tft->dmaWait();
-    Device::tft->endWrite();
-
-    _swap_ptr(Device::front_buffer, Device::back_buffer);
-  } else {
-    first_frame = false;
-  }
-
   // Blit the framebuffer to the screen
-  Device::tft->setAddrWindow(0, 0, Device::width, Device::height);
-  Device::tft->startWrite();
-  Device::tft->writePixels(Device::back_buffer, Device::width * Device::height, false);
+  Device::tft->drawRGBBitmap(0, 0, Device::back_buffer, Device::width, Device::height);
+  _swap_ptr(Device::front_buffer, Device::back_buffer);
 }
 
 
@@ -168,20 +175,9 @@ void loop() {
     cube2.transform.position.y = sin((millis() / 75)  * delta_time) * 5;
     cube2.transform.yaw += 2 * delta_time;
 
-    tick_count++;
     ticks_processed++;
-  }
-
-  // Tickrate and framerate reporting
-  if (now - last_report >= 1000) { // Every 1 second
-    // log("TPS: %lu ticks/sec\n", tick_count);
-    // log("FPS: %lu frames/sec\n", frame_count);
-    tick_count = 0;
-    frame_count = 0;
-    last_report = now;
   }
 
   /* Update back buffer, swap buffers and blit framebuffer to screen */
   render_frame();
-  ++frame_count;
 }

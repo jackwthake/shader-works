@@ -9,7 +9,7 @@
 #include "ff.h"
 #include "diskio.h"
 
-#include "files.h"
+#include "files.h" // Must run res_copy.py to generate this file
 
 Adafruit_FlashTransport_QSPI flash_transport;
 Adafruit_SPIFlash flash(&flash_transport);
