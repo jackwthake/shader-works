@@ -19,6 +19,7 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--compile", action="store_true", help="Only compile the project.")
 group.add_argument("--upload", action="store_true", help="Only upload the project (requires prior compilation).")
 group.add_argument("--all", action="store_true", help="Compile and upload the project.")
+parser.add_argument("--monitor", action="store_true", help="Open serial monitor after upload.")
 parser.add_argument("--port", type=str, help="Serial port for upload (e.g. /dev/ttyACM0)")
 args = parser.parse_args()
 
@@ -70,3 +71,9 @@ if args.upload or args.all:
         print("Upload failed.")
         sys.exit(result.returncode)
     print("Upload successful.")
+
+if args.monitor:
+    port = args.port
+    print("Opening serial monitor...")
+    monitor_cmd = ["arduino-cli", "monitor", "-p", port, "-c", "115200" if port else "auto"]
+    subprocess.run(monitor_cmd)

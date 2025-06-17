@@ -6,12 +6,15 @@
 #include <SdFat_Adafruit_Fork.h>
 #include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
+#include "ff.h"
+#include "diskio.h"
 
 #include "files.h"
 
 Adafruit_FlashTransport_QSPI flash_transport;
 Adafruit_SPIFlash flash(&flash_transport);
 FatVolume fatfs;
+
 
 /**
  * Writes a file from the files array to the onboard flash memory.
@@ -58,6 +61,42 @@ static void write_files_to_flash() {
 }
 
 
+/**
+ * Formats the onboard flash memory as a FAT12 filesystem.
+ * This function creates a new FAT12 filesystem, sets the disk label,
+ * and mounts the filesystem to apply the label.
+ */
+void format_fat12(void) {
+  uint8_t workbuf[4096];
+  FATFS _fatfs;
+
+  // Make filesystem.
+  FRESULT r = f_mkfs("", FM_FAT, 0, workbuf, sizeof(workbuf));
+  if (r != FR_OK) {
+    Serial.print(F("Error, f_mkfs failed with error code: "));
+    Serial.println(r, DEC);
+    while (1)
+      yield();
+  }
+
+  // mount to set disk label
+  r = f_mount(&_fatfs, "0:", 1);
+  if (r != FR_OK) {
+    Serial.print(F("Error, f_mount failed with error code: "));
+    Serial.println(r, DEC);
+    for (;;);
+  }
+
+  // unmount
+  f_unmount("0:");
+
+  // sync to make sure all data is written to flash
+  flash.syncBlocks();
+
+  Serial.println("FAT12 filesystem formatted successfully.");
+}
+
+
 void setup() {
   // Open serial communications and wait for port to open:
   Serial.begin(115200);
@@ -65,24 +104,90 @@ void setup() {
     delay(10); // wait for serial port to connect. Needed for native USB port only
   }
 
-  Serial.println("Initializing Filesystem for onboard flash...");
+  Serial.println("Initializing onboard flash...");
 
   // Init internal flash
   flash.begin();
 
-  // Open file system on the flash
-  if (!fatfs.begin(&flash)) {
-    Serial.println("Error: filesystem does not exist.");
-    //TODO: format the flash instead of halting the program
-    for(;;);
-  }
+  Serial.println("Reformatting flash as FAT12...");
+  format_fat12();
 
   Serial.println("Initialization done.");
 
+  if (!fatfs.begin(&flash)) {
+    Serial.println("Failed to mount FAT12 filesystem.");
+    for (;;);
+  }
+
   // File system setup, write files to flash
   write_files_to_flash();
+
+  File cube = fatfs.open("cube.obj", O_RDONLY);
+  Serial.println(cube.readString());
 }
 
 void loop() {
 
 }
+
+//--------------------------------------------------------------------+
+// fatfs diskio
+//--------------------------------------------------------------------+
+extern "C" {
+
+DSTATUS disk_status(BYTE pdrv) {
+  (void)pdrv;
+  return 0;
+}
+
+DSTATUS disk_initialize(BYTE pdrv) {
+  (void)pdrv;
+  return 0;
+}
+
+DRESULT disk_read(BYTE pdrv,  /* Physical drive nmuber to identify the drive */
+                  BYTE *buff, /* Data buffer to store read data */
+                  DWORD sector, /* Start sector in LBA */
+                  UINT count    /* Number of sectors to read */
+) {
+  (void)pdrv;
+  return flash.readBlocks(sector, buff, count) ? RES_OK : RES_ERROR;
+}
+
+DRESULT disk_write(BYTE pdrv, /* Physical drive nmuber to identify the drive */
+                   const BYTE *buff, /* Data to be written */
+                   DWORD sector,     /* Start sector in LBA */
+                   UINT count        /* Number of sectors to write */
+) {
+  (void)pdrv;
+  return flash.writeBlocks(sector, buff, count) ? RES_OK : RES_ERROR;
+}
+
+DRESULT disk_ioctl(BYTE pdrv, /* Physical drive nmuber (0..) */
+                   BYTE cmd,  /* Control code */
+                   void *buff /* Buffer to send/receive control data */
+) {
+  (void)pdrv;
+
+  switch (cmd) {
+  case CTRL_SYNC:
+    flash.syncBlocks();
+    return RES_OK;
+
+  case GET_SECTOR_COUNT:
+    *((DWORD *)buff) = flash.size() / 512;
+    return RES_OK;
+
+  case GET_SECTOR_SIZE:
+    *((WORD *)buff) = 512;
+    return RES_OK;
+
+  case GET_BLOCK_SIZE:
+    *((DWORD *)buff) = 8; // erase block size in units of sector size
+    return RES_OK;
+
+  default:
+    return RES_PARERR;
+  }
+}
+} // extern "C"
