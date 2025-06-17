@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include <SPI.h>
+#include <SdFat_Adafruit_Fork.h>
 #include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
 
@@ -10,18 +11,15 @@
 
 Adafruit_FlashTransport_QSPI flash_transport;
 Adafruit_SPIFlash flash(&flash_transport);
-FatFileSystem file_sys = FatFileSystem();
-
 FatVolume fatfs;
-File32 myFile;
 
-char *cwd_path = new char[64]{
-    '/', '\0' // Initialize with root directory
-};
-
-
+/**
+ * Writes a file from the files array to the onboard flash memory.
+ * @param idx The index of the file to write in the files array.
+ * @return true if the file was written successfully, false otherwise.
+ */
 static bool write_file_to_flash(unsigned idx) {
-  if (idx < 0 || idx >= num_files) {
+  if (idx >= num_files) {
     Serial.println("Invalid file index.");
     return false;
   }
@@ -33,41 +31,18 @@ static bool write_file_to_flash(unsigned idx) {
   }
 
   Serial.printf("Writing to file %s...  [", files[idx].name);
-  file.printf("%s", files[idx].data);
+  file.write(files[idx].data, files[idx].size);
   file.close();
-  Serial.println("done.]\n");
-  Serial.flush();
+  Serial.println(" OK ]\n");
+  
+  return true;
 }
 
 
-static bool check_file(unsigned long idx) {
-  if (idx < 0 || idx >= num_files) {
-    Serial.println("Invalid file index.");
-    return false;
-  }
-
-  File32 file = fatfs.open(files[idx].name, O_RDONLY);
-  if (!file) {
-    Serial.printf("Error opening file %s for reading.\n", files[idx].name);
-    return false;
-  }
-
-  Serial.printf("Checking file %s... [ ", files[idx].name);
-  String content = file.readString();
-  file.close();
-
-  if (strcmp(content.c_str(), files[idx].data) == 0) {
-    Serial.println(" OK ]");
-    return true;
-  } else {
-    Serial.println(" FAILED ]");
-    return false;
-  }
-
-  Serial.flush();
-}
-
-
+/**
+ * Writes all files defined in the files array to the onboard flash memory.
+ * This function iterates through each file and calls write_file_to_flash for each one.
+ */
 static void write_files_to_flash() {
   Serial.println("Writing files to flash...");
 
@@ -83,50 +58,29 @@ static void write_files_to_flash() {
 }
 
 
-static void check_files() {
-  Serial.println("Checking files...");
-
-  for (unsigned i = 0; i < num_files; i++) {
-    if (!check_file(i)) {
-      Serial.printf("File %s check failed.\n", files[i].name);
-      return;
-    }
-
-    Serial.printf("File %s check passed.\n", files[i].name);
-  }
-
-  Serial.println("All files checked successfully.");
-  return;
-}
-
-
 void setup() {
   // Open serial communications and wait for port to open:
   Serial.begin(115200);
   while (!Serial) {
-    delay(
-        10); // wait for serial port to connect. Needed for native USB port only
+    delay(10); // wait for serial port to connect. Needed for native USB port only
   }
 
-  Serial.println("Initializing Filesystem on external flash...");
+  Serial.println("Initializing Filesystem for onboard flash...");
 
-  // Init external flash
+  // Init internal flash
   flash.begin();
 
   // Open file system on the flash
   if (!fatfs.begin(&flash)) {
-    Serial.println("Error: filesystem is not existed. Please try SdFat_format "
-                   "example to make one.");
-    while (1) {
-      yield();
-      delay(1);
-    }
+    Serial.println("Error: filesystem does not exist.");
+    //TODO: format the flash instead of halting the program
+    for(;;);
   }
 
-  Serial.println("initialization done.");
+  Serial.println("Initialization done.");
 
+  // File system setup, write files to flash
   write_files_to_flash();
-  check_files();
 }
 
 void loop() {
