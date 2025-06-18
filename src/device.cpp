@@ -2,6 +2,19 @@
 
 #include "util/helpers.h"
 
+
+/**
+ * Maps a value from the range [-512, 512] to [-1, 1].
+ */
+static float map_joystick_range(int16_t value) {
+    // Clamp value to [-512, 512] just in case
+    if (value < -512) value = -512;
+    if (value > 512) value = 512;
+    return static_cast<float>(value) / 512.0f;
+}
+
+
+
 namespace Device {
 
 /**
@@ -20,7 +33,6 @@ FatVolume file_sys = FatFileSystem();
 unsigned long now = 0, last_tick = 0;
 float delta_time = 0;
 bool log_debug_to_screen = true;
-
 
 
 /**
@@ -79,6 +91,54 @@ void spi_flash_init() {
 
       log("Filesystem mounted successfully.\n");
     }
+}
+
+
+/**
+ *  Input Code
+ */
+
+/**
+ * Generic function that reads a joystick
+ * @param pin The Analog pin to read
+ * @param samples The number of samples to average
+ * @returns a mapped vakue from -1 to 1
+*/
+static float read_joystick(pins pin, uint8_t samples) {
+  float reading = 0;
+
+  for (int i = 0; i < samples; i++) {
+    reading += analogRead(pin);
+  }
+  
+  reading /= samples;
+  reading -= 512; // adjust range from 0->1024 to -512 to 511;
+
+  float mapped = map_joystick_range(reading);
+  if (mapped > JOYSTICK_THRESH || mapped < -JOYSTICK_THRESH)
+    return mapped;
+  
+  return 0.0;
+}
+
+
+/**
+ * Reads the X axis of the joystick, averages over the given number of samples.
+ * @param sampling Number of samples to average (default: 3)
+ * @return Averaged X axis value, centered to range [-512, 511]
+*/
+float read_joystick_x(uint8_t sampling) {
+  return read_joystick(JOYSTICK_PIN_X, sampling);
+}
+
+
+/**
+ * Reads the Y axis of the joystick, averages over the given number of samples.
+ * @param sampling Number of samples to average (default: 3)
+ * @return Averaged Y axis value, centered to range [-512, 511]
+*/
+float read_joystick_y(uint8_t sampling) {
+  return read_joystick(JOYSTICK_PIN_Y, sampling);
 }
 
 } // namespace Device

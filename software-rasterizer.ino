@@ -87,8 +87,10 @@ void loop() {
     delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
     last_tick += tick_interval;
 
-    cube.transform.yaw += 1.f * delta_time; // Rotate cube
-    cube.transform.pitch += 1.5f * delta_time; // Rotate cube
+    cube.transform.position.x += (read_joystick_x() * 5) * delta_time;
+    cube.transform.position.y += (read_joystick_y() * 5) * delta_time;
+    // cube.transform.yaw += 1.f * delta_time; // Rotate cube
+    // cube.transform.pitch += 1.5f * delta_time; // Rotate cube
 
     cube2.transform.position.y = sin((millis() / 75)  * delta_time) * 5;
     cube2.transform.yaw += 2 * delta_time;

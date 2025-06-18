@@ -1,5 +1,9 @@
 #pragma once
 
+#include <stdint.h>
+
+#include <Arduino.h>
+
 #define USE_SPI_DMA
 #include <SPI.h>
 #include <Adafruit_GFX.h>    // Not used, but required for ST7735
@@ -8,11 +12,13 @@
 #include <SdFat_Adafruit_Fork.h>
 #include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
+// Encapsulate necessary program globals
 namespace Device  {
   constexpr int width = 160, height = 128;
   constexpr int screen_buffer_len = width * height;
   constexpr float max_depth = 100.0f; // Maximum depth value for the depth buffer
   constexpr unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
+  constexpr float JOYSTICK_THRESH = 0.1;
   
   extern Adafruit_ST7735 *tft;
 
@@ -29,14 +35,31 @@ namespace Device  {
   extern float delta_time;
   extern bool log_debug_to_screen;
 
-
   extern void tft_init();
   extern void spi_flash_init();
 
+  extern float read_joystick_x(uint8_t sampling=3);
+  extern float read_joystick_y(uint8_t sampling=3);
+  
   enum pins {
-    TFT_CS = 44,            // Chip select for the TFT display
-    TFT_DC = 45,            // Data/Command select for the TFT display
-    TFT_RST = 46,           // Reset pin for the TFT display
-    TFT_BACKLIGHT = 47      // Backlight control pin for the TFT display
+    TFT_CS = 44,                // Chip select for the TFT display
+    TFT_DC = 45,                // Data/Command select for the TFT display
+    TFT_RST = 46,               // Reset pin for the TFT display
+    TFT_BACKLIGHT = 47,         // Backlight control pin for the TFT display
+
+    JOYSTICK_PIN_X = A11,       // X Potentiometer from joystick
+    JOYSTICK_PIN_Y = A10,       // y Potentiometer from joystick
+
+    BUTTON_PIN_CLOCK = 48,      // Used to pull data for A, B, SELECT, START
+    BUTTON_PIN_DATA = 49,
+    BUTTON_PIN_LATCH = 50,
+
+    BUTTON_MASK_A = 0x01,       // Button masks to decode input
+    BUTTON_MASK_B = 0x02,
+    BUTTON_MASK_SELECT = 0x04,
+    BUTTON_MASK_START = 0x08,
+
+    RUMBLE_PIN = A0,            // Runble Motor pin
+    BATT_SENSOR = A6            // Battery Level Sensor
   };
 };
