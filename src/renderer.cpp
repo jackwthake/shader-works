@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "const.h"
+#include "device.h"
 #include "util/helpers.h"
 #include "util/maths.h"
 

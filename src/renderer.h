@@ -5,13 +5,7 @@
 #include <stdint.h>
 
 #include "util/maths.h"
-
-struct Model {
-  std::vector<float3> vertices; // List of vertices
-  std::vector<float3> cols; // List of vertex colors
-
-  Transform transform;
-};
+#include "util/model.h"
 
 void render_model(uint16_t * &buff, Model &model);
 

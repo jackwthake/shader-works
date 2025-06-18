@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef CONST_H
-#define CONST_H
-
 #define USE_SPI_DMA
 #include <SPI.h>
 #include <Adafruit_GFX.h>    // Not used, but required for ST7735
@@ -27,6 +24,15 @@ namespace Device  {
   extern uint16_t *back_buffer;
   extern float *depth_buffer;
 
+  // Game Variables
+  extern unsigned long now, last_tick;
+  extern float delta_time;
+  extern bool log_debug_to_screen;
+
+
+  extern void tft_init();
+  extern void spi_flash_init();
+
   enum pins {
     TFT_CS = 44,            // Chip select for the TFT display
     TFT_DC = 45,            // Data/Command select for the TFT display
@@ -34,6 +40,3 @@ namespace Device  {
     TFT_BACKLIGHT = 47      // Backlight control pin for the TFT display
   };
 };
-
-
-#endif // CONST_H
