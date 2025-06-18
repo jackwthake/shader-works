@@ -152,6 +152,14 @@ float read_joystick_y(uint8_t sampling) {
 }
 
 
+/**
+ * Reads the state of the buttons connected to the device.
+ * Utilizes shift register to read multiple button states sequentially.
+ * Maps the button states to predefined button masks.
+ * 
+ * @return A 32-bit integer representing the state of the buttons, 
+ *         where each bit corresponds to a specific button mask.
+ */
 uint32_t read_buttons() {
   uint32_t buttons = 0;
 

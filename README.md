@@ -10,7 +10,7 @@ This project is a software 3D rasterizer for the Adafruit PyGamer M4, written in
 
 ## Hardware Specs
 - **Board:** Adafruit PyGamer M4
-  - **CPU** SAMD51J19 at 120MHZ
+  - **CPU** SAMD51J19 at Running at 200MHZ (120MHZ Stock)
     - 192kb RAM
     - 512kb Onboard QSPI flash
   - **Display:** ST7735 (160x128)

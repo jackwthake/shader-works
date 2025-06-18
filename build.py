@@ -29,6 +29,10 @@ compile_cmd = [
     "-v",
     "--fqbn", FQBN,
     "--output-dir", BIN_DIR,
+    "--board-options", "speed=200",        # Overclock this sucker to 200mhz
+    "--board-options", "opt=dragons",      # As fast a binary as possible
+    "--board-options", "maxqspi=fcpu",     # Speed up QSPI Flash to match CPU
+    "--board-options", "usbstack=arduino", # Use stock arduino usb stack
     PROJECT_DIR
 ]
 

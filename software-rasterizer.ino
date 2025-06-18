@@ -62,6 +62,7 @@ void setup() {
 void render_frame() {
   using namespace Device;
 
+  _swap_ptr(front_buffer, back_buffer);
   memset(back_buffer, 0x00, screen_buffer_len * sizeof(uint16_t));
   memset(depth_buffer, max_depth, screen_buffer_len * sizeof(float));
 
@@ -70,7 +71,6 @@ void render_frame() {
 
   // Blit the framebuffer to the screen
   tft->drawRGBBitmap(0, 0, back_buffer, width, height);
-  _swap_ptr(front_buffer, back_buffer);
 }
 
 
