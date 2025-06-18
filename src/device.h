@@ -35,13 +35,15 @@ namespace Device  {
   extern float delta_time;
   extern bool log_debug_to_screen;
 
+  extern void pin_init();
   extern void tft_init();
   extern void spi_flash_init();
 
   extern float read_joystick_x(uint8_t sampling=3);
   extern float read_joystick_y(uint8_t sampling=3);
+  extern uint32_t read_buttons();
   
-  enum pins {
+  enum pins : uint32_t {
     TFT_CS = 44,                // Chip select for the TFT display
     TFT_DC = 45,                // Data/Command select for the TFT display
     TFT_RST = 46,               // Reset pin for the TFT display
@@ -58,6 +60,11 @@ namespace Device  {
     BUTTON_MASK_B = 0x02,
     BUTTON_MASK_SELECT = 0x04,
     BUTTON_MASK_START = 0x08,
+
+    BUTTON_SHIFT_B = 0x80,      // Used internally to decode button data
+    BUTTON_SHIFT_A = 0x40,
+    BUTTON_SHIFT_START = 0x20,
+    BUTTON_SHIFT_SELECT = 0x10,
 
     RUMBLE_PIN = A0,            // Runble Motor pin
     BATT_SENSOR = A6            // Battery Level Sensor

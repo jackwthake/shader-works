@@ -35,6 +35,16 @@ float delta_time = 0;
 bool log_debug_to_screen = true;
 
 
+void pin_init() {
+  pinMode(BUTTON_PIN_CLOCK, OUTPUT);
+  digitalWrite(BUTTON_PIN_CLOCK, HIGH);
+  
+  pinMode(BUTTON_PIN_LATCH, OUTPUT);
+  digitalWrite(BUTTON_PIN_LATCH, HIGH);
+
+  pinMode(BUTTON_PIN_DATA, INPUT);
+}
+
 /**
  * Initialize the TFT display
  * Sets up the backlight, initializes the display, and sets the rotation.
@@ -139,6 +149,37 @@ float read_joystick_x(uint8_t sampling) {
 */
 float read_joystick_y(uint8_t sampling) {
   return read_joystick(JOYSTICK_PIN_Y, sampling);
+}
+
+
+uint32_t read_buttons() {
+  uint32_t buttons = 0;
+
+  uint8_t shift_buttons = 0;
+  digitalWrite(BUTTON_PIN_LATCH, LOW);
+  delayMicroseconds(1);
+  digitalWrite(BUTTON_PIN_LATCH, HIGH);
+  delayMicroseconds(1);
+
+  for (int i = 0; i < 8; i++) {
+    shift_buttons <<= 1;
+    shift_buttons |= digitalRead(BUTTON_PIN_DATA);
+    digitalWrite(BUTTON_PIN_CLOCK, HIGH);
+    delayMicroseconds(1);
+    digitalWrite(BUTTON_PIN_CLOCK, LOW);
+    delayMicroseconds(1);
+  }
+
+  if (shift_buttons & BUTTON_SHIFT_B)
+    buttons |= BUTTON_MASK_B;
+  if (shift_buttons & BUTTON_SHIFT_A)
+    buttons |= BUTTON_MASK_A;
+  if (shift_buttons & BUTTON_SHIFT_SELECT)
+    buttons |= BUTTON_MASK_SELECT;
+  if (shift_buttons & BUTTON_SHIFT_START)
+    buttons |= BUTTON_MASK_START;
+
+  return buttons;
 }
 
 } // namespace Device

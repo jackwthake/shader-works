@@ -18,6 +18,7 @@ void setup() {
   Serial.begin(115200);
 
   // Initialise hardware
+  Device::pin_init();
   Device::tft_init();
   Device::spi_flash_init();
   
@@ -46,10 +47,7 @@ void setup() {
       random_color(), random_color(), random_color(), random_color()
   };
 
-  cube.transform.yaw = 1.5f;
-  cube.transform.pitch = 3.f;
   cube.transform.position = { 0, 0, 5 };
-
   cube2.transform.position = {-2, -2, 8};
 
   delay(500);
@@ -89,11 +87,21 @@ void loop() {
 
     cube.transform.position.x += (read_joystick_x() * 5) * delta_time;
     cube.transform.position.y += (read_joystick_y() * 5) * delta_time;
-    // cube.transform.yaw += 1.f * delta_time; // Rotate cube
-    // cube.transform.pitch += 1.5f * delta_time; // Rotate cube
-
+  
     cube2.transform.position.y = sin((millis() / 75)  * delta_time) * 5;
     cube2.transform.yaw += 2 * delta_time;
+
+    /** Button Test */
+    uint32_t buttons = read_buttons();
+    if (buttons & BUTTON_MASK_A) {
+      log("A Pressed\n");
+    } else if (buttons & BUTTON_MASK_B) {
+      log("B Pressed\n");
+    } else if (buttons & BUTTON_MASK_START) {
+      log("Start Pressed\n");
+    } if (buttons & BUTTON_MASK_SELECT) {
+      log("Select Pressed\n");
+    }
 
     ticks_processed++;
   }
