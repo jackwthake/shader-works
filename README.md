@@ -8,9 +8,12 @@ This project is a software 3D rasterizer for the Adafruit PyGamer M4, written in
 - QSPI flash filesystem support
 - Serial debug console
 
-## Hardware Requirements
+## Hardware Specs
 - **Board:** Adafruit PyGamer M4
-- **Display:** ST7735 (160x128)
+  - **CPU** SAMD51J19 at 120MHZ
+    - 192kb RAM
+    - 512kb Onboard QSPI flash
+  - **Display:** ST7735 (160x128)
 
 ## Setup Instructions
 
