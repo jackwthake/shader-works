@@ -26,7 +26,7 @@ void setup() {
   // Initialise hardware
   Device::pin_init();
   Device::tft_init();
-  Device::Resource_manager *res_manager = new Device::Resource_manager();
+  res_manager = new Device::Resource_manager();
   
   log("Initialized.\n");
 

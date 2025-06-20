@@ -67,6 +67,21 @@ Resource_manager::Resource_manager() {
 }
 
 
+/**
+ * Destructor for Resource Manager, in theory this will never be called
+ */
+Resource_manager::~Resource_manager() {
+  if (resources) {
+    for (int i = 0; i < MAX_RESOURCES; ++i) {
+      if (resources[i])
+        delete resources[i];
+    }
+
+    delete []resources;
+  }
+}
+
+
 
 /**
  * Load a resource into memory

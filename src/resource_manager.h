@@ -21,7 +21,7 @@ struct Resource {
 class Resource_manager {
   public:
     Resource_manager(void);
-    ~Resource_manager() = default;
+    ~Resource_manager();
 
     int load_resource(const char *);
     Resource *get_resource(int id);
