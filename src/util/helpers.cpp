@@ -49,6 +49,7 @@ void log(const char *format, ...) {
     if (Device::log_debug_to_screen)
         Device::tft->printf(format, args);
     va_end(args);
+    Serial.flush();
 }
 
 

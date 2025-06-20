@@ -1,16 +1,11 @@
 #pragma once
 
+#include <Arduino.h>
 #include <stdint.h>
 
-#include <Arduino.h>
-
 #define USE_SPI_DMA
-#include <SPI.h>
-#include <Adafruit_GFX.h>    // Not used, but required for ST7735
+#include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-
-#include <SdFat_Adafruit_Fork.h>
-#include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
 // Encapsulate necessary program globals
 namespace Device  {
@@ -22,9 +17,8 @@ namespace Device  {
   
   extern Adafruit_ST7735 *tft;
 
-  extern Adafruit_FlashTransport_QSPI flash_transport;
-  extern Adafruit_SPIFlash flash;
-  extern FatVolume file_sys;
+  struct Resource;
+  class Resource_manager;
 
   extern uint16_t *front_buffer;
   extern uint16_t *back_buffer;

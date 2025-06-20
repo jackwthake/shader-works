@@ -5,6 +5,9 @@
 #include "src/renderer.h"
 #include "src/util/model.h"
 
+#include "src/resource_manager.h"
+
+Device::Resource_manager *res_manager = NULL;
 
 /**
  * Global vars for test model
@@ -16,20 +19,25 @@ Model cube, cube2;
 
 void setup() {
   Serial.begin(115200);
+  while(!Serial) {
+    // Wait for serial to be ready
+  }
 
   // Initialise hardware
   Device::pin_init();
   Device::tft_init();
-  Device::spi_flash_init();
+  Device::Resource_manager *res_manager = new Device::Resource_manager();
   
   log("Initialized.\n");
 
-  // Load the cube model from the filesystem
-  log("Loading cube model from filesystem...\n");
-  File32 f = Device::file_sys.open("cube.obj", O_RDONLY);
-  cube_obj = f.readString().c_str();
-  cube_vertices = read_obj(cube_obj);
+  // load cube model
+  int idx = res_manager->load_resource("cube.obj");
+  Device::Resource *res = res_manager->get_resource(idx);
+  if (!res) {
+    log_panic("Failed to load cube.obj");
+  }
 
+  cube_vertices = read_obj(std::string(res->data));
 
   // Initialize the cube model
   cube.vertices = cube_vertices;
