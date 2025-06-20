@@ -12,11 +12,11 @@ Resource::Resource() : id(-1), size(0), data(nullptr) {}
 Resource::Resource(int id, File32 &f) : id(id) {
   // get filesize
   f.seekEnd();
-  size = f.curPosition();
+  size = f.curPosition() + 1;
   f.rewind();
 
   // allocate buffer
-  data = new char[size + 1];
+  data = new char[size];
 
   // read file into memory, stop when an EOF character is encountered
   int16_t c, idx = 0;
@@ -24,6 +24,8 @@ Resource::Resource(int id, File32 &f) : id(id) {
     uint8_t byte = static_cast<uint8_t>(c & 0xFF);
     data[idx++] = byte;
   }
+
+  data[size - 1] = '\0'; // ensure data is null terminated
 }
 
 /**

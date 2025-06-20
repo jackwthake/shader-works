@@ -37,6 +37,9 @@ void setup() {
     log_panic("Failed to load cube.obj");
   }
 
+  auto test = res_manager->get_resource(res_manager->load_resource("test.txt"));
+  Serial.println(test->data);
+
   cube_vertices = read_obj(std::string(res->data));
 
   // Initialize the cube model
