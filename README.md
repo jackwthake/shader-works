@@ -47,10 +47,9 @@ arduino-cli core install adafruit:samd
 
 Install all required libraries (as specified in platformio.ini):
 ```sh
-arduino-cli lib install "Adafruit ST7735 and ST7789 Library@^1.5.5"
-arduino-cli lib install "Adafruit GFX Library@^1.12.1"
-arduino-cli lib install "Adafruit EPD@^4.5.6"
-arduino-cli lib install "Adafruit SPIFlash@^5.1.1"
+arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
+arduino-cli lib install "Adafruit GFX Library"
+arduino-cli lib install "Adafruit SPIFlash"
 ```
 
 ## Building and Uploading
