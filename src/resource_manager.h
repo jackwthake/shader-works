@@ -40,11 +40,13 @@ class Data_Resource : public Resource {
 
 
 class Bitmap_Resource : public Resource {
+  void read_bitmap_data();
+
   public:
     Bitmap_Resource();
     Bitmap_Resource(unsigned id, struct File32 &f);
     Bitmap_Resource(const Bitmap_Resource& other); // Copy constructor
 
-    const unsigned width, height;
-    const uint16_t *pixels;
+    unsigned width, height;
+    uint16_t *pixels;
 };

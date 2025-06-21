@@ -9,8 +9,13 @@ import os
 
 RES_DIR = os.path.abspath("../res");
 OUTFILE_DIR = os.path.abspath("./files.h")
-NUM_FILES = sum([len(files) for _, _, files in os.walk(RES_DIR)])
 EXCLUDE_EXT = [".pyxel"]
+NUM_FILES = sum(
+  1
+  for root, _, files in os.walk(RES_DIR)
+  for file in files
+  if not any(file.endswith(ext) for ext in EXCLUDE_EXT)
+)
 
 # Add newlines at the end of each line in the file content
 # This is necessary for the C code to properly interpret the file content

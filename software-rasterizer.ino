@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#include <Adafruit_SPIFlash.h>
+#include <SdFat_Adafruit_Fork.h>
+
 #include "src/device.h"
 #include "src/util/helpers.h"
 #include "src/util/model.h"
@@ -39,16 +42,31 @@ void setup() {
     log("Filesystem mounted successfully.\n");
   }
 
-  File32 f = file_sys.open("cube.obj", O_READ);
+  // File32 f = file_sys.open("cube.obj", O_READ);
+  // if (!f.available()) {
+  //   Serial.println("Failed to open cube.OBJ");
+  //   while(1){}
+  // }
+
+  // Data_Resource cube_obj(0, f);
+  // size_t sz;
+  // const char *text = cube_obj.get_text(sz);
+  // Serial.printf("Buffer size: %u, textlen: %u\n", sz, strlen(text));
+  // f.close();
+
+  // Serial.println(text);
+
+  File32 f = file_sys.open("atlas.bmp", O_READ);
   if (!f.available()) {
     Serial.println("Failed to open cube.OBJ");
     while(1){}
   }
 
-  Data_Resource cube_obj(0, f);
-  size_t sz;
-  Serial.printf("Buffer size: %u, textlen: %u\n", sz, strlen(cube_obj.get_text(sz)));
-  Serial.println(cube_obj.get_text(sz));
+  Serial.println("atlas.bmp opened");
+  Bitmap_Resource atlas(1, f);
+  Serial.println("atlas initialized");
+  Device::tft->drawRGBBitmap(0, 0, atlas.pixels, atlas.width, atlas.height);
+  Serial.println("draw call finished");
 
   Serial.println("Finished resource test");
   Serial.flush();
