@@ -21,6 +21,8 @@ group.add_argument("--upload", action="store_true", help="Only upload the projec
 group.add_argument("--all", action="store_true", help="Compile and upload the project.")
 parser.add_argument("--monitor", action="store_true", help="Open serial monitor after upload.")
 parser.add_argument("--port", type=str, help="Serial port for upload (e.g. /dev/ttyACM0)")
+parser.add_argument("--clean", action="store_true", help="Compile from scratch, dont use cached libraries")
+
 args = parser.parse_args()
 
 # Compile command
@@ -29,12 +31,18 @@ compile_cmd = [
     "-v",
     "--fqbn", FQBN,
     "--output-dir", BIN_DIR,
+    "--additional-urls", "https://adafruit.github.io/arduino-board-index/package_adafruit_index.json",
     "--board-options", "speed=200",        # Overclock this sucker to 200mhz
     "--board-options", "opt=dragons",      # As fast a binary as possible
     "--board-options", "maxqspi=fcpu",     # Speed up QSPI Flash to match CPU
     "--board-options", "usbstack=arduino", # Use stock arduino usb stack
-    PROJECT_DIR
 ]
+
+if args.clean:
+    compile_cmd.extend(["--clean"])
+
+compile_cmd.append(PROJECT_DIR) # Add project directory at the end
+
 
 # Find .bin file after compile
 def find_bin_file():
@@ -58,7 +66,6 @@ def upload_cmd(port=None):
     ]
     return cmd
 
-# Actions
 if args.compile or args.all:
     print("Compiling...")
     result = subprocess.run(compile_cmd)
