@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include <Adafruit_SPIFlash.h>
+#include "util/model.h"
 
 typedef int resource_id_t;
 constexpr resource_id_t INVALID_RESOURCE = -1;
@@ -31,7 +32,8 @@ public:
 
   resource_id_t load_resource(const char *path);
   const Resource_entry_t *get_resource(resource_id_t id);
-
+  
+  Model *read_obj_resource(resource_id_t id);
 private:
 
   bool load_text(File32 &f);

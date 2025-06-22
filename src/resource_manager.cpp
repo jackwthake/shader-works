@@ -6,6 +6,11 @@
 
 #include "util/helpers.h"
 
+#include <vector>
+#include <string>
+#include <sstream>
+#include <iostream>
+
 
 #pragma pack(push, 1) // ensure proper alignment of bitmap struct in memory
 // BMP file header structures
@@ -39,6 +44,54 @@ struct bitmap_file_header_t {
                             // displaying the bitmap. 0 if all colors are important.
 };
 #pragma pack(pop)
+
+using std::vector;
+
+/**
+ * Decodes vertex data from OBJ file content provided as a character array.
+ * @param obj_file_content A pointer to the character array containing the OBJ file content.
+ * @returns A std::vector<float3> containing all vertices found in the OBJ file.
+ */
+static vector<float3> decodeObjVertices(const char* content) {
+  using std::istringstream;
+  using std::string;
+
+  vector<float3> vertices, out_vertices;
+  istringstream stream(content);
+  string line;
+  
+  while (getline(stream, line)) {
+    if (line.empty()) continue;
+
+    // get first char of each line
+    // useful for telling us which type of data we are reading
+    istringstream iss(line);
+    string prefix;
+    iss >> prefix;
+
+    if (prefix == "v") { // vertices
+      float x, y, z;
+      if (iss >> x >> y >> z) {
+        vertices.emplace_back(x, y, z);
+      }
+    } else if (prefix == "f") { // faces
+      int count = 0;
+      string vert;
+
+      // OBJ indices are 1-based
+      while (iss >> vert && count < 4) {
+        size_t slash = vert.find('/');
+        int v_idx = stoi(slash == string::npos ? vert : vert.substr(0, slash));
+
+        if (v_idx < 0) v_idx = vertices.size() + v_idx + 1;
+        out_vertices.push_back(vertices[v_idx - 1]);
+        count++;
+      }
+    }
+  }
+  
+  return out_vertices;
+}
 
 
 /**
@@ -136,6 +189,35 @@ const Resource_entry_t *Resource_manager::get_resource(resource_id_t id) {
   Serial.printf("Resource Index out of bounds! id: %d\n", id);
   return nullptr;
 }
+
+
+Model *Resource_manager::read_obj_resource(resource_id_t id) {
+  if (id >= 0 && id < MAX_RESOURCES) {
+    Resource_entry_t res = this->resources[id];
+
+    if (res.type == DATA_FIlE) {
+      if (res.length > 0) {
+        Model *model = new Model();
+        if (!model) {
+          Serial.printf("Failed to allocate model object for resource at id: %d\n", id);
+        }
+
+        model->vertices = decodeObjVertices(reinterpret_cast<const char *>(res.data));
+        return model;
+      }
+
+      Serial.printf("Resource at %d has size %u\n", id, this->resources[id].length);
+    }
+
+    Serial.printf("Resource at %d is not a DATA_FILE\n", id);
+  } else {
+    Serial.printf("id: %d out of bounds.\n", id);
+  }
+
+
+  return nullptr;
+}
+
 
 
 /**
