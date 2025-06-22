@@ -1,69 +1,72 @@
 #include <Arduino.h>
 
+#include <cstring>
+
 #include "src/device.h"
-#include "src/util/helpers.h"
-#include "src/renderer.h"
-#include "src/util/model.h"
-
 #include "src/resource_manager.h"
+#include "src/renderer.h"
 
-Device::Resource_manager *res_manager = NULL;
+#include "src/util/helpers.h"
 
-/**
- * Global vars for test model
- */
-std::string cube_obj;
-std::vector<float3> cube_vertices;
-Model cube, cube2;
+#define BAUD_RATE 115200
+
+resource_id_t cube_id;
+Model *cube;
 
 
-void setup() {
-  Serial.begin(115200);
-  while(!Serial) {
-    // Wait for serial to be ready
-  }
+static void wait_for_serial() {
+  Serial.begin(BAUD_RATE);
+  while(!Serial) { delay(75); }
+}
+
+
+static void init_device_namespace() {
+  using namespace Device;
 
   // Initialise hardware
-  Device::pin_init();
-  Device::tft_init();
-  res_manager = new Device::Resource_manager();
-  
-  log("Initialized.\n");
+  pin_init();
+  tft_init();
+  manager.init_QSPI_flash();
+}
 
-  // load cube model
-  int idx = res_manager->load_resource("cube.obj");
-  Device::Resource *res = res_manager->get_resource(idx);
-  if (!res) {
+
+#ifdef RUN_BOARD_TESTS
+#include "src/test/test.h"
+
+void setup() {
+  wait_for_serial();
+  init_device_namespace();
+
+  Serial.println("Running in unit test mode.\n\n");
+  run_tests();
+
+  while (1) { delay(50); }
+}
+
+void loop() {}
+#else // else if !RUN_BOARD_TESTS
+
+void setup() {
+  using Device::manager;
+
+  wait_for_serial();
+  init_device_namespace();
+
+  cube_id = manager.load_resource("cube.obj");
+  if (cube_id == -1)
     log_panic("Failed to load cube.obj");
-  }
-
-  auto test = res_manager->get_resource(res_manager->load_resource("test.txt"));
-  Serial.println(test->data);
-
-  cube_vertices = read_obj(std::string(res->data));
-
-  // Initialize the cube model
-  cube.vertices = cube_vertices;
-  cube2.vertices = cube_vertices;
-
-  cube.cols = {
-      random_color(), random_color(), random_color(), random_color(),
-      random_color(), random_color(), random_color(), random_color(),
-      random_color(), random_color(), random_color(), random_color()
+  
+  cube = manager.read_obj_resource(cube_id);
+  if (!cube)
+    log_panic("Failed to init cube model");
+  
+  cube->cols = {
+    random_color(), random_color(), random_color(), random_color(),
+    random_color(), random_color(), random_color(), random_color(),
+    random_color(), random_color(), random_color(), random_color()
   };
 
-  cube2.cols = {
-      random_color(), random_color(), random_color(), random_color(),
-      random_color(), random_color(), random_color(), random_color(),
-      random_color(), random_color(), random_color(), random_color()
-  };
-
-  cube.transform.position = { 0, 0, 5 };
-  cube2.transform.position = {-2, -2, 8};
-
-  delay(500);
-  Device::last_tick = millis();
-  Device::log_debug_to_screen = false;
+  cube->transform.position = { 0, 0, 5 };
 }
 
 
@@ -77,8 +80,7 @@ void render_frame() {
   memset(back_buffer, 0x00, screen_buffer_len * sizeof(uint16_t));
   memset(depth_buffer, max_depth, screen_buffer_len * sizeof(float));
 
-  render_model(back_buffer, cube);
-  render_model(back_buffer, cube2);
+  render_model(back_buffer, *cube);
 
   // Blit the framebuffer to the screen
   tft->drawRGBBitmap(0, 0, back_buffer, width, height);
@@ -96,21 +98,22 @@ void loop() {
     delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
     last_tick += tick_interval;
 
-    cube.transform.position.x += (read_joystick_x() * 5) * delta_time;
-    cube.transform.position.y += (read_joystick_y() * 5) * delta_time;
-  
-    cube2.transform.position.y = sin((millis() / 75)  * delta_time) * 5;
-    cube2.transform.yaw += 2 * delta_time;
+    cube->transform.position.x += (read_joystick_x() * 5) * delta_time;
+    cube->transform.position.y += (read_joystick_y() * 5) * delta_time;
 
     /** Button Test */
     uint32_t buttons = read_buttons();
     if (buttons & BUTTON_MASK_A) {
+      cube->transform.yaw += 5 * delta_time;
       log("A Pressed\n");
     } else if (buttons & BUTTON_MASK_B) {
+      cube->transform.yaw -= 5 * delta_time;
       log("B Pressed\n");
     } else if (buttons & BUTTON_MASK_START) {
+      cube->transform.pitch += 5 * delta_time;
       log("Start Pressed\n");
     } if (buttons & BUTTON_MASK_SELECT) {
+      cube->transform.pitch -= 5 * delta_time;
       log("Select Pressed\n");
     }
 
@@ -120,3 +123,5 @@ void loop() {
   /* Update back buffer, swap buffers and blit framebuffer to screen */
   render_frame();
 }
+
+#endif // end if !RUN_BOARD_TESTS
