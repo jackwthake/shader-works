@@ -22,6 +22,7 @@ namespace Device {
  * Initialize critical components of the device.
  */
 Adafruit_ST7735 *tft = new Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
+Resource_manager manager;
 
 uint16_t *back_buffer = new uint16_t[screen_buffer_len];
 uint16_t *front_buffer = new uint16_t[screen_buffer_len];

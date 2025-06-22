@@ -51,8 +51,6 @@ Resource_manager::Resource_manager() {
     this->resources[i].length = 0;
     this->resources[i].type = INVALID_FILE;
   }
-
-  this->init_QSPI_flash();
 }
 
 
@@ -223,6 +221,7 @@ bool Resource_manager::load_bmp(File32 &f) {
     f.close();
     return false;
   }
+
 
   Serial.printf("--- BMP File Header ---\n");
   Serial.printf("bfType (should be 0z4D42): 0x%hX\n", header.bfType); // %hX for unsigned short in hex

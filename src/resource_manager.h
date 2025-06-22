@@ -27,12 +27,12 @@ class Resource_manager {
 public:
   Resource_manager();
   ~Resource_manager();
+  void init_QSPI_flash();
 
   resource_id_t load_resource(const char *path);
   const Resource_entry_t *get_resource(resource_id_t id);
 
 private:
-  void init_QSPI_flash();
 
   bool load_text(File32 &f);
   bool load_bmp(File32 &f);
