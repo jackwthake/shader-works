@@ -3,50 +3,45 @@
 #include <stdint.h>
 #include <stddef.h>
 
-enum RESOURCE_TYPE {
+#include <Adafruit_SPIFlash.h>
+
+typedef int resource_id_t;
+constexpr resource_id_t INVALID_RESOURCE = -1;
+
+
+enum resource_type_t {
   BITMAP_FILE,
   DATA_FIlE,
   INVALID_FILE
 };
 
 
-class Resource {
-  protected:
-    Resource();
-    Resource(unsigned id, RESOURCE_TYPE type, struct File32 &f);
-    ~Resource();
-
-    unsigned char *raw_data;
-    size_t raw_data_size;
-  
-  public:
-    Resource(const Resource& other); // Copy constructor
-
-    constexpr static unsigned MAX_FILENAME_LEN = 13;
-    const RESOURCE_TYPE res_type;
-    const unsigned id;
-    char name[MAX_FILENAME_LEN];
+struct Resource_entry_t {
+  void *data;
+  resource_type_t type;
+  uint32_t length;
 };
 
 
-class Data_Resource : public Resource {
-  public:
-    Data_Resource();
-    Data_Resource(unsigned id, struct File32 &f);
+class Resource_manager {
+public:
+  Resource_manager();
+  ~Resource_manager();
 
-    const char *get_text(size_t &len) const;
-    class Model *generate_obj_model(void);
-};
+  resource_id_t load_resource(const char *path);
+  const Resource_entry_t *get_resource(resource_id_t id);
 
+private:
+  void init_QSPI_flash();
 
-class Bitmap_Resource : public Resource {
-  void read_bitmap_data();
+  bool load_text(File32 &f);
+  bool load_bmp(File32 &f);
 
-  public:
-    Bitmap_Resource();
-    Bitmap_Resource(unsigned id, struct File32 &f);
-    Bitmap_Resource(const Bitmap_Resource& other); // Copy constructor
+  static constexpr int8_t MAX_RESOURCES = 5;
+  Resource_entry_t resources[MAX_RESOURCES];
+  resource_id_t num_resources;
 
-    unsigned width, height;
-    uint16_t *pixels;
+  Adafruit_FlashTransport_QSPI flash_transport;
+  Adafruit_SPIFlash flash;
+  FatVolume file_sys;
 };
