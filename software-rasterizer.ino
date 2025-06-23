@@ -10,17 +10,21 @@
 
 #define BAUD_RATE 115200
 
+Transform camera;
+
 resource_id_t cube_id;
 resource_id_t atlas_id;
 Model cube;
 
 
+// Wait for serial connection
 static void wait_for_serial() {
   Serial.begin(BAUD_RATE);
   while(!Serial) { delay(75); }
 }
 
 
+// Initialize board components
 static void init_device_namespace() {
   using namespace Device;
 
@@ -32,6 +36,9 @@ static void init_device_namespace() {
 
 
 #ifdef RUN_BOARD_TESTS
+/**
+ * Test main, Initialize board then run_tests
+ */
 #include "src/test/test.h"
 
 void setup() {
@@ -50,9 +57,11 @@ void loop() {}
 void setup() {
   using Device::manager;
 
+  // board initialization
   wait_for_serial();
   init_device_namespace();
 
+  // load resources
   cube_id = manager.load_resource("cube.obj");
   if (cube_id == INVALID_RESOURCE)
     log_panic("Failed to load cube.obj");
@@ -65,12 +74,15 @@ void setup() {
   if (cube.vertices.size() == 0)
     log_panic("Failed to init cube model");
   
+  // now that we have the cube vertices in memory,
+  // we doen't need the cube resource in memory (vertices won't change)
   if (manager.unload_resource(cube_id)) {
     Serial.println("Cube unloaded successfuilly");
   } else {
     Serial.println("Cube unloaded unsuccessfuilly");
   }
   
+  // colors
   cube.cols = {
     random_color(), random_color(), random_color(), random_color(),
     random_color(), random_color(), random_color(), random_color(),
@@ -88,18 +100,15 @@ void setup() {
 void render_frame() {
   using namespace Device;
 
+  // clear buffers and swap back and front buffers
   _swap_ptr(front_buffer, back_buffer);
   memset(back_buffer, 0x00, screen_buffer_len * sizeof(uint16_t));
   memset(depth_buffer, max_depth, screen_buffer_len * sizeof(float));
 
-  render_model(back_buffer, cube);
-
-  uint16_t tile[TILE_PIXEL_COUNT];
-  manager.get_tile_from_atlas(atlas_id, 0, tile);
+  render_model(back_buffer, camera, cube); // draw cube
 
   // Blit the framebuffer to the screen
   tft->drawRGBBitmap(0, 0, back_buffer, width, height);
-  tft->drawRGBBitmap(0, 0, tile, TILE_WIDTH_PX, TILE_HEIGHT_PX);
 }
 
 
@@ -114,25 +123,30 @@ void loop() {
     delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
     last_tick += tick_interval;
 
-    cube.transform.position.x += (read_joystick_x() * 5) * delta_time;
-    cube.transform.position.y += (read_joystick_y() * 5) * delta_time;
+    camera.yaw += -(read_joystick_x() * 2) * delta_time;
+
+    float3 cam_right, cam_up, cam_fwd, move_delta = { 0.0, 0.0, 0.0 };
+    camera.get_basis_vectors(cam_right, cam_up, cam_fwd);
+
+    if (read_joystick_y() < -JOYSTICK_THRESH)
+      move_delta += cam_fwd; // (read_joystick_y() * 5) * delta_time;
+    else if (read_joystick_y() > JOYSTICK_THRESH)
+      move_delta += (cam_fwd * -1);
+
 
     /** Button Test */
     uint32_t buttons = read_buttons();
     if (buttons & BUTTON_MASK_A) {
-      cube.transform.yaw += 5 * delta_time;
-      log("A Pressed\n");
+      cube.transform.yaw += 2 * delta_time;
     } else if (buttons & BUTTON_MASK_B) {
-      cube.transform.yaw -= 5 * delta_time;
-      log("B Pressed\n");
-    } else if (buttons & BUTTON_MASK_START) {
-      cube.transform.pitch += 5 * delta_time;
-      log("Start Pressed\n");
+      cube.transform.yaw -= 2 * delta_time;
+    } else if (buttons & BUTTON_MASK_START) { // Strafe
+      move_delta += cam_right;
     } if (buttons & BUTTON_MASK_SELECT) {
-      cube.transform.pitch -= 5 * delta_time;
-      log("Select Pressed\n");
+      move_delta += cam_right * -1;
     }
 
+    camera.position += float3::normalize(move_delta) * 2 * delta_time;
     ticks_processed++;
   }
 

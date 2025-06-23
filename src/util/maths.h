@@ -12,11 +12,14 @@ struct float3 {
   float3(float x, float y, float z) : x(x), y(y), z(z) {}
 
   static float dot(float3 a, float3 b);
+  static float3 normalize(const float3& vec);
 
   float3 operator+(const float3& other) const;
   float3 operator-(const float3& other) const;
   float3 operator*(float scalar) const;
   float3 operator/(float scalar) const;
+  float3 operator+=(const float3& other);
+  float3 operator-=(const float3& other);
 };
 
 
@@ -46,7 +49,11 @@ class Transform {
     float3 position;
 
   float3 to_world_point(float3 p);
+  float3 to_local_point(float3 world_point);
+  
   void get_basis_vectors(float3 &ihat, float3 &jhat, float3 &khat);
+  void get_inverse_basis_vectors(float3 &ihat, float3 &jhat, float3 &khat);
+  
   float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 v);
 };
 

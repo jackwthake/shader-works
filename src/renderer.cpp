@@ -54,31 +54,30 @@ static bool point_in_triangle(const float2& a, const float2& b, const float2& c,
  * @param dim The dimensions of the screen (width, height).
  * @return The screen coordinates of the vertex as a float2.
  */
-static float3 vertex_to_screen(const float3 &vertex, Transform &transform, float2 dim) {
+static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Transform &cam, float2 dim) {
   float3 vertex_world = transform.to_world_point(vertex);
+  float3 vertex_view = cam.to_local_point(vertex_world);
   float fov = 1.0472; // 60 degrees in radians
 
   float screen_height_world = tan(fov / 2) * 2;
-  float pixels_per_world_unit = dim.y / screen_height_world / vertex_world.z;
+  float pixels_per_world_unit = dim.y / screen_height_world / vertex_view.z;
 
-  float2 screen_pos;
-  screen_pos.x = vertex_world.x * pixels_per_world_unit;
-  screen_pos.y = vertex_world.y * pixels_per_world_unit;
-
-  float2 vertex_screen = (dim / 2) + screen_pos;
+  float2 pixel_offset = float2(vertex_view.x, vertex_view.y) * pixels_per_world_unit;
+  float2 vertex_screen = (dim / 2) + pixel_offset;
 
   return float3(vertex_screen.x, vertex_screen.y, vertex_world.z);
 }
 
 
-void render_model(uint16_t *buff, Model &model) {
+void render_model(uint16_t *buff, Transform &cam, Model &model) {
   // For each triangle in the model
   size_t triangle_count = model.vertices.size() / 3;
   float2 screen_dim(Device::width, Device::height);
   for (size_t tri = 0; tri < triangle_count; ++tri) {
-    float3 a = vertex_to_screen(model.vertices[tri * 3 + 0], model.transform, screen_dim);
-    float3 b = vertex_to_screen(model.vertices[tri * 3 + 1], model.transform, screen_dim);
-    float3 c = vertex_to_screen(model.vertices[tri * 3 + 2], model.transform, screen_dim);
+    float3 a = vertex_to_screen(model.vertices[tri * 3 + 0], model.transform, cam, screen_dim);
+    float3 b = vertex_to_screen(model.vertices[tri * 3 + 1], model.transform, cam, screen_dim);
+    float3 c = vertex_to_screen(model.vertices[tri * 3 + 2], model.transform, cam, screen_dim);
+    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; // skip tri if any vertex is behind camera
 
     // Compute triangle bounding box (clamped to screen)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));

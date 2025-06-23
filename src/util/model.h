@@ -12,7 +12,4 @@ struct Model {
   Transform transform;
 };
 
-
-std::vector<float3> read_obj(const std::string& content);
-
 #endif // MODEL_H
