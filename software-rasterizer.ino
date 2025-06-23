@@ -67,6 +67,7 @@ void setup() {
   };
 
   cube->transform.position = { 0, 0, 5 };
+  Device::log_debug_to_screen = false;
 }
 
 

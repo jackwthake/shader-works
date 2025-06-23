@@ -24,9 +24,9 @@ namespace Device {
 Adafruit_ST7735 *tft = new Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
 Resource_manager manager;
 
-uint16_t *back_buffer = new uint16_t[screen_buffer_len];
-uint16_t *front_buffer = new uint16_t[screen_buffer_len];
-float *depth_buffer = new float[screen_buffer_len];
+uint16_t back_buffer[screen_buffer_len] = { 0x00 };
+uint16_t front_buffer[screen_buffer_len] = { 0x00 };
+float depth_buffer[screen_buffer_len] = { 0x00 };;
 
 unsigned long now = 0, last_tick = 0;
 float delta_time = 0;

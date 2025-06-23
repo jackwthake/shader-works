@@ -71,7 +71,7 @@ static float3 vertex_to_screen(const float3 &vertex, Transform &transform, float
 }
 
 
-void render_model(uint16_t * &buff, Model &model) {
+void render_model(uint16_t *buff, Model &model) {
   // For each triangle in the model
   size_t triangle_count = model.vertices.size() / 3;
   float2 screen_dim(Device::width, Device::height);

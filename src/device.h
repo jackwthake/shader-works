@@ -20,9 +20,9 @@ namespace Device  {
   extern Adafruit_ST7735 *tft;
   extern Resource_manager manager;
 
-  extern uint16_t *front_buffer;
-  extern uint16_t *back_buffer;
-  extern float *depth_buffer;
+  extern uint16_t front_buffer[screen_buffer_len];
+  extern uint16_t back_buffer[screen_buffer_len];
+  extern float depth_buffer[screen_buffer_len];
 
   // Game Variables
   extern unsigned long now, last_tick;
