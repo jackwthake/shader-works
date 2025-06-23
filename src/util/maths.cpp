@@ -94,6 +94,15 @@ float2 float2::operator*(float scalar) const {
   return float2(x * scalar, y * scalar);
 }
 
+
+float3 operator/(float scaler, const float3 &rhs) {
+  if (scaler == 0)
+    return rhs;
+
+  return float3(scaler / rhs.x, scaler / rhs.y, scaler / rhs.z);
+}
+
+
 float2 float2::operator/(float scalar) const {
   if (scalar != 0) {
     return float2(x / scalar, y / scalar);

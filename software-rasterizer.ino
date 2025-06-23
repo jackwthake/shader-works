@@ -137,9 +137,9 @@ void loop() {
     /** Button Test */
     uint32_t buttons = read_buttons();
     if (buttons & BUTTON_MASK_A) {
-      cube.transform.yaw += 2 * delta_time;
+      camera.position.y += 2 * delta_time;
     } else if (buttons & BUTTON_MASK_B) {
-      cube.transform.yaw -= 2 * delta_time;
+      camera.position.y -= 2 * delta_time;
     } else if (buttons & BUTTON_MASK_START) { // Strafe
       move_delta += cam_right;
     } if (buttons & BUTTON_MASK_SELECT) {

@@ -23,6 +23,9 @@ struct float3 {
 };
 
 
+float3 operator/(float scaler, const float3 &rhs);
+
+
 /**
  * A simple 2D vector structure to represent 2D coordinates or vectors.
  */

@@ -8,6 +8,8 @@
 
 using namespace std;
 
+#define EPSILON 0.0001f
+
 
 /**
  * Calculates the signed area of a triangle defined by three points.
@@ -57,7 +59,11 @@ static bool point_in_triangle(const float2& a, const float2& b, const float2& c,
 static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Transform &cam, float2 dim) {
   float3 vertex_world = transform.to_world_point(vertex);
   float3 vertex_view = cam.to_local_point(vertex_world);
-  float fov = 1.0472; // 60 degrees in radians
+  constexpr float fov = 1.0472; // 60 degrees in radians
+
+  if (vertex_view.z < EPSILON) {
+      return float3(0, 0, -1.0f); // Return -1.0f or similar to indicate "invalid" for the Z check
+  }
 
   float screen_height_world = tan(fov / 2) * 2;
   float pixels_per_world_unit = dim.y / screen_height_world / vertex_view.z;
@@ -77,7 +83,17 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
     float3 a = vertex_to_screen(model.vertices[tri * 3 + 0], model.transform, cam, screen_dim);
     float3 b = vertex_to_screen(model.vertices[tri * 3 + 1], model.transform, cam, screen_dim);
     float3 c = vertex_to_screen(model.vertices[tri * 3 + 2], model.transform, cam, screen_dim);
-    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; // skip tri if any vertex is behind camera
+    
+    if (a.z < 0 || b.z < 0 || c.z < 0) continue; // skip tri if any vertex is behind camera
+
+    // Calculate the signed area of the projected triangle on the screen.
+    // A positive area indicates a counter-clockwise winding (front-facing),
+    // and a negative area indicates a clockwise winding (back-facing).
+    // If the triangle is back-facing or degenerate (area near zero), skip rendering it.
+    float projected_area = -signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
+    if (projected_area <= EPSILON) { // Use EPSILON to handle floating point inaccuracies and degenerate triangles
+        continue; // Skip back-facing or degenerate triangles
+    }
 
     // Compute triangle bounding box (clamped to screen)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
@@ -93,10 +109,13 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
       for (int x = (int)min_x; x <= (int)max_x; ++x) {
         float3 weights;
+
         if (point_in_triangle(float2(a.x, a.y), float2(b.x, b.y), float2(c.x, c.y), float2(x, y), weights)) {
           float3 depths(a.z, b.z, c.z);
-          float depth = float3::dot(depths, weights);
+          float depth = 1 / float3::dot(1 / depths, weights);
+
           if (depth < 0 || depth > Device::max_depth) continue;
+
           int idx = x + Device::width * y;
           if (depth < Device::depth_buffer[idx]) {
             buff[idx] = color;
