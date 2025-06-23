@@ -159,16 +159,7 @@ Resource_manager::Resource_manager() {
 // dealloc
 Resource_manager::~Resource_manager() {
   for (int i = 0; i < MAX_RESOURCES; ++i) {
-    if(this->resources[i].data) {
-      // Assuming pixel data is allocated as uint16_t array or char array for text
-      if (this->resources[i].type == BITMAP_FILE) {
-        delete []reinterpret_cast<uint16_t*>(this->resources[i].data);
-      } else if (this->resources[i].type == DATA_FIlE) {
-        delete []reinterpret_cast<char*>(this->resources[i].data);
-      }
-
-      this->resources[i].data = nullptr;
-    }
+    this->unload_resource(i);
   }
 }
 
@@ -237,6 +228,30 @@ const Resource_entry_t *Resource_manager::get_resource(resource_id_t id) {
 
   Serial.printf("Resource Index out of bounds! id: %d\n", id);
   return nullptr;
+}
+
+
+// FIXME ! Doesn't allow a new resource to be allocated in an old ones spot
+//         Rearrangine the internal array would break the logic for rettrieving 
+//         Resources. All it does is ensure memory deletion and cleans up the entry
+bool Resource_manager::unload_resource(resource_id_t id) {
+  if (id >= 0 && id < MAX_RESOURCES) {
+    Resource_entry_t entry = this->resources[id];
+
+    if (entry.data) {
+      if (entry.type == BITMAP_FILE) {
+        delete []reinterpret_cast<uint16_t*>(entry.data);
+      } else if (entry.type == DATA_FIlE) {
+        delete []reinterpret_cast<char*>(entry.data);
+      }
+
+      entry.data = nullptr;
+      entry.type = INVALID_FILE;
+      entry.length = 0;
+    }
+  }
+
+  return false;
 }
 
 

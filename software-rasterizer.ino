@@ -11,10 +11,9 @@
 #define BAUD_RATE 115200
 
 resource_id_t cube_id;
+resource_id_t atlas_id;
 Model cube;
 
-
-resource_id_t atlas_id;
 
 static void wait_for_serial() {
   Serial.begin(BAUD_RATE);
@@ -65,6 +64,12 @@ void setup() {
   manager.read_obj_resource(cube_id, cube);
   if (cube.vertices.size() == 0)
     log_panic("Failed to init cube model");
+  
+  if (manager.unload_resource(cube_id)) {
+    Serial.println("Cube unloaded successfuilly");
+  } else {
+    Serial.println("Cube unloaded unsuccessfuilly");
+  }
   
   cube.cols = {
     random_color(), random_color(), random_color(), random_color(),

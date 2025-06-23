@@ -44,6 +44,7 @@ public:
 
   resource_id_t load_resource(const char *path);
   const Resource_entry_t *get_resource(resource_id_t id);
+  bool unload_resource(resource_id_t id);
   
   bool read_obj_resource(resource_id_t id, Model &model);
   bool get_tile_from_atlas(resource_id_t id, unsigned tile_id, uint16_t *output_tile_data);
