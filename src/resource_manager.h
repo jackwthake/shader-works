@@ -9,6 +9,18 @@
 typedef int resource_id_t;
 constexpr resource_id_t INVALID_RESOURCE = -1;
 
+// --- Constants for the Atlas ---
+constexpr int ATLAS_WIDTH_PX = 80;
+constexpr int ATLAS_HEIGHT_PX = 24;
+constexpr int TILE_WIDTH_PX = 8;
+constexpr int TILE_HEIGHT_PX = 8;
+
+// Derived constants
+constexpr int TILES_PER_ROW = ATLAS_WIDTH_PX / TILE_WIDTH_PX;
+constexpr int TILES_PER_COL = ATLAS_HEIGHT_PX / TILE_HEIGHT_PX;
+constexpr int TOTAL_TILES = TILES_PER_ROW * TILES_PER_COL;
+constexpr int TILE_PIXEL_COUNT = TILE_WIDTH_PX * TILE_HEIGHT_PX;
+
 
 enum resource_type_t {
   BITMAP_FILE,
@@ -33,7 +45,8 @@ public:
   resource_id_t load_resource(const char *path);
   const Resource_entry_t *get_resource(resource_id_t id);
   
-  Model *read_obj_resource(resource_id_t id);
+  bool read_obj_resource(resource_id_t id, Model &model);
+  bool get_tile_from_atlas(resource_id_t id, unsigned tile_id, uint16_t *output_tile_data);
 private:
 
   bool load_text(File32 &f);

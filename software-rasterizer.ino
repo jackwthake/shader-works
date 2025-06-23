@@ -11,8 +11,10 @@
 #define BAUD_RATE 115200
 
 resource_id_t cube_id;
-Model *cube;
+Model cube;
 
+
+resource_id_t atlas_id;
 
 static void wait_for_serial() {
   Serial.begin(BAUD_RATE);
@@ -53,20 +55,24 @@ void setup() {
   init_device_namespace();
 
   cube_id = manager.load_resource("cube.obj");
-  if (cube_id == -1)
+  if (cube_id == INVALID_RESOURCE)
     log_panic("Failed to load cube.obj");
   
-  cube = manager.read_obj_resource(cube_id);
-  if (!cube)
+  atlas_id = manager.load_resource("atlas.bmp");
+  if (atlas_id == INVALID_RESOURCE)
+    log_panic("Failed to load atlas.bmp");
+  
+  manager.read_obj_resource(cube_id, cube);
+  if (cube.vertices.size() == 0)
     log_panic("Failed to init cube model");
   
-  cube->cols = {
+  cube.cols = {
     random_color(), random_color(), random_color(), random_color(),
     random_color(), random_color(), random_color(), random_color(),
     random_color(), random_color(), random_color(), random_color()
   };
 
-  cube->transform.position = { 0, 0, 5 };
+  cube.transform.position = { 0, 0, 5 };
   Device::log_debug_to_screen = false;
 }
 
@@ -81,10 +87,14 @@ void render_frame() {
   memset(back_buffer, 0x00, screen_buffer_len * sizeof(uint16_t));
   memset(depth_buffer, max_depth, screen_buffer_len * sizeof(float));
 
-  render_model(back_buffer, *cube);
+  render_model(back_buffer, cube);
+
+  uint16_t tile[TILE_PIXEL_COUNT];
+  manager.get_tile_from_atlas(atlas_id, 0, tile);
 
   // Blit the framebuffer to the screen
   tft->drawRGBBitmap(0, 0, back_buffer, width, height);
+  tft->drawRGBBitmap(0, 0, tile, TILE_WIDTH_PX, TILE_HEIGHT_PX);
 }
 
 
@@ -99,22 +109,22 @@ void loop() {
     delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
     last_tick += tick_interval;
 
-    cube->transform.position.x += (read_joystick_x() * 5) * delta_time;
-    cube->transform.position.y += (read_joystick_y() * 5) * delta_time;
+    cube.transform.position.x += (read_joystick_x() * 5) * delta_time;
+    cube.transform.position.y += (read_joystick_y() * 5) * delta_time;
 
     /** Button Test */
     uint32_t buttons = read_buttons();
     if (buttons & BUTTON_MASK_A) {
-      cube->transform.yaw += 5 * delta_time;
+      cube.transform.yaw += 5 * delta_time;
       log("A Pressed\n");
     } else if (buttons & BUTTON_MASK_B) {
-      cube->transform.yaw -= 5 * delta_time;
+      cube.transform.yaw -= 5 * delta_time;
       log("B Pressed\n");
     } else if (buttons & BUTTON_MASK_START) {
-      cube->transform.pitch += 5 * delta_time;
+      cube.transform.pitch += 5 * delta_time;
       log("Start Pressed\n");
     } if (buttons & BUTTON_MASK_SELECT) {
-      cube->transform.pitch -= 5 * delta_time;
+      cube.transform.pitch -= 5 * delta_time;
       log("Select Pressed\n");
     }
 

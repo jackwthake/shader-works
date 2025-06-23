@@ -95,6 +95,55 @@ static vector<float3> decodeObjVertices(const char* content) {
 
 
 /**
+ * @brief Retrieves a tile's pixel data from a 1D RGB 565 texture atlas.
+ *
+ * Caller must pre-allocate `output_tile_data` for `TILE_PIXEL_COUNT` `uint16_t` values.
+ *
+ * @param atlas_data Pointer to the 1D atlas pixel data.
+ * @param tile_index 0-based index of the desired tile.
+ * @param output_tile_data Pointer to store the extracted tile data.
+ * @return True on success, false if pointers are null or `tile_index` is out of bounds.
+ */
+static bool _get_tile_from_atlas(const uint16_t* atlas_data, int tile_index, uint16_t* output_tile_data) {
+    if (atlas_data == nullptr) {
+        std::cerr << "Error: atlas_data pointer is null." << std::endl;
+        return false;
+    }
+    if (output_tile_data == nullptr) {
+        std::cerr << "Error: output_tile_data pointer is null. Must be pre-allocated." << std::endl;
+        return false;
+    }
+
+    if (tile_index < 0 || tile_index >= TOTAL_TILES) {
+        std::cerr << "Error: Tile index " << tile_index << " is out of bounds. Total tiles: " << TOTAL_TILES << std::endl;
+        return false;
+    }
+
+    // Calculate (x, y) pixel coordinates of the tile's top-left corner
+    int tile_row = tile_index / TILES_PER_ROW;
+    int tile_col = tile_index % TILES_PER_ROW;
+
+    int start_pixel_x = tile_col * TILE_WIDTH_PX;
+    int start_pixel_y = tile_row * TILE_HEIGHT_PX;
+
+    // Copy pixel data row by row
+    for (int y = 0; y < TILE_HEIGHT_PX; ++y) {
+        int current_atlas_pixel_y = start_pixel_y + y;
+        size_t atlas_row_start_index = static_cast<size_t>(current_atlas_pixel_y) * ATLAS_WIDTH_PX;
+        size_t atlas_pixel_start_index = atlas_row_start_index + start_pixel_x;
+        size_t output_tile_row_start_index = static_cast<size_t>(y) * TILE_WIDTH_PX;
+
+        // Copy pixels for the current row
+        for (int x = 0; x < TILE_WIDTH_PX; ++x) {
+            output_tile_data[output_tile_row_start_index + x] = atlas_data[atlas_pixel_start_index + x];
+        }
+    }
+
+    return true;
+}
+
+
+/**
  * Initializes resoure pool and initializes on board flash
  */
 Resource_manager::Resource_manager() {
@@ -191,19 +240,14 @@ const Resource_entry_t *Resource_manager::get_resource(resource_id_t id) {
 }
 
 
-Model *Resource_manager::read_obj_resource(resource_id_t id) {
+bool Resource_manager::read_obj_resource(resource_id_t id, Model &model) {
   if (id >= 0 && id < MAX_RESOURCES) {
     Resource_entry_t res = this->resources[id];
 
     if (res.type == DATA_FIlE) {
       if (res.length > 0) {
-        Model *model = new Model();
-        if (!model) {
-          Serial.printf("Failed to allocate model object for resource at id: %d\n", id);
-        }
-
-        model->vertices = decodeObjVertices(reinterpret_cast<const char *>(res.data));
-        return model;
+        model.vertices = decodeObjVertices(reinterpret_cast<const char *>(res.data));
+        return true;
       }
 
       Serial.printf("Resource at %d has size %u\n", id, this->resources[id].length);
@@ -215,9 +259,29 @@ Model *Resource_manager::read_obj_resource(resource_id_t id) {
   }
 
 
-  return nullptr;
+  return false;
 }
 
+
+bool Resource_manager::get_tile_from_atlas(resource_id_t id, unsigned tile_id, uint16_t *output_tile_data) {
+  if (id >= 0 && id < MAX_RESOURCES) {
+    Resource_entry_t res = this->resources[id];
+    
+    if (res.type == BITMAP_FILE) {
+      if (res.length > 0) {
+        return _get_tile_from_atlas(reinterpret_cast<const uint16_t*>(res.data), tile_id, output_tile_data);
+      }
+
+      Serial.printf("Resource at %d has size %u\n", id, this->resources[id].length);
+    } else {
+      Serial.printf("Resource at %d is not a BITMAP_FILE\n", id);
+    }
+  } else {
+    Serial.printf("id: %d out of bounds.\n", id);
+  }
+
+  return false;
+}
 
 
 /**
@@ -404,3 +468,4 @@ bool Resource_manager::load_bmp(File32 &f) {
   entry->type = BITMAP_FILE;
   return true;
 }
+
