@@ -47,100 +47,216 @@ struct bitmap_file_header_t {
 
 using std::vector;
 
-/**
- * Decodes vertex data from OBJ file content provided as a character array.
- * @param obj_file_content A pointer to the character array containing the OBJ file content.
- * @returns A std::vector<float3> containing all vertices found in the OBJ file.
- */
-static vector<float3> decodeObjVertices(const char* content) {
-  using std::istringstream;
-  using std::string;
-
-  vector<float3> vertices, out_vertices;
-  istringstream stream(content);
-  string line;
-  
-  while (getline(stream, line)) {
-    if (line.empty()) continue;
-
-    // get first char of each line
-    // useful for telling us which type of data we are reading
-    istringstream iss(line);
-    string prefix;
-    iss >> prefix;
-
-    if (prefix == "v") { // vertices
-      float x, y, z;
-      if (iss >> x >> y >> z) {
-        vertices.emplace_back(x, y, z);
-      }
-    } else if (prefix == "f") { // faces
-      int count = 0;
-      string vert;
-
-      // OBJ indices are 1-based
-      while (iss >> vert && count < 4) {
-        size_t slash = vert.find('/');
-        int v_idx = stoi(slash == string::npos ? vert : vert.substr(0, slash));
-
-        if (v_idx < 0) v_idx = vertices.size() + v_idx + 1;
-        out_vertices.push_back(vertices[v_idx - 1]);
-        count++;
-      }
-    }
-  }
-  
-  return out_vertices;
-}
-
 
 /**
- * @brief Retrieves a tile's pixel data from a 1D RGB 565 texture atlas.
+ * Decodes vertex and UV data from OBJ file content, populating a Model struct.
+ * Parses 'v' (vertex), 'vt' (texture UV), and 'f' (face) directives.
+ * Handles 1-based and negative OBJ indices, and triangulates quad faces.
  *
- * Caller must pre-allocate `output_tile_data` for `TILE_PIXEL_COUNT` `uint16_t` values.
- *
- * @param atlas_data Pointer to the 1D atlas pixel data.
- * @param tile_index 0-based index of the desired tile.
- * @param output_tile_data Pointer to store the extracted tile data.
- * @return True on success, false if pointers are null or `tile_index` is out of bounds.
+ * @param obj_file_content The OBJ file content as a char array.
+ * @param model The Model struct to populate (assumes `vertices` and `uvs` members).
+ * @returns True on success, false otherwise.
  */
-static bool _get_tile_from_atlas(const uint16_t* atlas_data, int tile_index, uint16_t* output_tile_data) {
-    if (atlas_data == nullptr) {
-        std::cerr << "Error: atlas_data pointer is null." << std::endl;
-        return false;
-    }
-    if (output_tile_data == nullptr) {
-        std::cerr << "Error: output_tile_data pointer is null. Must be pre-allocated." << std::endl;
-        return false;
-    }
+ static bool decode_obj_file(const char* content, Model &model) {
+    using std::istringstream;
+    using std::string;
+    using std::vector;
 
-    if (tile_index < 0 || tile_index >= TOTAL_TILES) {
-        std::cerr << "Error: Tile index " << tile_index << " is out of bounds. Total tiles: " << TOTAL_TILES << std::endl;
-        return false;
-    }
+    vector<float3> temp_vertices; // Temporary storage for unique vertex positions
 
-    // Calculate (x, y) pixel coordinates of the tile's top-left corner
-    int tile_row = tile_index / TILES_PER_ROW;
-    int tile_col = tile_index % TILES_PER_ROW;
+    model.vertices.clear(); // Clear any existing vertex data in the model
 
-    int start_pixel_x = tile_col * TILE_WIDTH_PX;
-    int start_pixel_y = tile_row * TILE_HEIGHT_PX;
+    istringstream stream(content);
+    string line;
+    int line_num = 0; // For more informative error messages
 
-    // Copy pixel data row by row
-    for (int y = 0; y < TILE_HEIGHT_PX; ++y) {
-        int current_atlas_pixel_y = start_pixel_y + y;
-        size_t atlas_row_start_index = static_cast<size_t>(current_atlas_pixel_y) * ATLAS_WIDTH_PX;
-        size_t atlas_pixel_start_index = atlas_row_start_index + start_pixel_x;
-        size_t output_tile_row_start_index = static_cast<size_t>(y) * TILE_WIDTH_PX;
+    Serial.printf("--- Starting OBJ decoding ---\n");
 
-        // Copy pixels for the current row
-        for (int x = 0; x < TILE_WIDTH_PX; ++x) {
-            output_tile_data[output_tile_row_start_index + x] = atlas_data[atlas_pixel_start_index + x];
+    // Read the OBJ file line by line
+    while (getline(stream, line)) {
+        line_num++;
+        // Print the raw line content and its length
+        Serial.printf("Line %d (len %d): '%s'\n", line_num, line.length(), line.c_str());
+
+        if (line.empty()) {
+            Serial.printf("  Skipping empty line %d.\n", line_num);
+            continue; // Skip empty lines
+        }
+
+        istringstream iss(line); // Use stringstream to tokenize the line
+        string prefix;
+        iss >> prefix; // Read the line prefix (e.g., "v", "f")
+
+        Serial.printf("  Prefix: '%s'\n", prefix.c_str());
+
+        if (prefix == "#") { // Skip comment lines
+            Serial.printf("  Skipping comment line %d.\n", line_num);
+            continue;
+        }
+
+        if (prefix == "v") { // Vertex position line (e.g., "v 1.0 2.0 3.0")
+            string x_str, y_str, z_str;
+            // Check if 3 string components can be extracted after the prefix
+            if (iss >> x_str >> y_str >> z_str) {
+                Serial.printf("  Extracted v components: x='%s', y='%s', z='%s'\n", x_str.c_str(), y_str.c_str(), z_str.c_str());
+                float x, y, z;
+                char* endptr_x, *endptr_y, *endptr_z;
+
+                errno = 0; // Clear errno before calls to detect conversion errors
+                x = strtof(x_str.c_str(), &endptr_x);
+                if (errno == ERANGE || *endptr_x != '\0') {
+                    Serial.printf("Error on line %d: Invalid X value '%s' in OBJ file. Endptr char: 0x%X. Errno: %d. Line: '%s'\n", line_num, x_str.c_str(), (unsigned char)*endptr_x, errno, line.c_str());
+                    return false;
+                }
+
+                errno = 0;
+                y = strtof(y_str.c_str(), &endptr_y);
+                if (errno == ERANGE || *endptr_y != '\0') {
+                    Serial.printf("Error on line %d: Invalid Y value '%s' in OBJ file. Endptr char: 0x%X. Errno: %d. Line: '%s'\n", line_num, y_str.c_str(), (unsigned char)*endptr_y, errno, line.c_str());
+                    return false;
+                }
+
+                errno = 0;
+                z = strtof(z_str.c_str(), &endptr_z);
+                if (errno == ERANGE || *endptr_z != '\0') {
+                    Serial.printf("Error on line %d: Invalid Z value '%s' in OBJ file. Endptr char: 0x%X. Errno: %d. Line: '%s'\n", line_num, z_str.c_str(), (unsigned char)*endptr_z, errno, line.c_str());
+                    return false;
+                }
+                temp_vertices.emplace_back(x, y, z);
+                Serial.printf("  Added vertex: (%.2f, %.2f, %.2f). temp_vertices.size() = %d\n", x, y, z, temp_vertices.size());
+            } else {
+                Serial.printf("Error on line %d: Not enough components for vertex format. Line: '%s'\n", line_num, line.c_str());
+                return false;
+            }
+        } else if (prefix == "f") { // Face definition line (e.g., "f 1 2 3" or "f 1/1 2/2 3/3")
+            Serial.printf("  Processing face line %d.\n", line_num);
+            vector<int> face_v_indices; // Stores 1-based vertex indices for the current face
+
+            string vert_component;
+            while (iss >> vert_component) {
+                size_t slash_pos = vert_component.find('/');
+                string v_idx_str = (slash_pos == string::npos) ? vert_component : vert_component.substr(0, slash_pos);
+
+                if (vert_component == "#") // encountered inline comment, move to next line
+                  break;
+
+                int v_idx;
+                char* endptr_idx;
+                errno = 0; // Clear errno before strtol call
+                long val = strtol(v_idx_str.c_str(), &endptr_idx, 10);
+                v_idx = static_cast<int>(val);
+
+                if (errno == ERANGE || *endptr_idx != '\0' || v_idx_str.empty()) {
+                    Serial.printf("Error on line %d: Invalid vertex index format '%s'. Endptr char: 0x%X. Errno: %d. Line: '%s'\n", line_num, v_idx_str.c_str(), (unsigned char)*endptr_idx, errno, line.c_str());
+                    return false;
+                }
+                face_v_indices.push_back(v_idx);
+                Serial.printf("    Parsed face component: '%s', index: %d\n", vert_component.c_str(), v_idx);
+            }
+
+            if (face_v_indices.size() < 3) {
+                Serial.printf("Warning on line %d: Face with less than 3 vertices (%d) skipped: %s\n", line_num, face_v_indices.size(), line.c_str());
+                continue;
+            }
+
+            Serial.printf("    Face indices (1-based): %d, %d, %d", face_v_indices[0], face_v_indices[1], face_v_indices[2]);
+            if (face_v_indices.size() == 4) Serial.printf(", %d", face_v_indices[3]);
+            Serial.printf("\n");
+
+            // Get indices (0-based) for the first triangle (v0, v1, v2)
+            int idx0 = face_v_indices[0];
+            int idx1 = face_v_indices[1];
+            int idx2 = face_v_indices[2];
+
+            idx0 = (idx0 < 0) ? temp_vertices.size() + idx0 : idx0 - 1;
+            idx1 = (idx1 < 0) ? temp_vertices.size() + idx1 : idx1 - 1;
+            idx2 = (idx2 < 0) ? temp_vertices.size() + idx2 : idx2 - 1;
+
+            Serial.printf("    Converted 0-based indices: %d, %d, %d\n", idx0, idx1, idx2);
+
+            if (temp_vertices.empty() || idx0 < 0 || idx0 >= temp_vertices.size() ||
+                idx1 < 0 || idx1 >= temp_vertices.size() ||
+                idx2 < 0 || idx2 >= temp_vertices.size()) {
+                Serial.printf("Error on line %d: Vertex index out of bounds or temp_vertices empty! (%d, %d, %d). temp_vertices size: %d. Line: '%s'\n", 
+                              line_num, idx0, idx1, idx2, temp_vertices.size(), line.c_str());
+                model.vertices.clear();
+                return false;
+            }
+
+            model.vertices.push_back(temp_vertices[idx0]);
+            model.vertices.push_back(temp_vertices[idx1]);
+            model.vertices.push_back(temp_vertices[idx2]);
+            Serial.printf("    Added first triangle. model.vertices.size() = %d\n", model.vertices.size());
+
+
+            if (face_v_indices.size() == 4) {
+                int idx3 = face_v_indices[3];
+                idx3 = (idx3 < 0) ? temp_vertices.size() + idx3 : idx3 - 1;
+
+                Serial.printf("    Converted 0-based 4th index: %d\n", idx3);
+
+                if (idx3 < 0 || idx3 >= temp_vertices.size()) {
+                    Serial.printf("Error on line %d: 4th vertex index (%d) out of bounds. temp_vertices size: %d. Line: '%s'\n", 
+                                  line_num, idx3, temp_vertices.size(), line.c_str());
+                    model.vertices.clear();
+                    return false;
+                }
+
+                model.vertices.push_back(temp_vertices[idx0]);
+                model.vertices.push_back(temp_vertices[idx2]);
+                model.vertices.push_back(temp_vertices[idx3]);
+                Serial.printf("    Added second triangle for quad. model.vertices.size() = %d\n", model.vertices.size());
+            }
         }
     }
 
+    Serial.printf("--- OBJ decoding finished. Final temp_vertices size: %d, model.vertices size: %d ---\n", temp_vertices.size(), model.vertices.size());
     return true;
 }
+
+
+/**
+ * Helper to get a specific tile from bitmap data, assuming the atlas dimensions
+ * match the global ATLAS_WIDTH_PX and ATLAS_HEIGHT_PX constants.
+ * * @param atlas_data: Pointer to the raw uint16_t pixel data of the entire atlas.
+ * @param tile_id: ID of tile within the bitmap (0-indexed).
+ * @param output_tile_data: Buffer for the outputted tile. This buffer MUST be pre-allocated to at least TILE_PIXEL_COUNT.
+ * @returns true on success, false otherwise.
+ */
+static bool _get_tile_from_atlas(const uint16_t* atlas_data, unsigned tile_id, uint16_t *output_tile_data) {
+  // Check if tile_id is within the valid range based on the defined constants
+  if (tile_id >= TOTAL_TILES) { 
+    Serial.printf("Error: tile_id %u is out of bounds for total tiles %u\n", tile_id, TOTAL_TILES);
+    return false;
+  }
+
+  // Calculate top-left pixel coordinates of the desired tile within the atlas.
+  int tile_x_in_atlas = (tile_id % TILES_PER_ROW) * TILE_WIDTH_PX;
+  int tile_y_in_atlas = (tile_id / TILES_PER_ROW) * TILE_HEIGHT_PX;
+
+  // Final bounds check using the global ATLAS_WIDTH_PX and ATLAS_HEIGHT_PX.
+  if (tile_x_in_atlas + TILE_WIDTH_PX > ATLAS_WIDTH_PX ||
+      tile_y_in_atlas + TILE_HEIGHT_PX > ATLAS_HEIGHT_PX) {
+    Serial.printf("Error: Calculated tile bounds (%d,%d to %d,%d) exceed global atlas dimensions (%d,%d)\n",
+                  tile_x_in_atlas, tile_y_in_atlas,
+                  tile_x_in_atlas + TILE_WIDTH_PX, tile_y_in_atlas + TILE_HEIGHT_PX,
+                  ATLAS_WIDTH_PX, ATLAS_HEIGHT_PX);
+    return false;
+  }
+
+  // Copy pixels from the atlas to the output buffer
+  for (int y = 0; y < TILE_HEIGHT_PX; ++y) {
+    for (int x = 0; x < TILE_WIDTH_PX; ++x) {
+      // Access atlas_data using global ATLAS_WIDTH_PX for row stride
+      int source_idx = (tile_y_in_atlas + y) * ATLAS_WIDTH_PX + (tile_x_in_atlas + x);
+      int dest_idx = y * TILE_WIDTH_PX + x;
+      output_tile_data[dest_idx] = atlas_data[source_idx];
+    }
+  }
+
+  return true;
+}
+
 
 
 /**
@@ -255,14 +371,20 @@ bool Resource_manager::unload_resource(resource_id_t id) {
 }
 
 
+/**
+ *  Read a data file from the resource pool, populating the passed model struct
+ *  With vertex data.
+ *  @param id: ID of the desired resource, must be populated
+ *  @param model: The model to be populated
+ *  @returns true on success, false otherwise
+*/
 bool Resource_manager::read_obj_resource(resource_id_t id, Model &model) {
   if (id >= 0 && id < MAX_RESOURCES) {
     Resource_entry_t res = this->resources[id];
 
     if (res.type == DATA_FIlE) {
       if (res.length > 0) {
-        model.vertices = decodeObjVertices(reinterpret_cast<const char *>(res.data));
-        return true;
+        return decode_obj_file(reinterpret_cast<const char *>(res.data), model);
       }
 
       Serial.printf("Resource at %d has size %u\n", id, this->resources[id].length);
@@ -278,6 +400,16 @@ bool Resource_manager::read_obj_resource(resource_id_t id, Model &model) {
 }
 
 
+/**
+ * Gets a specific tile index from the passed resource.
+ * Tile 0 is at top-left corner of the bitmap
+ * 
+ * @param id: ID of the bitmap in the resource pool
+ * @param tile_id: ID of tile within the bitmap
+ * @param output_tile_data: Buffer for the outputted tile, This 
+ *                          buffer MUST be pre-allocated to attleast TILE_PIXEL_COUNT
+ * @returns true on success, false otherwise
+ */
 bool Resource_manager::get_tile_from_atlas(resource_id_t id, unsigned tile_id, uint16_t *output_tile_data) {
   if (id >= 0 && id < MAX_RESOURCES) {
     Resource_entry_t res = this->resources[id];
@@ -411,6 +543,10 @@ bool Resource_manager::load_bmp(File32 &f) {
 
   // Determine actual image height (absolute value)
   int32_t imageHeight = abs(header.biHeight);
+
+  // Store dimensions in the resource entry
+  entry->width = header.biWidth;
+  entry->height = imageHeight;
 
   entry->length = header.biWidth * imageHeight;
   entry->data = new uint16_t[entry->length];

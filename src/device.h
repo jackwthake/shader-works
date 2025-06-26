@@ -15,7 +15,7 @@ namespace Device  {
   constexpr int screen_buffer_len = width * height;
   constexpr float max_depth = 100.0f; // Maximum depth value for the depth buffer
   constexpr unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
-  constexpr float JOYSTICK_THRESH = 0.1;
+  constexpr float JOYSTICK_THRESH = 0.2;
   
   extern Adafruit_ST7735 *tft;
   extern Resource_manager manager;

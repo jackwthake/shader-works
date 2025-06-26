@@ -32,10 +32,15 @@ enum resource_type_t {
 struct Resource_entry_t {
   void *data;
   resource_type_t type;
+  
   uint32_t length;
+  uint16_t width, height;
 };
 
 
+/**
+ * Simple readonly resource manager. Used to load bitmaps and data files from onboard flash
+ */
 class Resource_manager {
 public:
   Resource_manager();

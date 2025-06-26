@@ -71,55 +71,132 @@ static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Trans
   float2 pixel_offset = float2(vertex_view.x, vertex_view.y) * pixels_per_world_unit;
   float2 vertex_screen = (dim / 2) + pixel_offset;
 
-  return float3(vertex_screen.x, vertex_screen.y, vertex_world.z);
+  return float3(vertex_screen.x, vertex_screen.y, vertex_view.z);
 }
 
 
+/**
+ * Renders a 3D model onto a 2D buffer using a basic rasterization pipeline.
+ * Applies transformations, projects vertices to screen space, performs simple frustum culling,
+ * back-face culling, and rasterizes triangles with depth testing.
+ *
+ * @param buff A pointer to the 16-bit color buffer (e.g., Device::back_buffer).
+ * @param camera The camera's transform (position and orientation).
+ * @param model The Model to render, containing vertices, colors, and its own transform.
+ */
 void render_model(uint16_t *buff, Transform &cam, Model &model) {
-  // For each triangle in the model
-  size_t triangle_count = model.vertices.size() / 3;
-  float2 screen_dim(Device::width, Device::height);
-  for (size_t tri = 0; tri < triangle_count; ++tri) {
+  float2 screen_dim = { (float)Device::width, (float)Device::height };
+
+  // Get texture atlas data if a valid ID is provided
+  const Resource_entry_t* texture_res = nullptr;
+  const uint16_t* texture_data = nullptr;
+  int tex_width = 0;
+  int tex_height = 0;
+  bool use_texture = false;
+
+  if (model.texture_atlas_id != INVALID_RESOURCE) {
+    texture_res = Device::manager.get_resource(model.texture_atlas_id);
+    if (texture_res && texture_res->type == BITMAP_FILE) {
+      texture_data = reinterpret_cast<const uint16_t*>(texture_res->data);
+      tex_width = texture_res->width;
+      tex_height = texture_res->height;
+      use_texture = true;
+    } else {
+        Serial.printf("Warning: Model has invalid texture_atlas_id %d or resource is not a BITMAP_FILE.\n", model.texture_atlas_id);
+    }
+  }
+
+
+  // Loop through each triangle in the model
+  for (int tri = 0; tri < model.vertices.size() / 3; ++tri) {
+    // Get the three vertices of the current triangle
+    // Transform vertices from model space to world space, then to view space, then to screen space
     float3 a = vertex_to_screen(model.vertices[tri * 3 + 0], model.transform, cam, screen_dim);
     float3 b = vertex_to_screen(model.vertices[tri * 3 + 1], model.transform, cam, screen_dim);
     float3 c = vertex_to_screen(model.vertices[tri * 3 + 2], model.transform, cam, screen_dim);
-    
-    if (a.z < 0 || b.z < 0 || c.z < 0) continue; // skip tri if any vertex is behind camera
 
-    // Calculate the signed area of the projected triangle on the screen.
-    // A positive area indicates a counter-clockwise winding (front-facing),
-    // and a negative area indicates a clockwise winding (back-facing).
-    // If the triangle is back-facing or degenerate (area near zero), skip rendering it.
-    float projected_area = -signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
-    if (projected_area <= EPSILON) { // Use EPSILON to handle floating point inaccuracies and degenerate triangles
-        continue; // Skip back-facing or degenerate triangles
-    }
+    // Get the UV coordinates for the current triangle's vertices
+    float2 uv_a = model.uvs[tri * 3 + 0];
+    float2 uv_b = model.uvs[tri * 3 + 1];
+    float2 uv_c = model.uvs[tri * 3 + 2];
 
-    // Compute triangle bounding box (clamped to screen)
+    // Basic frustum culling: skip triangle if any vertex is behind the camera (z <= 0)
+    // Note: a.z, b.z, c.z here are 1/w values from vertex_to_screen
+    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; 
+
+    Serial.printf("Processing Triangle %d (Orig Vtx Indices: %d, %d, %d)\n", tri, tri * 3, tri * 3 + 1, tri * 3 + 2);
+    Serial.printf("  Screen coords: A(%d,%d,%d), B(%d,%d,%d), C(%d,%d,%d)\n", (int)(a.x * 100), (int)(a.y * 100), (int)(a.z * 100), (int)(b.x * 100), (int)(b.y * 100), (int)(b.z * 100), (int)(c.x * 100), (int)(c.y * 100), (int)(c.z * 100));
+
+    // Back-face culling implementation: skip back-facing or degenerate triangles
+    float projected_area = signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
+    Serial.printf("  Signed Triangle Area: %d\n", (int)(projected_area * 100));
+    // if (projected_area >= 0) { // <-- problematic potentially
+    //     Serial.printf("  Triangle %d CULLED (Area <= 0)\n", tri);
+    //     continue; 
+    // }
+
+    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (a.z, b.z, c.z)
+    // This gives us u/w and v/w, which we can interpolate linearly.
+    // At the pixel, we'll divide by the interpolated 1/w to get the correct u and v.
+    float2 uv_a_prime = uv_a / a.z; // u_a * (1/w_a), v_a * (1/w_a)
+    float2 uv_b_prime = uv_b / b.z; // u_b * (1/w_b), v_b * (1/w_b)
+    float2 uv_c_prime = uv_c / c.z; // u_c * (1/w_c), v_c * (1/w_c)
+
+
+    // Compute triangle bounding box (clamped to screen boundaries)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
     float max_x = fminf(Device::width - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
     float max_y = fminf(Device::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
-    // Precompute color for this triangle
+    // Precompute color for this triangle (fallback if no texture)
     int color_idx = tri < model.cols.size() ? tri : 0;
-    uint16_t color = rgb_to_565(model.cols[color_idx].x, model.cols[color_idx].y, model.cols[color_idx].z);
+    uint16_t flat_color = rgb_to_565(model.cols[color_idx].x, model.cols[color_idx].y, model.cols[color_idx].z);
 
-    // Rasterize only within bounding box
+    // Rasterize only within the computed bounding box
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
       for (int x = (int)min_x; x <= (int)max_x; ++x) {
-        float3 weights;
+        float2 p = { (float)x, (float)y }; // Current pixel coordinate
 
-        if (point_in_triangle(float2(a.x, a.y), float2(b.x, b.y), float2(c.x, c.y), float2(x, y), weights)) {
-          float3 depths(a.z, b.z, c.z);
-          float depth = 1 / float3::dot(1 / depths, weights);
+        float3 weights; // Barycentric coordinates
+        // Check if the current pixel is inside the triangle
+        if (point_in_triangle({a.x, a.y}, {b.x, b.y}, {c.x, c.y}, p, weights)) {
+          // Interpolate depth using barycentric coordinates (this is 1/w_interpolated)
+          float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z); // new_depth is actual interpolated Z
 
-          if (depth < 0 || depth > Device::max_depth) continue;
+          // Z-buffering: check if this pixel is closer than what's already drawn at this position
+          int pixel_idx = y * Device::width + x;
+          if (new_depth < Device::depth_buffer[pixel_idx]) {
+            uint16_t final_pixel_color;
 
-          int idx = x + Device::width * y;
-          if (depth < Device::depth_buffer[idx]) {
-            buff[idx] = color;
-            Device::depth_buffer[idx] = depth;
+            if (use_texture && texture_data) {
+              // Interpolate perspective-corrected UVs
+              float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
+              float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
+
+              // Divide by interpolated 1/w (new_depth is already 1/w_interpolated)
+              // NOTE: new_depth is the actual interpolated Z-value here, not 1/w.
+              // We need the interpolated 1/w which is 1.0f / new_depth.
+              // So, u = (u/w)_interp / (1/w)_interp = interpolated_u_prime / (1.0f / new_depth)
+              // This simplifies to u = interpolated_u_prime * new_depth;
+              float final_u = interpolated_u_prime * new_depth;
+              float final_v = interpolated_v_prime * new_depth;
+
+              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates [0, tex_width-1], [0, tex_height-1]
+              int tex_x = static_cast<int>(final_u * tex_width);
+              int tex_y = static_cast<int>(final_v * tex_height);
+
+              // Clamp texture coordinates to avoid out-of-bounds access (optional, but good practice)
+              tex_x = constrain(tex_x, 0, tex_width - 1);
+              tex_y = constrain(tex_y, 0, tex_height - 1);
+
+              final_pixel_color = texture_data[tex_y * tex_width + tex_x];
+            } else {
+              final_pixel_color = flat_color; // Use flat color as fallback
+            }
+            
+            buff[pixel_idx] = final_pixel_color; // Draw the pixel
+            Device::depth_buffer[pixel_idx] = new_depth; // Update depth buffer
           }
         }
       }
