@@ -17,6 +17,7 @@ struct float3 {
   float3 operator+(const float3& other) const;
   float3 operator-(const float3& other) const;
   float3 operator*(float scalar) const;
+  float3 operator*(const float3& other) const;
   float3 operator/(float scalar) const;
   float3 operator+=(const float3& other);
   float3 operator-=(const float3& other);

@@ -1,0 +1,21 @@
+[submodule "lib/CMSIS"]
+	path = lib/CMSIS
+	url = https://github.com/ARM-software/CMSIS_5.git
+[submodule "lib/CMSIS-Atmel"]
+	path = lib/CMSIS-Atmel
+	url = https://github.com/arduino/ArduinoModule-CMSIS-Atmel.git
+[submodule "lib/SPIFlash"]
+	path = lib/SPIFlash
+	url = https://github.com/adafruit/Adafruit_SPIFlash.git
+[submodule "lib/Adafruit-GFX"]
+	path = lib/Adafruit-GFX
+	url = https://github.com/adafruit/Adafruit-GFX-Library.git
+[submodule "lib/BusIO"]
+	path = lib/BusIO
+	url = https://github.com/adafruit/Adafruit_BusIO.git
+[submodule "lib/ST7735"]
+	path = lib/ST7735
+	url = https://github.com/adafruit/Adafruit-ST7735-Library.git
+[submodule "lib/samd-core"]
+	path = lib/samd-core
+	url = https://github.com/adafruit/ArduinoCore-samd.git

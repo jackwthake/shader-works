@@ -38,6 +38,10 @@ float3 float3::operator*(float scalar) const {
   return float3(x * scalar, y * scalar, z * scalar);
 }
 
+float3 float3::operator*(const float3& other) const {
+  return float3(x * other.x, y * other.y, z * other.z);
+}
+
 float3 float3::operator/(float scalar) const {
   if (scalar != 0) {
     return float3(x / scalar, y / scalar, z / scalar);
