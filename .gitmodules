@@ -7,9 +7,9 @@
 [submodule "lib/SPIFlash"]
 	path = lib/SPIFlash
 	url = https://github.com/adafruit/Adafruit_SPIFlash.git
-[submodule "lib/BusIO"]
-	path = lib/BusIO
-	url = https://github.com/adafruit/Adafruit_BusIO.git
+[submodule "lib/SdFat"]
+	path = lib/SdFat
+	url = https://github.com/adafruit/SdFat.git
 [submodule "lib/samd-core"]
 	path = lib/samd-core
 	url = https://github.com/adafruit/ArduinoCore-samd.git
