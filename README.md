@@ -2,6 +2,9 @@
 
 A real-time 3D software rasterizer written in C++ for the Adafruit PyGamer M4 development board. This project demonstrates advanced embedded graphics programming, featuring custom 3D rendering, texture mapping, and QSPI flash-based resource management on ARM Cortex-M4 hardware.
 
+![trim 0F0E8C95-FEEA-4100-9E01-108D7FB7BA68](https://github.com/user-attachments/assets/ffdd5347-e50c-466f-96e4-c8a2eb842b11)
+
+
 ## Features
 
 - **Real-time 3D Rendering**: Custom software rasterizer with perspective projection
@@ -167,33 +170,21 @@ If you prefer to understand the build process:
 
 ## Resource Management
 
-### ⚠️ Critical First Step: QSPI Flash Setup
-
-**This step is mandatory before the main rasterizer will function properly.**
-
-Before running the main rasterizer, you **must** format the QSPI flash and upload resources using the flash format utility. This is required:
-- On first installation
-- Whenever files in the `res/` directory are modified
-- If the QSPI flash becomes corrupted
-
-### Flash Format Process
+### Reflashing the QSPI Flash
 
 1. **Navigate to flash format utility**
    ```bash
    cd tools/flash_format
    ```
 
-2. **Generate resource files**
-   ```bash
-   python3 res_copy.py
-   ```
-   This creates the necessary `files.h` header with embedded resources.
 
 3. **Build and flash the formatter**
    ```bash
    # Build the flash formatter
    chmod +x build
-   ./build
+
+   # build will execute res_copy.py and bake all files found in the res/ directory
+   ./build 
    
    # Put PyGamer in bootloader mode (double-click reset button)
    # Flash the formatter binary using bossac
@@ -206,13 +197,11 @@ Before running the main rasterizer, you **must** format the QSPI flash and uploa
    - Monitor the output to ensure successful formatting
    - Return to the main directory: `cd ../..`
 
-**⚠️ Warning**: The main software rasterizer will not work correctly without this step. If you see resource loading errors or blank screens, ensure the flash format process was completed successfully.
-
 ### Resource Files
 
 - **atlas.bmp**: Texture atlas for 3D models
+- **test.bmp**: Test texture, 1 8x8 tile
 - **cube.obj**: 3D model data in Wavefront OBJ format
-- **test.txt**: Sample text data
 
 ---
 
@@ -224,7 +213,6 @@ Connect to the PyGamer's serial port at **115200 baud** for:
 - Real-time performance metrics
 - Memory usage statistics  
 - Error messages and warnings
-- Test results output
 
 ### Performance Optimization
 
