@@ -24,6 +24,7 @@
 #define ST7735_GMCTRN1 0xE1
 #define ST7735_NORON   0x13
 
+extern SPIClass SPI1; // Use SPI1 for display communication
 
 uint8_t init_cmds[] = {           // 7735R init
   19,                             // 19 commands in list:

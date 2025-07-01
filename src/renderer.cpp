@@ -236,6 +236,26 @@ void render_model(uint16_t *buff, float *depth_buf, Resource_manager &manager, T
               final_pixel_color = flat_color; // Use flat color as fallback
             }
             
+            // Apply distance-based fog
+            float fog_factor = (new_depth - FOG_START) / (FOG_END - FOG_START);
+            fog_factor = constrain(fog_factor, 0.0f, 1.0f);
+
+            // Extract RGB components from BGR565 format correctly
+            uint8_t b = (final_pixel_color & 0x1F) << 3;        // Blue: bits 0-4, expand to 8-bit
+            uint8_t g = ((final_pixel_color >> 5) & 0x3F) << 2; // Green: bits 5-10, expand to 8-bit  
+            uint8_t r = ((final_pixel_color >> 11) & 0x1F) << 3; // Red: bits 11-15, expand to 8-bit
+
+            // Fog color (light gray) - 8-bit values
+            constexpr uint8_t fog_r = 175;
+            constexpr uint8_t fog_g = 175;
+            constexpr uint8_t fog_b = 255;
+
+            // Interpolate between original color and fog color
+            r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
+            g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
+            b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
+
+            final_pixel_color = rgb_to_565(r, g, b);
             buff[pixel_idx] = final_pixel_color; // Draw the pixel
             depth_buf[pixel_idx] = new_depth; // Update depth buffer
           }

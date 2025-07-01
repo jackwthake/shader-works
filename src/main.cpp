@@ -99,8 +99,8 @@ void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_i
  */
 void render_frame(Resource_manager &manager, uint16_t *buf, float *depth_buffer, Display &display, Transform &camera, Model &cube) {
   // clear buffers and swap back and front buffers
-  memset(buf, 0x00, display.width * display.height * sizeof(uint16_t));
-  
+  memset(buf, 0x971c, display.width * display.height * sizeof(uint16_t));
+
   for (int i = 0; i < Display::width * Display::height; ++i) {
     depth_buffer[i] = MAX_DEPTH;
   }
@@ -126,7 +126,7 @@ void tick_world(float delta_time, Transform &camera, Model &cube) {
     move_delta += (cam_fwd * -1);
   
   // bob and spin test cube
-  cube.transform.position.y = sin((float)millis() / 1000) * 7 * delta_time;
+  cube.transform.position.y = (sin((float)millis() / 1000) * 7 * delta_time) + 2;
   cube.transform.yaw += delta_time;
 
   /** Button Test */
@@ -185,12 +185,7 @@ int main(void) {
       delta_time = (float)tick_interval / 1000.0f; // fixed delta time in seconds
       last_tick += tick_interval;
 
-      tick_world(delta_time, camera, cube);
-      Serial.printf("Camera Position: (%.2f, %.2f, %.2f), Yaw: %.2f\n", camera.position.x, camera.position.y, camera.position.z, camera.yaw);
-      Serial.printf("Cube Position: (%.2f, %.2f, %.2f), Yaw: %.2f\n", cube.transform.position.x, cube.transform.position.y, cube.transform.position.z, cube.transform.yaw);
-      Serial.printf("Ticks processed: %d\n", ticks_processed);
-      Serial.printf("Delta Time: %.3f seconds\n", delta_time);
-
+      tick_world(delta_time, camera, cube); // Update the world state
       ticks_processed++;
     }
 
