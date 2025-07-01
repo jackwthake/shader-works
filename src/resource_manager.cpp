@@ -437,21 +437,24 @@ bool Resource_manager::get_tile_from_atlas(resource_id_t id, unsigned tile_id, u
 void Resource_manager::init_QSPI_flash() {
   this->flash = Adafruit_SPIFlash(&this->flash_transport);
   this->file_sys = FatVolume();
+  Serial.println("flash transport created and file system created");
 
+  Serial.println("attempting to mount flash filesystem");
   if (this->flash.begin()) {
-    log("Filesystem found\n");
-    log("Flash chip JEDEC ID: %#04x\n", this->flash.getJEDECID());
-    log("Flash chip size: %lu bytes\n", this->flash.size());
+    Serial.printf("Filesystem found\n");
+    Serial.printf("Flash chip JEDEC ID: %#04x\n", this->flash.getJEDECID());
+    Serial.printf("Flash chip size: %lu bytes\n", this->flash.size());
 
     // First call begin to mount the filesystem.  Check that it returns true
     // to make sure the filesystem was mounted.
     if (!this->file_sys.begin(&this->flash)) {
-      log_panic("Failed to mount Filesystem.\n");
+      Serial.println("Failed to mount Filesystem.\n");
+      for(;;); // Halt execution if the filesystem cannot be mounted
     }
 
-    log("Dumping root directory\n");
+    Serial.printf("Dumping root directory\n");
     this->file_sys.dmpRootDir(&Serial);
-    log("Filesystem mounted successfully.\n");
+    Serial.printf("Filesystem mounted successfully.\n");
   }
 }
 
@@ -477,8 +480,10 @@ bool Resource_manager::load_text(File32 &f) {
   // allocate buffer
   Serial.printf("Allocated %u bytes for resource\n", entry->length);
   entry->data = new char[entry->length];
-  if (!entry->data)
-    log_panic("Failed to allocated %u bytes for file load\n", entry->length);
+  if (!entry->data) {
+    Serial.printf("Failed to allocated %u bytes for file load\n", entry->length);
+    for(;;);
+  }
 
   // read file into memory, stop when an EOF character is encountered
   int16_t c, idx = 0;
@@ -491,12 +496,11 @@ bool Resource_manager::load_text(File32 &f) {
   return true;
 }
 
-
-/**
- * Read in a bitmap from flash, store the pixel data in rgb 565 format, ready to be blitted to the display.
- * @param f Open file to read from, assumes f is valid and readable
- * @returns true upon successful decode, false otherwise
- */
+  /**
+   * Read in a bitmap from flash, store the pixel data in rgb 565 format, ready to be blitted to the display.
+   * @param f Open file to read from, assumes f is valid and readable
+   * @returns true upon successful decode, false otherwise
+   */
 bool Resource_manager::load_bmp(File32 &f) {
   bitmap_file_header_t header;
   Resource_entry_t *entry = &this->resources[this->num_resources];
@@ -506,11 +510,11 @@ bool Resource_manager::load_bmp(File32 &f) {
 
   size_t read = f.read(&header, sizeof(bitmap_file_header_t));
   if (read != sizeof(bitmap_file_header_t)) {
-    log_panic("Expected to read %u bytes but only read %u bytes\n", sizeof(bitmap_file_header_t), read);
+    Serial.printf("Expected to read %u bytes but only read %u bytes\n", sizeof(bitmap_file_header_t), read);
   }
 
   if (header.bfType != 0x4D42) { // 0x4D42 is 'BM' in little-endian
-    log_panic("Error: Not a valid BMP file (bfType is not 'BM').");
+    Serial.println("Error: Not a valid BMP file (bfType is not 'BM').");
     f.close();
     return false;
   }
@@ -534,12 +538,18 @@ bool Resource_manager::load_bmp(File32 &f) {
   Serial.printf("biClrImportant: %u\n", header.biClrImportant);
 
   // Validate essential info for a 24-bit BMP
-  if (header.biSize != 40)
-    log_panic("Warning: biSize is not 40. This might not be a standard Windows BMP info header.");
-  if (header.biBitCount != 32)
-    log_panic("Error: This is not a 32-bit BMP (biBitCount is %u).\n", (unsigned int)header.biBitCount);
-  if (header.biCompression != 0) // BI_RGB
-    log_panic("Error: Only uncompressed (BI_RGB) 24-bit BMPs are supported (biCompression is %u).\n", header.biCompression);
+  if (header.biSize != 40) {
+    Serial.println("Warning: biSize is not 40. This might not be a standard Windows BMP info header.");
+    for(;;);
+  }
+  if (header.biBitCount != 32) {
+    Serial.printf("Error: This is not a 32-bit BMP (biBitCount is %u).\n", (unsigned int)header.biBitCount);
+    for(;;);
+  }
+  if (header.biCompression != 0) { // BI_RGB
+    Serial.printf("Error: Only uncompressed (BI_RGB) 24-bit BMPs are supported (biCompression is %u).\n", header.biCompression);
+    for (;;);
+  }
 
   // Determine actual image height (absolute value)
   int32_t imageHeight = abs(header.biHeight);
@@ -550,9 +560,11 @@ bool Resource_manager::load_bmp(File32 &f) {
 
   entry->length = header.biWidth * imageHeight;
   entry->data = new uint16_t[entry->length];
-  if (!entry->data)
-    log_panic("Failed to allocate buffer for resource of size %u", entry->length);
-  
+  if (!entry->data) {
+    Serial.printf("Failed to allocate buffer for resource of size %u\n", entry->length);
+    for (;;);
+  }
+
   // Calculate row size in bytes dynamically based on biBitCount
   // Rows in BMP are padded to be a multiple of 4 bytes.
   int bytes_per_pixel = header.biBitCount / 8; // Calculate bytes per pixel

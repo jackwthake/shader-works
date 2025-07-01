@@ -10,10 +10,44 @@
 #define ST7735_MADCTL  0x36
 #define ST7735_COLMOD  0x3A
 
+/**
+ * Reverses the elements of a uint16_t array in-place.
+ * @param buffer A pointer to the uint16_t array to be reversed.
+ * @param n The number of elements in the array.
+ */
+static void reverse_buffer(uint16_t* buffer, size_t n) {
+  // Guard against null pointers or empty arrays.
+  if (!buffer || n == 0) {
+    return;
+  }
+
+  // Initialize two pointers: one at the start and one at the end.
+  size_t start = 0;
+  size_t end = n - 1;
+
+  // Loop until the pointers meet or cross in the middle.
+  while (start < end) {
+    // Swap the elements at the start and end positions.
+    uint16_t temp = buffer[start];
+    buffer[start] = buffer[end];
+    buffer[end] = temp;
+
+    // Move the pointers towards the center.
+    start++;
+    end--;
+  }
+}
+
+
 Display::Display() {
   spi = &SPI1;
 }
 
+
+/**
+ * Initializes the display by setting up the pins and sending the necessary commands.
+ * This function must be called before any drawing operations.
+ */
 void Display::begin() {
   // Pin Initialization
   pinMode(cs_pin, OUTPUT);
@@ -33,7 +67,6 @@ void Display::begin() {
   spi->begin();
   SPISettings settings(24000000, MSBFIRST, SPI_MODE0);
   
-  // Minimal Init Sequence (known good from our test)
   spi->beginTransaction(settings);
   digitalWrite(cs_pin, LOW);
   digitalWrite(dc_pin, LOW); spi->transfer(ST7735_SWRESET);
@@ -65,13 +98,13 @@ void Display::begin() {
   spi->endTransaction();
 }
 
+
+/**
+ * Draws a full-screen buffer using blocking SPI transfers.
+ * @param buffer Pointer to a 160x128 uint16_t buffer.
+ */
 void Display::draw(uint16_t *buffer) {
-  uint32_t n = width * height;
-  for (uint32_t i = 0; i < n / 2; ++i) {
-    uint16_t temp = buffer[i];
-    buffer[i] = buffer[n - 1 - i];
-    buffer[n - 1 - i] = temp;
-  }
+  reverse_buffer(buffer, width * height); // Reverse the buffer for correct display order
 
 
   SPISettings settings(24000000, MSBFIRST, SPI_MODE0);
@@ -104,6 +137,13 @@ void Display::draw(uint16_t *buffer) {
   spi->endTransaction();
 }
 
+
+/**
+ * Swaps the bytes of each 16-bit value in the array.
+ * This is useful for converting between little-endian and big-endian formats.
+ * @param src Pointer to the source array of uint16_t values.
+ * @param len The number of elements in the array.
+ */
 void Display::swap_bytes(uint16_t *src, uint32_t len) {
   for (uint32_t i = 0; i < len; i++) {
     src[i] = __builtin_bswap16(src[i]);

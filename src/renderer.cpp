@@ -3,12 +3,29 @@
 #include <cmath>
 
 #include "device.h"
+#include "display.h"
 #include "util/helpers.h"
 #include "util/maths.h"
 
 using namespace std;
 
 #define EPSILON 0.0001f
+
+
+ /**
+ * packs 3 8 bit RGB values into a 16 bit BGR565 value.
+ * The 16 bit value is packed as follows:
+ *  - 5 bits for blue (B)
+ *  - 6 bits for green (G)
+ *  - 5 bits for red (R) 
+ */
+static uint16_t rgb_to_565(uint8_t r, uint8_t g, uint8_t b) {
+    uint16_t BGRColor = b >> 3;
+    BGRColor         |= (g & 0xFC) << 3;
+    BGRColor         |= (r & 0xF8) << 8;
+
+    return BGRColor;
+}
 
 
 /**
@@ -117,8 +134,8 @@ void compute_uv_coords(std::vector<float2>& uvs, int tile_id) {
  * @param camera The camera's transform (position and orientation).
  * @param model The Model to render, containing vertices, colors, and its own transform.
  */
-void render_model(uint16_t *buff, Transform &cam, Model &model) {
-  float2 screen_dim = { (float)Device::width, (float)Device::height };
+void render_model(uint16_t *buff, float *depth_buf, Resource_manager &manager, Transform &cam, Model &model) {
+  float2 screen_dim = { (float)Display::width, (float)Display::height };
 
   // Get texture atlas data if a valid ID is provided
   const Resource_entry_t* texture_res = nullptr;
@@ -128,7 +145,7 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
   bool use_texture = false;
 
   if (model.texture_atlas_id != INVALID_RESOURCE) {
-    texture_res = Device::manager.get_resource(model.texture_atlas_id);
+    texture_res = manager.get_resource(model.texture_atlas_id);
     if (texture_res && texture_res->type == BITMAP_FILE) {
       texture_data = reinterpret_cast<const uint16_t*>(texture_res->data);
       tex_width = texture_res->width;
@@ -174,9 +191,9 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
 
     // Compute triangle bounding box (clamped to screen boundaries)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
-    float max_x = fminf(Device::width - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
+    float max_x = fminf(Display::width - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
-    float max_y = fminf(Device::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
+    float max_y = fminf(Display::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
     // Precompute color for this triangle (fallback if no texture)
     uint16_t flat_color = rgb_to_565(255, 0, 255);
@@ -193,8 +210,8 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
           float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z); // new_depth is actual interpolated Z
 
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
-          int pixel_idx = y * Device::width + x;
-          if (new_depth < Device::depth_buffer[pixel_idx]) {
+          int pixel_idx = y * Display::width + x;
+          if (new_depth < depth_buf[pixel_idx]) {
             uint16_t final_pixel_color;
 
             if (use_texture && texture_data) {
@@ -220,7 +237,7 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
             }
             
             buff[pixel_idx] = final_pixel_color; // Draw the pixel
-            Device::depth_buffer[pixel_idx] = new_depth; // Update depth buffer
+            depth_buf[pixel_idx] = new_depth; // Update depth buffer
           }
         }
       }

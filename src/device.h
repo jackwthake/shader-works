@@ -7,26 +7,7 @@
 
 // Encapsulate necessary program globals
 namespace Device  {
-  constexpr int width = 160, height = 128;
-  constexpr int screen_buffer_len = width * height;
-  constexpr float max_depth = 100.0f; // Maximum depth value for the depth buffer
-  constexpr unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
   constexpr float JOYSTICK_THRESH = 0.2;
-  
-  extern Resource_manager manager;
-
-  extern uint16_t front_buffer[screen_buffer_len];
-  extern uint16_t back_buffer[screen_buffer_len];
-  extern float depth_buffer[screen_buffer_len];
-
-  // Game Variables
-  extern unsigned long now, last_tick;
-  extern float delta_time;
-  extern bool log_debug_to_screen;
-
-  extern void pin_init();
-  extern void tft_init();
-  extern void spi_flash_init();
 
   extern float read_joystick_x(uint8_t sampling=3);
   extern float read_joystick_y(uint8_t sampling=3);

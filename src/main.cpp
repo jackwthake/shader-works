@@ -39,9 +39,20 @@ static void serial_poll_events() {
 }
 
 
-void resource_init(resource_id_t &cube_id, resource_id_t &atlas_id, Model &cube) {
+static void button_init() {
   using namespace Device;
 
+  pinMode(BUTTON_PIN_CLOCK, OUTPUT);
+  digitalWrite(BUTTON_PIN_CLOCK, HIGH);
+  
+  pinMode(BUTTON_PIN_LATCH, OUTPUT);
+  digitalWrite(BUTTON_PIN_LATCH, HIGH);
+
+  pinMode(BUTTON_PIN_DATA, INPUT);
+}
+
+
+void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_id_t &atlas_id, Model &cube) {
   manager.init_QSPI_flash();
 
   // Initialize the cube model
@@ -53,19 +64,23 @@ void resource_init(resource_id_t &cube_id, resource_id_t &atlas_id, Model &cube)
   // Load the cube model from resources
   cube_id = manager.load_resource("cube.obj");
   if (cube_id == INVALID_RESOURCE) {
-    log_panic("Failed to load cube model.\n");
+    Serial.println("Failed to load cube model.\n");
+    for(;;); // Halt execution if the cube model cannot be loaded
   }
 
   manager.read_obj_resource(cube_id, cube);
-  if (cube.vertices.size() == 0)
-    log_panic("Failed to init cube model");
-  
+  if (cube.vertices.size() == 0) {
+    Serial.println("Failed to init cube model");
+    for(;;); // Halt execution if the cube model cannot be initialized
+  }
+
   // Load the texture atlas
   resource_id_t texture_id = manager.load_resource("atlas.bmp");
   if (texture_id != INVALID_RESOURCE) {
     cube.texture_atlas_id = texture_id; // Assign the texture ID to your model
   } else {
-    log_panic("Invalid bitmap");
+    Serial.println("Invalid bitmap");
+    for(;;); // Halt execution if the cube model cannot be loaded
   }
 
   compute_uv_coords(cube.uvs, 2); // top face
@@ -82,22 +97,22 @@ void resource_init(resource_id_t &cube_id, resource_id_t &atlas_id, Model &cube)
 /**
  * Manages the double buffering rendering strategy
  */
-void render_frame(Display &display, Transform &camera, Model &cube) {
-  using namespace Device;
-
+void render_frame(Resource_manager &manager, uint16_t *buf, float *depth_buffer, Display &display, Transform &camera, Model &cube) {
   // clear buffers and swap back and front buffers
-  _swap_ptr(front_buffer, back_buffer);
-  memset(back_buffer, 0x00, screen_buffer_len * sizeof(uint16_t));
-  memset(depth_buffer, max_depth, screen_buffer_len * sizeof(float));
+  memset(buf, 0x00, display.width * display.height * sizeof(uint16_t));
+  
+  for (int i = 0; i < Display::width * Display::height; ++i) {
+    depth_buffer[i] = MAX_DEPTH;
+  }
 
-  render_model(back_buffer, camera, cube); // draw cube
+  render_model(buf, depth_buffer, manager, camera, cube); // draw cube
 
   // Blit the framebuffer to the screen
-  display.draw(back_buffer);
+  display.draw(buf);
 }
 
 
-void tick_world(Transform &camera, Model &cube) {
+void tick_world(float delta_time, Transform &camera, Model &cube) {
   using namespace Device;
 
   camera.yaw += -(read_joystick_x() * 2) * delta_time;
@@ -111,9 +126,8 @@ void tick_world(Transform &camera, Model &cube) {
     move_delta += (cam_fwd * -1);
   
   // bob and spin test cube
-  cube.transform.position.y = sin((float)now / 1000) * 7 * delta_time;
+  cube.transform.position.y = sin((float)millis() / 1000) * 7 * delta_time;
   cube.transform.yaw += delta_time;
-
 
   /** Button Test */
   uint32_t buttons = read_buttons();
@@ -132,47 +146,55 @@ void tick_world(Transform &camera, Model &cube) {
 
 
 int main(void) {
+  constexpr unsigned long tick_interval = 50;
+  unsigned long now, last_tick = 0;
+  float delta_time = 0.0f;
+
   resource_id_t cube_id;
   resource_id_t atlas_id;
   Transform camera;
   Model cube;
 
-  init_arduino();
-  Device::pin_init(); // Initialize button pins
-
-  // Create the buffer to hold the screen's pixel data
-  uint16_t screen_buffer[Display::width * Display::height];
-
-  // Create the display object
+  init_arduino(); // Initialize Arduino and USB
+  button_init();  // Initialize button pins
+  
+  // Initialize display and buffers
   Display display;
-
+  uint16_t screen_buffer[Display::width * Display::height];
+  float depth_buffer[Display::width * Display::height];
+  
   Serial.println("Initializing display...");
   display.begin();
   Serial.println("Display initialized successfully. Starting render loop.");
-
+  
   // Initialize resources
-  resource_init(cube_id, atlas_id, cube);
+  Resource_manager manager;
+  resource_init(manager, cube_id, atlas_id, cube);
 
-  camera.position = { 1, 0, 1 };
+  last_tick = millis(); // Initialize last tick time
+
+  camera.position = { 1, 2, 0 };
 
   for (;;) {
-    using namespace Device;
-
     serial_poll_events(); // Poll for serial events
     now = millis();
 
     // Process all pending ticks to maintain a fixed timestep
     int ticks_processed = 0;
     while ((now - last_tick) >= tick_interval && ticks_processed < 5) { // Limit catch-up to avoid spiral of death
-      delta_time = tick_interval / 1000.0f; // fixed delta time in seconds
+      delta_time = (float)tick_interval / 1000.0f; // fixed delta time in seconds
       last_tick += tick_interval;
 
-      tick_world(camera, cube);
+      tick_world(delta_time, camera, cube);
+      Serial.printf("Camera Position: (%.2f, %.2f, %.2f), Yaw: %.2f\n", camera.position.x, camera.position.y, camera.position.z, camera.yaw);
+      Serial.printf("Cube Position: (%.2f, %.2f, %.2f), Yaw: %.2f\n", cube.transform.position.x, cube.transform.position.y, cube.transform.position.z, cube.transform.yaw);
+      Serial.printf("Ticks processed: %d\n", ticks_processed);
+      Serial.printf("Delta Time: %.3f seconds\n", delta_time);
 
       ticks_processed++;
     }
 
-    render_frame(display, camera, cube); // Render the frame
+    render_frame(manager, screen_buffer, depth_buffer, display, camera, cube); // Render the frame
   }
 
   return 0;

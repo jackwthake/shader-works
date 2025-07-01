@@ -64,11 +64,11 @@ float3 float3::operator+=(const float3& other) {
 
 float3 float3::operator-=(const float3& other) {
   // Add the x components
-  x += other.x;
+  x -= other.x;
   // Add the y components
-  y += other.y;
+  y -= other.y;
   // Add the z components
-  z += other.z;
+  z -= other.z;
   // Return a reference to the modified current object
   return *this;
 }

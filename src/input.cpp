@@ -15,45 +15,7 @@ static float map_joystick_range(int16_t value) {
 }
 
 
-
 namespace Device {
-
-/**
- * Initialize critical components of the device.
- */
-Resource_manager manager;
-
-uint16_t back_buffer[screen_buffer_len] = { 0x00 };
-uint16_t front_buffer[screen_buffer_len] = { 0x00 };
-float depth_buffer[screen_buffer_len] = { 0x00 };;
-
-unsigned long now = 0, last_tick = 0;
-float delta_time = 0;
-bool log_debug_to_screen = true;
-
-
-void pin_init() {
-  pinMode(BUTTON_PIN_CLOCK, OUTPUT);
-  digitalWrite(BUTTON_PIN_CLOCK, HIGH);
-  
-  pinMode(BUTTON_PIN_LATCH, OUTPUT);
-  digitalWrite(BUTTON_PIN_LATCH, HIGH);
-
-  pinMode(BUTTON_PIN_DATA, INPUT);
-}
-
-/**
- * Initialize the TFT display
- * Sets up the backlight, initializes the display, and sets the rotation.
- */
-void tft_init() {
-  // DEPRECATD
-}
-
-
-/**
- *  Input Code
- */
 
 /**
  * Generic function that reads a joystick
