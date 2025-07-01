@@ -38,6 +38,10 @@ float3 float3::operator*(float scalar) const {
   return float3(x * scalar, y * scalar, z * scalar);
 }
 
+float3 float3::operator*(const float3& other) const {
+  return float3(x * other.x, y * other.y, z * other.z);
+}
+
 float3 float3::operator/(float scalar) const {
   if (scalar != 0) {
     return float3(x / scalar, y / scalar, z / scalar);
@@ -60,11 +64,11 @@ float3 float3::operator+=(const float3& other) {
 
 float3 float3::operator-=(const float3& other) {
   // Add the x components
-  x += other.x;
+  x -= other.x;
   // Add the y components
-  y += other.y;
+  y -= other.y;
   // Add the z components
-  z += other.z;
+  z -= other.z;
   // Return a reference to the modified current object
   return *this;
 }

@@ -3,12 +3,29 @@
 #include <cmath>
 
 #include "device.h"
+#include "display.h"
 #include "util/helpers.h"
 #include "util/maths.h"
 
 using namespace std;
 
 #define EPSILON 0.0001f
+
+
+ /**
+ * packs 3 8 bit RGB values into a 16 bit BGR565 value.
+ * The 16 bit value is packed as follows:
+ *  - 5 bits for blue (B)
+ *  - 6 bits for green (G)
+ *  - 5 bits for red (R) 
+ */
+static uint16_t rgb_to_565(uint8_t r, uint8_t g, uint8_t b) {
+    uint16_t BGRColor = b >> 3;
+    BGRColor         |= (g & 0xFC) << 3;
+    BGRColor         |= (r & 0xF8) << 8;
+
+    return BGRColor;
+}
 
 
 /**
@@ -75,6 +92,39 @@ static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Trans
 }
 
 
+void compute_uv_coords(std::vector<float2>& uvs, int tile_id) {
+  if (tile_id < 0 || tile_id >= TOTAL_TILES) {
+    Serial.printf("Error: Tile ID %d is out of bounds. Must be between 0 and %d\n", tile_id, (TOTAL_TILES - 1));
+  }
+
+  // Calculate the tile's top-left pixel corner in the atlas.
+  float tile_x_start = static_cast<float>((tile_id % TILES_PER_ROW) * TILE_WIDTH_PX);
+  float tile_y_start = static_cast<float>((tile_id / TILES_PER_ROW) * TILE_HEIGHT_PX);
+
+  // Convert pixel coordinates to normalized UV coordinates [0.0, 1.0] by casting constants to float.
+  float u_start = tile_x_start / static_cast<float>(ATLAS_WIDTH_PX);
+  float v_start = tile_y_start / static_cast<float>(ATLAS_HEIGHT_PX);
+  float u_end = (tile_x_start + static_cast<float>(TILE_WIDTH_PX)) / static_cast<float>(ATLAS_WIDTH_PX);
+  float v_end = (tile_y_start + static_cast<float>(TILE_HEIGHT_PX)) / static_cast<float>(ATLAS_HEIGHT_PX);
+
+  // Define the 4 UV corners for the tile.
+  float2 uv_top_left     = {u_start, v_start};
+  float2 uv_top_right    = {u_end,   v_start};
+  float2 uv_bottom_left  = {u_start, v_end};
+  float2 uv_bottom_right = {u_end,   v_end};
+
+  // Add UVs for the first triangle (v0, v1, v2)
+  uvs.push_back(uv_top_left);     // Corresponds to vertex v0
+  uvs.push_back(uv_bottom_left);  // Corresponds to vertex v1
+  uvs.push_back(uv_bottom_right); // Corresponds to vertex v2
+
+  // Add UVs for the second triangle (v0, v2, v3)
+  uvs.push_back(uv_top_left);     // Corresponds to vertex v0
+  uvs.push_back(uv_bottom_right); // Corresponds to vertex v2
+  uvs.push_back(uv_top_right);    // Corresponds to vertex v3
+}
+
+
 /**
  * Renders a 3D model onto a 2D buffer using a basic rasterization pipeline.
  * Applies transformations, projects vertices to screen space, performs simple frustum culling,
@@ -84,8 +134,8 @@ static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Trans
  * @param camera The camera's transform (position and orientation).
  * @param model The Model to render, containing vertices, colors, and its own transform.
  */
-void render_model(uint16_t *buff, Transform &cam, Model &model) {
-  float2 screen_dim = { (float)Device::width, (float)Device::height };
+void render_model(uint16_t *buff, float *depth_buf, Resource_manager &manager, Transform &cam, Model &model) {
+  float2 screen_dim = { (float)Display::width, (float)Display::height };
 
   // Get texture atlas data if a valid ID is provided
   const Resource_entry_t* texture_res = nullptr;
@@ -95,7 +145,7 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
   bool use_texture = false;
 
   if (model.texture_atlas_id != INVALID_RESOURCE) {
-    texture_res = Device::manager.get_resource(model.texture_atlas_id);
+    texture_res = manager.get_resource(model.texture_atlas_id);
     if (texture_res && texture_res->type == BITMAP_FILE) {
       texture_data = reinterpret_cast<const uint16_t*>(texture_res->data);
       tex_width = texture_res->width;
@@ -109,11 +159,15 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
 
   // Loop through each triangle in the model
   for (int tri = 0; tri < model.vertices.size() / 3; ++tri) {
+    float3 scaled_vertex_a = model.vertices[tri * 3 + 0] * model.scale;
+    float3 scaled_vertex_b = model.vertices[tri * 3 + 1] * model.scale;
+    float3 scaled_vertex_c = model.vertices[tri * 3 + 2] * model.scale;
+
     // Get the three vertices of the current triangle
     // Transform vertices from model space to world space, then to view space, then to screen space
-    float3 a = vertex_to_screen(model.vertices[tri * 3 + 0], model.transform, cam, screen_dim);
-    float3 b = vertex_to_screen(model.vertices[tri * 3 + 1], model.transform, cam, screen_dim);
-    float3 c = vertex_to_screen(model.vertices[tri * 3 + 2], model.transform, cam, screen_dim);
+    float3 a = vertex_to_screen(scaled_vertex_a, model.transform, cam, screen_dim);
+    float3 b = vertex_to_screen(scaled_vertex_b, model.transform, cam, screen_dim);
+    float3 c = vertex_to_screen(scaled_vertex_c, model.transform, cam, screen_dim);
 
     // Get the UV coordinates for the current triangle's vertices
     float2 uv_a = model.uvs[tri * 3 + 0];
@@ -124,17 +178,9 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
     // Note: a.z, b.z, c.z here are 1/w values from vertex_to_screen
     if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; 
 
-    Serial.printf("Processing Triangle %d (Orig Vtx Indices: %d, %d, %d)\n", tri, tri * 3, tri * 3 + 1, tri * 3 + 2);
-    Serial.printf("  Screen coords: A(%d,%d,%d), B(%d,%d,%d), C(%d,%d,%d)\n", (int)(a.x * 100), (int)(a.y * 100), (int)(a.z * 100), (int)(b.x * 100), (int)(b.y * 100), (int)(b.z * 100), (int)(c.x * 100), (int)(c.y * 100), (int)(c.z * 100));
-
     // Back-face culling implementation: skip back-facing or degenerate triangles
     float projected_area = signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
-    Serial.printf("  Signed Triangle Area: %d\n", (int)(projected_area * 100));
-    // if (projected_area >= 0) { // <-- problematic potentially
-    //     Serial.printf("  Triangle %d CULLED (Area <= 0)\n", tri);
-    //     continue; 
-    // }
-
+ 
     // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (a.z, b.z, c.z)
     // This gives us u/w and v/w, which we can interpolate linearly.
     // At the pixel, we'll divide by the interpolated 1/w to get the correct u and v.
@@ -145,13 +191,12 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
 
     // Compute triangle bounding box (clamped to screen boundaries)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
-    float max_x = fminf(Device::width - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
+    float max_x = fminf(Display::width - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
-    float max_y = fminf(Device::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
+    float max_y = fminf(Display::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
     // Precompute color for this triangle (fallback if no texture)
-    int color_idx = tri < model.cols.size() ? tri : 0;
-    uint16_t flat_color = rgb_to_565(model.cols[color_idx].x, model.cols[color_idx].y, model.cols[color_idx].z);
+    uint16_t flat_color = rgb_to_565(255, 0, 255);
 
     // Rasterize only within the computed bounding box
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
@@ -165,8 +210,8 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
           float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z); // new_depth is actual interpolated Z
 
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
-          int pixel_idx = y * Device::width + x;
-          if (new_depth < Device::depth_buffer[pixel_idx]) {
+          int pixel_idx = y * Display::width + x;
+          if (new_depth < depth_buf[pixel_idx]) {
             uint16_t final_pixel_color;
 
             if (use_texture && texture_data) {
@@ -175,10 +220,6 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
               float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
 
               // Divide by interpolated 1/w (new_depth is already 1/w_interpolated)
-              // NOTE: new_depth is the actual interpolated Z-value here, not 1/w.
-              // We need the interpolated 1/w which is 1.0f / new_depth.
-              // So, u = (u/w)_interp / (1/w)_interp = interpolated_u_prime / (1.0f / new_depth)
-              // This simplifies to u = interpolated_u_prime * new_depth;
               float final_u = interpolated_u_prime * new_depth;
               float final_v = interpolated_v_prime * new_depth;
 
@@ -196,7 +237,7 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
             }
             
             buff[pixel_idx] = final_pixel_color; // Draw the pixel
-            Device::depth_buffer[pixel_idx] = new_depth; // Update depth buffer
+            depth_buf[pixel_idx] = new_depth; // Update depth buffer
           }
         }
       }

@@ -3,12 +3,17 @@
 
 #include <stdint.h>
 
-void _swap_ptr(void *a, void *b);
-void _swap_int(int& a, int& b);
+inline void _swap_int(int& a, int& b) {
+    int tmp = a;
+    a = b;
+    b = tmp;
+}
 
-uint16_t rgb_to_565(uint8_t r, uint8_t g, uint8_t b);
 
-void log(const char *format, ...);
-void log_panic(const char *format, ...);
+inline void _swap_ptr(void *a, void *b) {
+    void *tmp = a;
+    a = b;
+    b = tmp;
+}
 
 #endif // HELPERS_H
