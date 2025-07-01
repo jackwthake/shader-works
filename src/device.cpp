@@ -21,7 +21,6 @@ namespace Device {
 /**
  * Initialize critical components of the device.
  */
-Adafruit_ST7735 *tft = new Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
 Resource_manager manager;
 
 uint16_t back_buffer[screen_buffer_len] = { 0x00 };
@@ -48,36 +47,7 @@ void pin_init() {
  * Sets up the backlight, initializes the display, and sets the rotation.
  */
 void tft_init() {
-  pinMode(TFT_BACKLIGHT, OUTPUT);
-  digitalWrite(TFT_BACKLIGHT, HIGH);
-
-  if (!tft) {
-    log_panic("Failed to init ST7735 driver.\n");
-  }
-
-  log("Initialized ST7735 driver.\n");
-
-  tft->initR(INITR_BLACKTAB);
-  tft->setRotation(1);
-
-  pinMode(TFT_CS, OUTPUT);
-  digitalWrite(TFT_CS, HIGH);
-
-  tft->fillScreen(0x00);
-  tft->setCursor(0, 0);
-
-  if (!front_buffer || !back_buffer) {
-    log_panic("Failed to alloc framebuffer memory.\n");
-  }
-
-  log("framebuffer Alloc successful\n");
-
-  if (!depth_buffer) {
-    log_panic("Failed to alloc depth buffer memory.\n");
-  }
-
-  log("Depth Buffer Alloc successful.\n");
-  log("Screen Initialized.\n");
+  // DEPRECATD
 }
 
 

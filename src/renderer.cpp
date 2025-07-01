@@ -161,13 +161,9 @@ void render_model(uint16_t *buff, Transform &cam, Model &model) {
     // Note: a.z, b.z, c.z here are 1/w values from vertex_to_screen
     if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; 
 
-    Serial.printf("Processing Triangle %d (Orig Vtx Indices: %d, %d, %d)\n", tri, tri * 3, tri * 3 + 1, tri * 3 + 2);
-    Serial.printf("  Screen coords: A(%d,%d,%d), B(%d,%d,%d), C(%d,%d,%d)\n", (int)(a.x * 100), (int)(a.y * 100), (int)(a.z * 100), (int)(b.x * 100), (int)(b.y * 100), (int)(b.z * 100), (int)(c.x * 100), (int)(c.y * 100), (int)(c.z * 100));
-
     // Back-face culling implementation: skip back-facing or degenerate triangles
     float projected_area = signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
-    Serial.printf("  Signed Triangle Area: %d\n", (int)(projected_area * 100));
-
+ 
     // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (a.z, b.z, c.z)
     // This gives us u/w and v/w, which we can interpolate linearly.
     // At the pixel, we'll divide by the interpolated 1/w to get the correct u and v.

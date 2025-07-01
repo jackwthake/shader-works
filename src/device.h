@@ -3,10 +3,6 @@
 #include <Arduino.h>
 #include <stdint.h>
 
-#define USE_SPI_DMA
-#include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-
 #include "resource_manager.h"
 
 // Encapsulate necessary program globals
@@ -17,7 +13,6 @@ namespace Device  {
   constexpr unsigned long tick_interval = 50; // 20 ticks per second (1000ms / 20 = 50ms)
   constexpr float JOYSTICK_THRESH = 0.2;
   
-  extern Adafruit_ST7735 *tft;
   extern Resource_manager manager;
 
   extern uint16_t front_buffer[screen_buffer_len];

@@ -240,7 +240,7 @@ def core_library_build():
   build_directory("samd-core/libraries/Wire", warnings)
   build_directory("samd-core/libraries/SPI", warnings)
   build_directory("samd-core/libraries/Adafruit_ZeroDMA/", warnings)
-  build_directory("BusIO", warnings, additional_include=['BusIO/', 'samd-core/libraries/Wire', 'samd-core/libraries/SPI'])
+#   build_directory("BusIO", warnings, additional_include=['BusIO/', 'samd-core/libraries/Wire', 'samd-core/libraries/SPI'])
   build_directory("variant", warnings)
 
 
@@ -252,8 +252,8 @@ def main_dependency_build():
       'Adafruit-GFX/', 'SdFat/src/', 'SPIFlash/src/'
   ]
 
-  build_directory("Adafruit-GFX", warnings, additional_include)
-  build_directory("ST7735", warnings, additional_include)
+#   build_directory("Adafruit-GFX", warnings, additional_include)
+#   build_directory("ST7735", warnings, additional_include)
   build_directory("SdFat", warnings, additional_include, exclude_paths=["SdFat/extras"])
   build_directory("SPIFlash/src", warnings, additional_include + ["SPIFlash/src/spi/"])
 
@@ -269,7 +269,8 @@ def main_project_build():
     warnings = []
     additional_include = [
       'BusIO/', 'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
-      'Adafruit-GFX/', 'ST7735/', 'SdFat/src/', 'SPIFlash/src/'
+      'samd-core/libraries/Adafruit_zeroDMA/', 'CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL/samd51/include/',
+      'SPIFlash/src/', 'SdFat/src/', 'variant/',
     ]
 
     build_directory(".", warnings, additional_include, is_src=True)
@@ -291,9 +292,6 @@ def link_project():
     if not object_files:
         print("Linker Error: No object files found in " + OBJ_DIR)
         return
-    # if not os.path.exists(core_archive):
-    #     print("Linker Error: Core archive not found at " + core_archive)
-    #     return
 
     # Define output files and linker script path
     output_map = os.path.join(BIN_DIR, PROG_NAME + ".map")

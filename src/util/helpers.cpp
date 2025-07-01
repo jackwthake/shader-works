@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <stdarg.h>
 
-#include <Adafruit_GFX.h>
-
 #include "../device.h"
 
 void _swap_int(int& a, int& b) {
@@ -46,8 +44,6 @@ void log(const char *format, ...) {
     va_start(args, format);
     Serial.printf("[ %u ]: ", millis());
     Serial.printf(format, args);
-    if (Device::log_debug_to_screen)
-        Device::tft->printf(format, args);
     va_end(args);
     Serial.flush();
 }
@@ -61,8 +57,6 @@ void log_panic(const char *format, ...) {
     va_start(args, format);
     Serial.printf("[ %u ]: ", millis());
     Serial.printf(format, args);
-    if (Device::log_debug_to_screen)
-        Device::tft->printf(format, args);
     va_end(args);
     
     Serial.println();
