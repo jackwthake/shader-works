@@ -8,7 +8,7 @@
 import os
 
 RES_DIR = os.path.abspath("../res");
-OUTFILE_DIR = os.path.abspath("./files.h")
+OUTFILE_DIR = os.path.abspath("./src/files.h")
 EXCLUDE_EXT = [".pyxel"]
 NUM_FILES = sum(
   1

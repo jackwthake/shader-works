@@ -1,19 +1,34 @@
+#define ARDUINO_MAIN
 #include <Arduino.h>
 
-#include <inttypes.h>
-
 #include <SPI.h>
-#include <SdFat_Adafruit_Fork.h>
+#include <SdFat.h>
 #include <Adafruit_SPIFlash.h> // SPI Flash library for QSPI flash memory
 
-#include "ff.h"
-#include "diskio.h"
+#include "util/ff.h"
+#include "util/diskio.h"
+#include "files.h" // Automatically generated file containing the files to write (generated in build step)
 
-#include "files.h" // Must run res_copy.py to generate this file
 
-Adafruit_FlashTransport_QSPI flash_transport;
-Adafruit_SPIFlash flash(&flash_transport);
-FatVolume fatfs;
+// Initialize C library
+extern "C" void __libc_init_array(void);
+
+
+/* Arduino initialization */
+static void init_arduino(size_t serial_wait_timeout = 1000) {
+  init();                   // Arduino.h board initialization
+  __libc_init_array();      // initialize libc
+
+  delay(1);                 // Let the dust settle
+  USBDevice.init();         // Startup USB Device
+  USBDevice.attach();  
+
+  Serial.begin(115200);     // Initialize Serial at 115200 baud, with timeout
+  while (!Serial && (serial_wait_timeout-- > 0)) { delay(50); }
+
+  interrupts();            // Enable interrupts
+  Serial.println("Arduino initialized successfully!");
+}
 
 
 /**
@@ -21,7 +36,7 @@ FatVolume fatfs;
  * @param idx The index of the file to write in the files array.
  * @return true if the file was written successfully, false otherwise.
  */
-static bool write_file_to_flash(unsigned idx) {
+static bool write_file_to_flash(unsigned idx, FatVolume &fatfs) {
   if (idx >= num_files) {
     Serial.println("Invalid file index.");
     return false;
@@ -46,11 +61,11 @@ static bool write_file_to_flash(unsigned idx) {
  * Writes all files defined in the files array to the onboard flash memory.
  * This function iterates through each file and calls write_file_to_flash for each one.
  */
-static void write_files_to_flash() {
+static void write_files_to_flash(FatVolume &fatfs) {
   Serial.println("Writing files to flash...");
 
   for (unsigned i = 0; i < num_files; i++) {
-    if (!write_file_to_flash(i)) {
+    if (!write_file_to_flash(i, fatfs)) {
       Serial.printf("Failed to write file %s.\n", files[i].name);
       return;
     }
@@ -66,7 +81,7 @@ static void write_files_to_flash() {
  * This function creates a new FAT12 filesystem, sets the disk label,
  * and mounts the filesystem to apply the label.
  */
-void format_fat12(void) {
+void format_fat12(Adafruit_SPIFlash &flash, FatVolume &fatfs) {
   uint8_t workbuf[4096];
   FATFS _fatfs;
 
@@ -97,12 +112,14 @@ void format_fat12(void) {
 }
 
 
-void setup() {
-  // Open serial communications and wait for port to open:
-  Serial.begin(115200);
-  while (!Serial) {
-    delay(10); // wait for serial port to connect. Needed for native USB port only
-  }
+Adafruit_FlashTransport_QSPI flash_transport;
+Adafruit_SPIFlash flash(&flash_transport);
+
+
+int main() {
+  FatVolume fatfs;
+
+  init_arduino(); // Initialize Arduino environment
 
   Serial.println("Initializing onboard flash...");
 
@@ -110,7 +127,7 @@ void setup() {
   flash.begin();
 
   Serial.println("Reformatting flash as FAT12...");
-  format_fat12();
+  format_fat12(flash, fatfs);
 
   Serial.println("Initialization done.");
 
@@ -120,13 +137,10 @@ void setup() {
   }
 
   // File system setup, write files to flash
-  write_files_to_flash();
+  write_files_to_flash(fatfs);
 }
 
-void loop() {
-
-}
-
+ 
 //--------------------------------------------------------------------+
 // fatfs diskio
 //--------------------------------------------------------------------+

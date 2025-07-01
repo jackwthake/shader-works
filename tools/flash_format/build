@@ -4,13 +4,13 @@ import subprocess
 import os
 import glob
 
-TOOLS_DIR = os.path.relpath('./tools/')
+TOOLS_DIR = os.path.relpath('../')
 SRC_DIR = os.path.relpath('./src/')
-LIB_DIR = os.path.relpath('./lib/')
+LIB_DIR = os.path.relpath('../../lib/')
 BIN_DIR = os.path.relpath('./bin/')
 OBJ_DIR = os.path.relpath('./bin/obj/')
 
-PROG_NAME = "software-rasterizer"
+PROG_NAME = "flash_format"
 
 CXX = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-g++")
 CC = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-gcc")
@@ -247,8 +247,8 @@ def main_dependency_build():
   print("\n\n-------- Building Core Dependencies --------")
   warnings = []
   additional_include = [
-      'BusIO/', 'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
-      'Adafruit-GFX/', 'SdFat/src/', 'SPIFlash/src/'
+      'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
+      'SdFat/src/', 'SPIFlash/src/'
   ]
 
   build_directory("SdFat", warnings, additional_include, exclude_paths=["SdFat/extras"])
@@ -265,8 +265,8 @@ def main_project_build():
     print("\n\n---------- Building Main Project ---------")
     warnings = []
     additional_include = [
-      'BusIO/', 'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
-      'samd-core/libraries/Adafruit_zeroDMA/', 'CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL/samd51/include/',
+      'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
+      'CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL/samd51/include/',
       'SPIFlash/src/', 'SdFat/src/', 'variant/',
     ]
 
@@ -344,7 +344,9 @@ if __name__ == "__main__":
         os.makedirs(BIN_DIR)
     if not os.path.exists(OBJ_DIR):
         os.makedirs(OBJ_DIR)
-    
+
+    execute_command(['python3', 'res_copy.py'], [])
+
     core_library_build()
     main_dependency_build()
     main_project_build()
