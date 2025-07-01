@@ -11,6 +11,8 @@
 // Initialize C library
 extern "C" void __libc_init_array(void);
 
+constexpr size_t MAX_CUBES = 16; // Maximum number of cubes to render
+Model cubes[MAX_CUBES] = { Model() };
 
 /* Arduino initialization */
 static void init_arduino(size_t serial_wait_timeout = 1000) {
@@ -19,7 +21,7 @@ static void init_arduino(size_t serial_wait_timeout = 1000) {
 
   delay(1);                 // Let the dust settle
   USBDevice.init();         // Startup USB Device
-  USBDevice.attach();  
+  USBDevice.attach();
 
   Serial.begin(115200);     // Initialize Serial at 115200 baud, with timeout
   while (!Serial && (serial_wait_timeout-- > 0)) { delay(50); }
@@ -52,14 +54,8 @@ static void button_init() {
 }
 
 
-void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_id_t &atlas_id, Model &cube) {
+void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_id_t &atlas_id) {
   manager.init_QSPI_flash();
-
-  // Initialize the cube model
-  cube = Model();
-  cube.transform.position = { 1, 2, 5 };
-  cube.transform.yaw = DEG_TO_RAD * 45;
-  cube.transform.pitch = DEG_TO_RAD * 45;
   
   // Load the cube model from resources
   cube_id = manager.load_resource("cube.obj");
@@ -68,51 +64,77 @@ void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_i
     for(;;); // Halt execution if the cube model cannot be loaded
   }
 
-  manager.read_obj_resource(cube_id, cube);
-  if (cube.vertices.size() == 0) {
-    Serial.println("Failed to init cube model");
-    for(;;); // Halt execution if the cube model cannot be initialized
-  }
-
   // Load the texture atlas
-  resource_id_t texture_id = manager.load_resource("atlas.bmp");
-  if (texture_id != INVALID_RESOURCE) {
-    cube.texture_atlas_id = texture_id; // Assign the texture ID to your model
-  } else {
+  atlas_id = manager.load_resource("atlas.bmp");
+  if (atlas_id == INVALID_RESOURCE) {
     Serial.println("Invalid bitmap");
     for(;;); // Halt execution if the cube model cannot be loaded
   }
-
-  compute_uv_coords(cube.uvs, 2); // top face
-  compute_uv_coords(cube.uvs, 0); // bottom face
-  compute_uv_coords(cube.uvs, 1); // side face
-  compute_uv_coords(cube.uvs, 1); // side face
-  compute_uv_coords(cube.uvs, 1); // side face
-  compute_uv_coords(cube.uvs, 1); // side face
   
   Serial.println("Resources initialized successfully.");
 }
 
 
+void init_cubes(Resource_manager &manager, resource_id_t cube_id, resource_id_t atlas_id) {
+  Serial.println("Starting cube initialization...");
+  
+  std::vector<float3> temp_vertices;
+
+  // Load vertex data for each cube
+  Serial.println("Loading OBJ resource...");
+  bool success = manager.read_obj_resource(cube_id, temp_vertices);
+  if (!success || temp_vertices.size() == 0) {
+    Serial.printf("Failed to init cube model, vertices count: %d\n", temp_vertices.size());
+    for(;;); // Halt execution if the cube model cannot be initialized
+  }
+  
+  Serial.printf("Loaded %d vertices successfully\n", temp_vertices.size());
+
+  Serial.println("Initializing cube models...");
+  for (int i = 0; i < MAX_CUBES; ++i) {
+    cubes[i] = Model();
+    cubes[i].transform.position = { (float)(i % 4) * 2.0f, -1, (float)(i / 4) * 2.0f };
+    cubes[i].transform.yaw = 0.0f;
+    cubes[i].transform.pitch = 0.0f;
+    cubes[i].texture_atlas_id = atlas_id;
+    cubes[i].vertices = temp_vertices;
+
+    compute_uv_coords(cubes[i].uvs, 2); // top face
+    compute_uv_coords(cubes[i].uvs, 0); // bottom face
+    compute_uv_coords(cubes[i].uvs, 1); // side face
+    compute_uv_coords(cubes[i].uvs, 1); // side face
+    compute_uv_coords(cubes[i].uvs, 1); // side face
+    compute_uv_coords(cubes[i].uvs, 1); // side face
+  }
+
+  Serial.println("Cubes initialized successfully.");
+}
+
 /**
  * Manages the double buffering rendering strategy
  */
-void render_frame(Resource_manager &manager, uint16_t *buf, float *depth_buffer, Display &display, Transform &camera, Model &cube) {
+void render_frame(Resource_manager &manager, uint16_t *buf, float *depth_buffer, Display &display, Transform &camera) {
+  Serial.println("Starting buffer clear...");
   // clear buffers and swap back and front buffers
   memset(buf, 0x971c, display.width * display.height * sizeof(uint16_t));
 
+  Serial.println("Clearing depth buffer...");
   for (int i = 0; i < Display::width * Display::height; ++i) {
     depth_buffer[i] = MAX_DEPTH;
   }
 
-  render_model(buf, depth_buffer, manager, camera, cube); // draw cube
+  for (int i = 0; i < MAX_CUBES; ++i) {
+    Serial.printf("Rendering cube %d...\n", i);
+    render_model(buf, depth_buffer, manager, camera, cubes[i]); // draw cubes
+    Serial.printf("Cube %d rendered\n", i);
+  }
 
   // Blit the framebuffer to the screen
   display.draw(buf);
 }
 
 
-void tick_world(float delta_time, Transform &camera, Model &cube) {
+void tick_world(float delta_time, Transform &camera) {
   using namespace Device;
 
   camera.yaw += -(read_joystick_x() * 2) * delta_time;
@@ -124,10 +146,6 @@ void tick_world(float delta_time, Transform &camera, Model &cube) {
     move_delta += cam_fwd; // (read_joystick_y() * 5) * delta_time;
   else if (read_joystick_y() > JOYSTICK_THRESH)
     move_delta += (cam_fwd * -1);
-  
-  // bob and spin test cube
-  cube.transform.position.y = (sin((float)millis() / 1000) * 7 * delta_time) + 2;
-  cube.transform.yaw += delta_time;
 
   /** Button Test */
   uint32_t buttons = read_buttons();
@@ -153,7 +171,6 @@ int main(void) {
   resource_id_t cube_id;
   resource_id_t atlas_id;
   Transform camera;
-  Model cube;
 
   init_arduino(); // Initialize Arduino and USB
   button_init();  // Initialize button pins
@@ -169,11 +186,17 @@ int main(void) {
   
   // Initialize resources
   Resource_manager manager;
-  resource_init(manager, cube_id, atlas_id, cube);
+  resource_init(manager, cube_id, atlas_id);
+  init_cubes(manager, cube_id, atlas_id); // Initialize cubes with the texture atlas
+  
+  camera.position = { 1, 2, 0 };
+  camera.yaw = 0.0f; // Set initial yaw to 0
+  camera.pitch = 0.0f; // Set initial pitch to 0
+
+  Serial.println("Camera initialized");
 
   last_tick = millis(); // Initialize last tick time
-
-  camera.position = { 1, 2, 0 };
+  Serial.println("Starting main loop...");
 
   for (;;) {
     serial_poll_events(); // Poll for serial events
@@ -185,11 +208,11 @@ int main(void) {
       delta_time = (float)tick_interval / 1000.0f; // fixed delta time in seconds
       last_tick += tick_interval;
 
-      tick_world(delta_time, camera, cube); // Update the world state
+      tick_world(delta_time, camera); // Update the world state
       ticks_processed++;
     }
 
-    render_frame(manager, screen_buffer, depth_buffer, display, camera, cube); // Render the frame
+    render_frame(manager, screen_buffer, depth_buffer, display, camera); // Render the frame
   }
 
   return 0;

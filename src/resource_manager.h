@@ -51,7 +51,7 @@ public:
   const Resource_entry_t *get_resource(resource_id_t id);
   bool unload_resource(resource_id_t id);
   
-  bool read_obj_resource(resource_id_t id, Model &model);
+  bool read_obj_resource(resource_id_t id, std::vector<float3> &vertices);
   bool get_tile_from_atlas(resource_id_t id, unsigned tile_id, uint16_t *output_tile_data);
 private:
 

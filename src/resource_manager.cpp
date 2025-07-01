@@ -57,14 +57,14 @@ using std::vector;
  * @param model The Model struct to populate (assumes `vertices` and `uvs` members).
  * @returns True on success, false otherwise.
  */
- static bool decode_obj_file(const char* content, Model &model) {
+ static bool decode_obj_file(const char* content, std::vector<float3>& vertices) {
     using std::istringstream;
     using std::string;
     using std::vector;
 
     vector<float3> temp_vertices; // Temporary storage for unique vertex positions
 
-    model.vertices.clear(); // Clear any existing vertex data in the model
+    vertices.clear(); // Clear any existing vertex data in the model
 
     istringstream stream(content);
     string line;
@@ -179,14 +179,14 @@ using std::vector;
                 idx2 < 0 || idx2 >= temp_vertices.size()) {
                 Serial.printf("Error on line %d: Vertex index out of bounds or temp_vertices empty! (%d, %d, %d). temp_vertices size: %d. Line: '%s'\n", 
                               line_num, idx0, idx1, idx2, temp_vertices.size(), line.c_str());
-                model.vertices.clear();
+                vertices.clear();
                 return false;
             }
 
-            model.vertices.push_back(temp_vertices[idx0]);
-            model.vertices.push_back(temp_vertices[idx1]);
-            model.vertices.push_back(temp_vertices[idx2]);
-            Serial.printf("    Added first triangle. model.vertices.size() = %d\n", model.vertices.size());
+            vertices.push_back(temp_vertices[idx0]);
+            vertices.push_back(temp_vertices[idx1]);
+            vertices.push_back(temp_vertices[idx2]);
+            Serial.printf("    Added first triangle. vertices.size() = %d\n", vertices.size());
 
 
             if (face_v_indices.size() == 4) {
@@ -198,19 +198,19 @@ using std::vector;
                 if (idx3 < 0 || idx3 >= temp_vertices.size()) {
                     Serial.printf("Error on line %d: 4th vertex index (%d) out of bounds. temp_vertices size: %d. Line: '%s'\n", 
                                   line_num, idx3, temp_vertices.size(), line.c_str());
-                    model.vertices.clear();
+                    vertices.clear();
                     return false;
                 }
 
-                model.vertices.push_back(temp_vertices[idx0]);
-                model.vertices.push_back(temp_vertices[idx2]);
-                model.vertices.push_back(temp_vertices[idx3]);
-                Serial.printf("    Added second triangle for quad. model.vertices.size() = %d\n", model.vertices.size());
+                vertices.push_back(temp_vertices[idx0]);
+                vertices.push_back(temp_vertices[idx2]);
+                vertices.push_back(temp_vertices[idx3]);
+                Serial.printf("    Added second triangle for quad. vertices.size() = %d\n", vertices.size());
             }
         }
     }
 
-    Serial.printf("--- OBJ decoding finished. Final temp_vertices size: %d, model.vertices size: %d ---\n", temp_vertices.size(), model.vertices.size());
+    Serial.printf("--- OBJ decoding finished. Final temp_vertices size: %d, vertices size: %d ---\n", temp_vertices.size(), vertices.size());
     return true;
 }
 
@@ -378,13 +378,13 @@ bool Resource_manager::unload_resource(resource_id_t id) {
  *  @param model: The model to be populated
  *  @returns true on success, false otherwise
 */
-bool Resource_manager::read_obj_resource(resource_id_t id, Model &model) {
+bool Resource_manager::read_obj_resource(resource_id_t id, std::vector<float3> &vertices) {
   if (id >= 0 && id < MAX_RESOURCES) {
     Resource_entry_t res = this->resources[id];
 
     if (res.type == DATA_FIlE) {
       if (res.length > 0) {
-        return decode_obj_file(reinterpret_cast<const char *>(res.data), model);
+        return decode_obj_file(reinterpret_cast<const char *>(res.data), vertices);
       }
 
       Serial.printf("Resource at %d has size %u\n", id, this->resources[id].length);
