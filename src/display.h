@@ -25,6 +25,8 @@ private:
   static constexpr int8_t rst_pin = 46;
   static constexpr int8_t backlight_pin = 47;
   
+  void send_command(uint8_t data);
+  void send_command(uint8_t cmd, uint8_t *data, size_t len);
   void swap_bytes(uint16_t *src, uint32_t len);
 
   SPIClass *spi;
