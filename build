@@ -70,7 +70,6 @@ def execute_command(command, errors):
     print(f"Error: Command not found: '{command[0]}'")
 
 
-
 def find_files_by_extension(folder_path, extension):
     """
     Recursively finds all files in a given folder and its subdirectories
@@ -129,9 +128,10 @@ def compile_code(source_files, iflags, is_cpp, output_filename, warnings):
         # Added this print statement back to show confirmation of compilation
         print(f"\t\t-> Compiled '{os.path.basename(output_filename)}'")
         if result.stderr: # If there were any warnings, they would be in result.stderr
-            unique_warnings = list(set(result.stderr.strip().splitlines()))
-            for warning in unique_warnings:
-                warnings.append(warning)
+            # Keep the original format but avoid exact duplicates
+            stderr_text = result.stderr.strip()
+            if stderr_text not in warnings:
+                warnings.append(stderr_text)
 
     except FileNotFoundError:
         print(f"Error: Compiler '{compiler}' not found. Please ensure it is installed and in your PATH.")
@@ -243,38 +243,18 @@ def core_library_build():
   build_directory("variant", warnings)
 
 
-def main_dependency_build():
-  print("\n\n-------- Building Core Dependencies --------")
-  warnings = []
-  additional_include = [
-      'BusIO/', 'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
-      'Adafruit-GFX/', 'SdFat/src/', 'SPIFlash/src/'
-  ]
-
-  build_directory("SdFat", warnings, additional_include, exclude_paths=["SdFat/extras"])
-  build_directory("SPIFlash/src", warnings, additional_include + ["SPIFlash/src/spi/"])
-
-  if warnings:
-    print("\n----------- Warnings Summary -------------")
-    unique_warnings = sorted(list(set(warnings)))
-    for warning in unique_warnings:
-        print(warning)
-
-
 def main_project_build():
     print("\n\n---------- Building Main Project ---------")
     warnings = []
     additional_include = [
-      'BusIO/', 'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/',
-      'samd-core/libraries/Adafruit_zeroDMA/', 'CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL/samd51/include/',
-      'SPIFlash/src/', 'SdFat/src/', 'variant/',
+      'samd-core/libraries/Wire/', 'samd-core/libraries/SPI/'
     ]
 
     build_directory(".", warnings, additional_include, is_src=True)
     if warnings:
       print("\n----------- Warnings Summary -------------")
-      unique_warnings = sorted(list(set(warnings)))
-      for warning in unique_warnings:
+      # Display warnings as they were collected, already deduplicated
+      for warning in warnings:
           print(warning)
 
 
@@ -346,6 +326,5 @@ if __name__ == "__main__":
         os.makedirs(OBJ_DIR)
     
     core_library_build()
-    main_dependency_build()
     main_project_build()
     link_project()

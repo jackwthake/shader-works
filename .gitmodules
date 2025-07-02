@@ -4,9 +4,6 @@
 [submodule "lib/CMSIS-Atmel"]
 	path = lib/CMSIS-Atmel
 	url = https://github.com/arduino/ArduinoModule-CMSIS-Atmel.git
-[submodule "lib/SPIFlash"]
-	path = lib/SPIFlash
-	url = https://github.com/adafruit/Adafruit_SPIFlash.git
 [submodule "lib/SdFat"]
 	path = lib/SdFat
 	url = https://github.com/adafruit/SdFat.git

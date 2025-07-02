@@ -4,3 +4,4 @@ main
 main.dsYM/
 .pio/
 bin/
+src/resources.inl
