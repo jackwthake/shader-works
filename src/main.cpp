@@ -144,6 +144,8 @@ int main(void) {
 
   scene.init(); // Initialize the scene
 
+  printMemoryUsage(); // Print memory usage after scene initialization
+
   last_tick = millis(); // Initialize last tick time
   Serial.println("Starting main loop...");
 
