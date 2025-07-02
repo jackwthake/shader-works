@@ -1,9 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
 #include <stdint.h>
 
-#include "resource_manager.h"
+#include <variant.h> // For pin definitions
 
 // Encapsulate necessary program globals
 namespace Device  {

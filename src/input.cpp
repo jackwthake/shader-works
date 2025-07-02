@@ -1,7 +1,7 @@
 #include "device.h"
 
-#include "util/helpers.h"
-#include "resource_manager.h"
+#include <arduino.h>
+#include <variant.h>
 
 
 /**

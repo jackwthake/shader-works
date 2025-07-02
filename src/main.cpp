@@ -1,18 +1,65 @@
 #define ARDUINO_MAIN
 #include <Arduino.h>
+#include <unistd.h>
 
 #include "display.h"
 #include "device.h"
-#include "resource_manager.h"
 #include "renderer.h"
 
-#include "util/helpers.h"
+#include "scene.h"
 
 // Initialize C library
 extern "C" void __libc_init_array(void);
 
-constexpr size_t MAX_CUBES = 16; // Maximum number of cubes to render
-Model cubes[MAX_CUBES] = { Model() };
+extern "C" {
+  extern char __data_start__;   // Start of .data section
+  extern char __data_end__;     // End of .data section
+  extern char __bss_start__;    // Start of .bss section
+  extern char __bss_end__;      // End of .bss section
+  extern void *end;             // Top of the heap upon initialization (end of .bss)
+  extern void *__StackTop;      // Top of the stack (highest RAM address)
+}
+
+/**
+ * @brief Prints a detailed report of the system's current RAM usage.
+*/
+void printMemoryUsage() {
+  // A pointer to the current top of the heap. sbrk(0) is a standard C call to get this.
+  char* heap_top = (char*)sbrk(0);
+
+  // A variable on the stack. Its address is the current stack pointer.
+  char stack_ptr_var;
+  char* stack_ptr = &stack_ptr_var;
+
+  // --- Calculate Sizes ---
+  
+  // Static data is split into .data (initialized globals) and .bss (zero-initialized globals).
+  size_t static_data_size = (&__data_end__ - &__data_start__) + (&__bss_end__ - &__bss_start__);
+
+  // The heap starts at the end of the .bss section and extends to its current top.
+  size_t heap_size = heap_top - (char*)&end;
+
+  // The stack starts at the top of RAM and grows downwards.
+  // The used stack is the space between the top of RAM and the current stack pointer.
+  size_t stack_used = (char*)&__StackTop - stack_ptr;
+  
+  // Total RAM used is the sum of all segments.
+  size_t ram_used = static_data_size + heap_size + stack_used;
+
+  // Total RAM available on the chip.
+  size_t ram_total = (char*)&__StackTop - &__data_start__;
+
+  // --- Print Report ---
+  Serial.println(F("--- System Memory Report ---"));
+  Serial.printf("Static Data (.data + .bss): %u bytes\n", static_data_size);
+  Serial.printf("Heap Used                 : %u bytes\n", heap_size);
+  Serial.printf("Stack Used (Current)      : %u bytes\n", stack_used);
+  Serial.println(F("------------------------------"));
+  Serial.printf("Total RAM Used            : %u bytes\n", ram_used);
+  Serial.printf("Total RAM Available       : %u bytes\n", ram_total);
+  Serial.printf("Free RAM (Heap + Stack)   : %u bytes\n", ram_total - ram_used);
+  Serial.println(F("------------------------------"));
+}
 
 /* Arduino initialization */
 static void init_arduino(size_t serial_wait_timeout = 1000) {
@@ -54,112 +101,22 @@ static void button_init() {
 }
 
 
-void resource_init(Resource_manager &manager, resource_id_t &cube_id, resource_id_t &atlas_id) {
-  manager.init_QSPI_flash();
-  
-  // Load the cube model from resources
-  cube_id = manager.load_resource("cube.obj");
-  if (cube_id == INVALID_RESOURCE) {
-    Serial.println("Failed to load cube model.\n");
-    for(;;); // Halt execution if the cube model cannot be loaded
-  }
-
-  // Load the texture atlas
-  atlas_id = manager.load_resource("atlas.bmp");
-  if (atlas_id == INVALID_RESOURCE) {
-    Serial.println("Invalid bitmap");
-    for(;;); // Halt execution if the cube model cannot be loaded
-  }
-  
-  Serial.println("Resources initialized successfully.");
-}
-
-
-void init_cubes(Resource_manager &manager, resource_id_t cube_id, resource_id_t atlas_id) {
-  Serial.println("Starting cube initialization...");
-  
-  std::vector<float3> temp_vertices;
-
-  // Load vertex data for each cube
-  Serial.println("Loading OBJ resource...");
-  bool success = manager.read_obj_resource(cube_id, temp_vertices);
-  if (!success || temp_vertices.size() == 0) {
-    Serial.printf("Failed to init cube model, vertices count: %d\n", temp_vertices.size());
-    for(;;); // Halt execution if the cube model cannot be initialized
-  }
-  
-  Serial.printf("Loaded %d vertices successfully\n", temp_vertices.size());
-
-  Serial.println("Initializing cube models...");
-  for (int i = 0; i < MAX_CUBES; ++i) {
-    cubes[i] = Model();
-    cubes[i].transform.position = { (float)(i % 4) * 2.0f, -1, (float)(i / 4) * 2.0f };
-    cubes[i].transform.yaw = 0.0f;
-    cubes[i].transform.pitch = 0.0f;
-    cubes[i].texture_atlas_id = atlas_id;
-    cubes[i].vertices = temp_vertices;
-
-    compute_uv_coords(cubes[i].uvs, 2); // top face
-    compute_uv_coords(cubes[i].uvs, 0); // bottom face
-    compute_uv_coords(cubes[i].uvs, 1); // side face
-    compute_uv_coords(cubes[i].uvs, 1); // side face
-    compute_uv_coords(cubes[i].uvs, 1); // side face
-    compute_uv_coords(cubes[i].uvs, 1); // side face
-  }
-
-  Serial.println("Cubes initialized successfully.");
-}
-
 /**
  * Manages the double buffering rendering strategy
  */
-void render_frame(Resource_manager &manager, uint16_t *buf, float *depth_buffer, Display &display, Transform &camera) {
-  Serial.println("Starting buffer clear...");
+void render_frame(Scene &scene, uint16_t *buf, float *depth_buffer, Display &display) {
   // clear buffers and swap back and front buffers
   memset(buf, 0x971c, display.width * display.height * sizeof(uint16_t));
 
-  Serial.println("Clearing depth buffer...");
   for (int i = 0; i < Display::width * Display::height; ++i) {
     depth_buffer[i] = MAX_DEPTH;
   }
 
-  for (int i = 0; i < MAX_CUBES; ++i) {
-    Serial.printf("Rendering cube %d...\n", i);
-    render_model(buf, depth_buffer, manager, camera, cubes[i]); // draw cubes
-    Serial.printf("Cube %d rendered\n", i);
-  }
+  // Draw scene
+  scene.render(buf, depth_buffer);  
 
   // Blit the framebuffer to the screen
   display.draw(buf);
-}
-
-
-void tick_world(float delta_time, Transform &camera) {
-  using namespace Device;
-
-  camera.yaw += -(read_joystick_x() * 2) * delta_time;
-
-  float3 cam_right, cam_up, cam_fwd, move_delta = { 0.0, 0.0, 0.0 };
-  camera.get_basis_vectors(cam_right, cam_up, cam_fwd);
-
-  if (read_joystick_y() < -JOYSTICK_THRESH)
-    move_delta += cam_fwd; // (read_joystick_y() * 5) * delta_time;
-  else if (read_joystick_y() > JOYSTICK_THRESH)
-    move_delta += (cam_fwd * -1);
-
-  /** Button Test */
-  uint32_t buttons = read_buttons();
-  if (buttons & BUTTON_MASK_A) {
-    camera.position.y += 2 * delta_time;
-  } else if (buttons & BUTTON_MASK_B) {
-    camera.position.y -= 2 * delta_time;
-  } else if (buttons & BUTTON_MASK_START) { // Strafe
-    move_delta += cam_right;
-  } if (buttons & BUTTON_MASK_SELECT) {
-    move_delta += cam_right * -1;
-  }
-
-  camera.position += float3::normalize(move_delta) * 2 * delta_time;
 }
 
 
@@ -168,10 +125,6 @@ int main(void) {
   unsigned long now, last_tick = 0;
   float delta_time = 0.0f;
 
-  resource_id_t cube_id;
-  resource_id_t atlas_id;
-  Transform camera;
-
   init_arduino(); // Initialize Arduino and USB
   button_init();  // Initialize button pins
   
@@ -179,21 +132,17 @@ int main(void) {
   Display display;
   uint16_t screen_buffer[Display::width * Display::height];
   float depth_buffer[Display::width * Display::height];
+
+  printMemoryUsage(); // Print memory usage report
   
+  Scene scene; // Create a scene instance
   Serial.println("Initializing display...");
   display.begin();
   Serial.println("Display initialized successfully. Starting render loop.");
-  
-  // Initialize resources
-  Resource_manager manager;
-  resource_init(manager, cube_id, atlas_id);
-  init_cubes(manager, cube_id, atlas_id); // Initialize cubes with the texture atlas
-  
-  camera.position = { 1, 2, 0 };
-  camera.yaw = 0.0f; // Set initial yaw to 0
-  camera.pitch = 0.0f; // Set initial pitch to 0
 
-  Serial.println("Camera initialized");
+  printMemoryUsage(); // Print memory usage after display initialization
+
+  scene.init(); // Initialize the scene
 
   last_tick = millis(); // Initialize last tick time
   Serial.println("Starting main loop...");
@@ -208,11 +157,11 @@ int main(void) {
       delta_time = (float)tick_interval / 1000.0f; // fixed delta time in seconds
       last_tick += tick_interval;
 
-      tick_world(delta_time, camera); // Update the world state
+      scene.update(delta_time); // Update the scene state
       ticks_processed++;
     }
 
-    render_frame(manager, screen_buffer, depth_buffer, display, camera); // Render the frame
+    render_frame(scene, screen_buffer, depth_buffer, display);
   }
 
   return 0;

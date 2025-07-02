@@ -2,14 +2,30 @@
 
 #include <cmath>
 
+#include "util/maths.h"
 #include "device.h"
 #include "display.h"
-#include "util/helpers.h"
-#include "util/maths.h"
+#include "scene.h"
+
+#include "resources.inl" // Automatically generated resource definitions
 
 using namespace std;
 
 #define EPSILON 0.0001f
+#define CUBE_VERTEX_COUNT 36
+
+
+// --- Constants for the Atlas ---
+constexpr int ATLAS_WIDTH_PX = 80;
+constexpr int ATLAS_HEIGHT_PX = 24;
+constexpr int TILE_WIDTH_PX = 8;
+constexpr int TILE_HEIGHT_PX = 8;
+
+// Derived constants
+constexpr int TILES_PER_ROW = ATLAS_WIDTH_PX / TILE_WIDTH_PX;
+constexpr int TILES_PER_COL = ATLAS_HEIGHT_PX / TILE_HEIGHT_PX;
+constexpr int TOTAL_TILES = TILES_PER_ROW * TILES_PER_COL;
+constexpr int TILE_PIXEL_COUNT = TILE_WIDTH_PX * TILE_HEIGHT_PX;
 
 
  /**
@@ -92,6 +108,11 @@ static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Trans
 }
 
 
+/**
+ * Computes the UV coordinates for a tile in the texture atlas.
+ * @param uvs The vector to store the computed UV coordinates.
+ * @param tile_id The ID of the tile to compute UVs for.
+ */
 void compute_uv_coords(std::vector<float2>& uvs, int tile_id) {
   if (tile_id < 0 || tile_id >= TOTAL_TILES) {
     Serial.printf("Error: Tile ID %d is out of bounds. Must be between 0 and %d\n", tile_id, (TOTAL_TILES - 1));
@@ -134,31 +155,17 @@ void compute_uv_coords(std::vector<float2>& uvs, int tile_id) {
  * @param camera The camera's transform (position and orientation).
  * @param model The Model to render, containing vertices, colors, and its own transform.
  */
-void render_model(uint16_t *buff, float *depth_buf, Resource_manager &manager, Transform &cam, Model &model) {
+void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model) {
   float2 screen_dim = { (float)Display::width, (float)Display::height };
 
-  // Get texture atlas data if a valid ID is provided
-  const Resource_entry_t* texture_res = nullptr;
-  const uint16_t* texture_data = nullptr;
-  int tex_width = 0;
-  int tex_height = 0;
-  bool use_texture = false;
-
-  if (model.texture_atlas_id != INVALID_RESOURCE) {
-    texture_res = manager.get_resource(model.texture_atlas_id);
-    if (texture_res && texture_res->type == BITMAP_FILE) {
-      texture_data = reinterpret_cast<const uint16_t*>(texture_res->data);
-      tex_width = texture_res->width;
-      tex_height = texture_res->height;
-      use_texture = true;
-    } else {
-        Serial.printf("Warning: Model has invalid texture_atlas_id %d or resource is not a BITMAP_FILE.\n", model.texture_atlas_id);
-    }
-  }
+  const uint16_t* texture_data = files[0].data; // Assuming the texture atlas is the first resource
+  int tex_width = ATLAS_WIDTH_PX;
+  int tex_height = ATLAS_HEIGHT_PX;
+  bool use_texture = true;
 
 
   // Loop through each triangle in the model
-  for (int tri = 0; tri < model.vertices.size() / 3; ++tri) {
+  for (int tri = 0; tri < CUBE_VERTEX_COUNT / 3; ++tri) {
     float3 scaled_vertex_a = model.vertices[tri * 3 + 0] * model.scale;
     float3 scaled_vertex_b = model.vertices[tri * 3 + 1] * model.scale;
     float3 scaled_vertex_c = model.vertices[tri * 3 + 2] * model.scale;
@@ -175,11 +182,7 @@ void render_model(uint16_t *buff, float *depth_buf, Resource_manager &manager, T
     float2 uv_c = model.uvs[tri * 3 + 2];
 
     // Basic frustum culling: skip triangle if any vertex is behind the camera (z <= 0)
-    // Note: a.z, b.z, c.z here are 1/w values from vertex_to_screen
-    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue; 
-
-    // Back-face culling implementation: skip back-facing or degenerate triangles
-    float projected_area = signed_triangle_area({a.x, a.y}, {b.x, b.y}, {c.x, c.y});
+    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue;
  
     // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (a.z, b.z, c.z)
     // This gives us u/w and v/w, which we can interpolate linearly.
