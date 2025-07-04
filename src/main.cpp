@@ -106,7 +106,7 @@ static void button_init() {
  */
 void render_frame(Scene &scene, uint16_t *buf, float *depth_buffer, Display &display) {
   // clear buffers and swap back and front buffers
-  memset(buf, 0x971c, display.width * display.height * sizeof(uint16_t));
+  memset(buf, 0xBE9C, display.width * display.height * sizeof(uint16_t));
 
   for (int i = 0; i < Display::width * Display::height; ++i) {
     depth_buffer[i] = MAX_DEPTH;

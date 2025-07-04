@@ -5,6 +5,22 @@
 
 static block_type_t _map[Scene::MAP_WIDTH][Scene::MAP_DEPTH][Scene::MAP_HEIGHT];
 
+// Helper function to check if block needs rendering (occlusion culling)
+bool is_block_visible(size_t x, size_t z, size_t y) {
+  // If block is on the edge of the map, it's visible
+  if (x == 0 || x == Scene::MAP_WIDTH-1 || z == 0 || z == Scene::MAP_DEPTH-1 || y == 0 || y == Scene::MAP_HEIGHT-1) {
+    return true;
+  }
+  
+  // Check if all 6 adjacent blocks are solid (occluding this block)
+  return (_map[x-1][z][y] == block_type_t::AIR ||
+          _map[x+1][z][y] == block_type_t::AIR ||
+          _map[x][z-1][y] == block_type_t::AIR ||
+          _map[x][z+1][y] == block_type_t::AIR ||
+          _map[x][z][y-1] == block_type_t::AIR ||
+          _map[x][z][y+1] == block_type_t::AIR);
+}
+
 float3 Scene::cube_vertices[36] = {
   {-1.000000, 1.000000, -1.000000}, {-1.000000, 1.000000, 1.000000}, {1.000000, 1.000000, 1.000000}, 
   {-1.000000, 1.000000, -1.000000}, {1.000000, 1.000000, 1.000000}, {1.000000, 1.000000, -1.000000}, 
@@ -25,29 +41,33 @@ float3 Scene::cube_vertices[36] = {
 // Each cube has 6 faces * 2 triangles * 3 vertices = 36 UV coordinates
 // Face order: bottom, top, front, back, right, left (matching cube_vertices order)
 
-// Helper function to calculate UV coordinates for a tile
-float2 get_tile_uv(int tile_id, int corner) {
-  constexpr int ATLAS_WIDTH_PX = 80;
-  constexpr int ATLAS_HEIGHT_PX = 24;
-  constexpr int TILE_WIDTH_PX = 8;
-  constexpr int TILE_HEIGHT_PX = 8;
-  constexpr int TILES_PER_ROW = ATLAS_WIDTH_PX / TILE_WIDTH_PX;
-  
-  float tile_x_start = static_cast<float>((tile_id % TILES_PER_ROW) * TILE_WIDTH_PX);
-  float tile_y_start = static_cast<float>((tile_id / TILES_PER_ROW) * TILE_HEIGHT_PX);
-  
-  float u_start = tile_x_start / static_cast<float>(ATLAS_WIDTH_PX);
-  float v_start = tile_y_start / static_cast<float>(ATLAS_HEIGHT_PX);
-  float u_end = (tile_x_start + static_cast<float>(TILE_WIDTH_PX)) / static_cast<float>(ATLAS_WIDTH_PX);
-  float v_end = (tile_y_start + static_cast<float>(TILE_HEIGHT_PX)) / static_cast<float>(ATLAS_HEIGHT_PX);
-  
-  switch (corner) {
-    case 0: return {u_start, v_end};   // top-left (flipped V)
-    case 1: return {u_start, v_start}; // bottom-left (flipped V)
-    case 2: return {u_end, v_start};   // bottom-right (flipped V)
-    case 3: return {u_end, v_end};     // top-right (flipped V)
-    default: return {u_start, v_end};
-  }
+// Precomputed UV coordinates for each tile corner (static constant)
+static const float2 TILE_UVS[10][4] = {
+  // Tile 0 (dirt)
+  {{0.0f, 0.333333f}, {0.0f, 0.0f}, {0.1f, 0.0f}, {0.1f, 0.333333f}},
+  // Tile 1 (grass side) 
+  {{0.1f, 0.333333f}, {0.1f, 0.0f}, {0.2f, 0.0f}, {0.2f, 0.333333f}},
+  // Tile 2 (grass top)
+  {{0.2f, 0.333333f}, {0.2f, 0.0f}, {0.3f, 0.0f}, {0.3f, 0.333333f}},
+  // Tile 3 (stone)
+  {{0.3f, 0.333333f}, {0.3f, 0.0f}, {0.4f, 0.0f}, {0.4f, 0.333333f}},
+  // Tile 4
+  {{0.4f, 0.333333f}, {0.4f, 0.0f}, {0.5f, 0.0f}, {0.5f, 0.333333f}},
+  // Tile 5
+  {{0.5f, 0.333333f}, {0.5f, 0.0f}, {0.6f, 0.0f}, {0.6f, 0.333333f}},
+  // Tile 6
+  {{0.6f, 0.333333f}, {0.6f, 0.0f}, {0.7f, 0.0f}, {0.7f, 0.333333f}},
+  // Tile 7
+  {{0.7f, 0.333333f}, {0.7f, 0.0f}, {0.8f, 0.0f}, {0.8f, 0.333333f}},
+  // Tile 8
+  {{0.8f, 0.333333f}, {0.8f, 0.0f}, {0.9f, 0.0f}, {0.9f, 0.333333f}},
+  // Tile 9
+  {{0.9f, 0.333333f}, {0.9f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.333333f}}
+};
+
+// Fast lookup function (no divisions, just array access)
+inline float2 get_tile_uv(int tile_id, int corner) {
+  return TILE_UVS[tile_id][corner];
 }
 
 // Generate UV coordinates for a full cube (6 faces, each with 2 triangles)
@@ -183,9 +203,10 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
   float min_z = fmaxf(0.0f, floorf(camera.position.z - MAX_DEPTH));
   float max_z = fminf((float)MAP_DEPTH, ceilf(camera.position.z + MAX_DEPTH));
 
-  for (size_t x = min_x; x < max_x; ++x) {
+  // Reorder loops for better cache locality (y-z-x order matches memory layout _map[x][z][y])  
+  for (size_t y = min_y; y < max_y; ++y) {
     for (size_t z = min_z; z < max_z; ++z) {
-      for (size_t y = min_y; y < max_y; ++y) {
+      for (size_t x = min_x; x < max_x; ++x) {
         // Check if block is ahead of the player
         float3 block_pos = { (float)x, (float)y, (float)z };
         float3 to_block = block_pos - camera.position;
@@ -195,10 +216,38 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
           continue;
         }
         
+        // Improved frustum culling - check if block is within view frustum
+        float distance = float3::magnitude(to_block);
+        if (distance > MAX_DEPTH) continue; // Distance culling
+        
+        // Project block position to screen space for quick frustum test
+        float projected_x = float3::dot(to_block, cam_right);
+        float projected_y = float3::dot(to_block, cam_up);
+        float projected_z = float3::dot(to_block, cam_fwd);
+        
+        // Less aggressive frustum culling with proper block size consideration
+        // FOV = 60 degrees, so half-angle = 30 degrees, tan(30°) ≈ 0.577f
+        // But we need to account for block size and be less aggressive
+        float frustum_half_width = projected_z * 0.8f; // Even wider to catch edge cases
+        float block_radius = 1.0f; // Increased margin for safety
+        
+        // More conservative check - only cull if block is clearly outside view
+        if (projected_z > 0.1f) { // Only do frustum culling for blocks not too close
+          if (fabsf(projected_x) > frustum_half_width + block_radius || 
+              fabsf(projected_y) > frustum_half_width + block_radius) {
+            continue;
+          }
+        }
+        
         block_type_t block = _map[x][z][y];
 
         if (block == block_type_t::AIR) {
           continue; // Skip air blocks
+        }
+        
+        // Occlusion culling: skip blocks that are completely surrounded
+        if (!is_block_visible(x, z, y)) {
+          continue;
         }
 
         model.transform.position = { (float)x, (float)y, (float)z };

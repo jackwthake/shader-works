@@ -13,6 +13,7 @@ struct float3 {
 
   static float dot(float3 a, float3 b);
   static float3 normalize(const float3& vec);
+  static float magnitude(const float3& vec);
 
   float3 operator+(const float3& other) const;
   float3 operator-(const float3& other) const;

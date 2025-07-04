@@ -158,8 +158,17 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
     float3 view_b = cam.to_local_point(world_b);
     float3 view_c = cam.to_local_point(world_c);
 
-    // Basic frustum culling: skip triangle if any vertex is behind the camera (z <= 0)
-    if (view_a.z <= 0 || view_b.z <= 0 || view_c.z <= 0) continue;
+    // Basic frustum culling: skip triangle if all vertices are behind camera OR outside frustum
+    if (view_a.z <= 0 && view_b.z <= 0 && view_c.z <= 0) continue;
+    
+    // Additional frustum culling - check if triangle is completely outside view frustum
+    float frustum_bound = tan(fov / 2) * 1.4f; // Add small margin
+    bool outside_left   = (view_a.x < -view_a.z * frustum_bound && view_b.x < -view_b.z * frustum_bound && view_c.x < -view_c.z * frustum_bound);
+    bool outside_right  = (view_a.x >  view_a.z * frustum_bound && view_b.x >  view_b.z * frustum_bound && view_c.x >  view_c.z * frustum_bound);
+    bool outside_top    = (view_a.y >  view_a.z * frustum_bound && view_b.y >  view_b.z * frustum_bound && view_c.y >  view_c.z * frustum_bound);
+    bool outside_bottom = (view_a.y < -view_a.z * frustum_bound && view_b.y < -view_b.z * frustum_bound && view_c.y < -view_c.z * frustum_bound);
+    
+    if (outside_left || outside_right || outside_top || outside_bottom) continue;
 
     // Use pre-computed projection constants
     float pixels_per_world_unit_a = projection_scale / view_a.z;
@@ -212,11 +221,22 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
     float max_y = fminf(Display::height - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
+    // Early exit if triangle is completely outside screen bounds
+    if (min_x > max_x || min_y > max_y) continue;
+
     // Precompute color for this triangle (fallback if no texture)
     uint16_t flat_color = rgb_to_565(255, 0, 255);
 
+    // Precompute values outside the pixel loop
+    const float inv_tex_width = 1.0f / tex_width;
+    const float inv_tex_height = 1.0f / tex_height;
+    const int tex_width_minus_1 = tex_width - 1;
+    const int tex_height_minus_1 = tex_height - 1;
+
     // Rasterize only within the computed bounding box
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
+      int pixel_base = y * Display::width; // Precompute row offset
+
       for (int x = (int)min_x; x <= (int)max_x; ++x) {
         float2 p = { (float)x, (float)y }; // Current pixel coordinate
 
@@ -227,7 +247,7 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
           float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
 
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
-          int pixel_idx = y * Display::width + x;
+          int pixel_idx = pixel_base + x; // Use precomputed row offset
           if (new_depth < depth_buf[pixel_idx]) {
             uint16_t final_pixel_color;
 
@@ -240,15 +260,33 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
               float final_u = interpolated_u_prime * new_depth;
               float final_v = interpolated_v_prime * new_depth;
 
-              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates
-              int tex_x = static_cast<int>(final_u * tex_width);
-              int tex_y = static_cast<int>(final_v * tex_height);
+              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates (optimized)
+              int tex_x = (int)(final_u * tex_width);
+              int tex_y = (int)(final_v * tex_height);
 
-              // Clamp texture coordinates
-              tex_x = constrain(tex_x, 0, tex_width - 1);
-              tex_y = constrain(tex_y, 0, tex_height - 1);
+              // Fast clamp using bit operations and conditionals
+              tex_x = (tex_x < 0) ? 0 : ((tex_x > tex_width_minus_1) ? tex_width_minus_1 : tex_x);
+              tex_y = (tex_y < 0) ? 0 : ((tex_y > tex_height_minus_1) ? tex_height_minus_1 : tex_y);
 
               final_pixel_color = texture_data[tex_y * tex_width + tex_x];
+              
+              // Apply basic shading to north, northwest, and bottom faces
+              // Face order: bottom(0-1), top(2-3), front(4-5), back(6-7), right(8-9), left(10-11)
+              // Bottom face = triangles 0-1, North face = back face (triangles 6-7), Northwest face = left face (triangles 10-11)
+              if (tri == 0 || tri == 1 || tri == 6 || tri == 7 || tri == 10 || tri == 11) {
+                // Extract RGB components and darken by ~25%
+                uint8_t shade_r = ((final_pixel_color >> 11) & 0x1F);
+                uint8_t shade_g = ((final_pixel_color >> 5) & 0x3F);
+                uint8_t shade_b = (final_pixel_color & 0x1F);
+                
+                // Apply 0.75 multiplier for shading (25% darker)
+                shade_r = (shade_r * 3) >> 2;  // * 0.75
+                shade_g = (shade_g * 3) >> 2;  // * 0.75  
+                shade_b = (shade_b * 3) >> 2;  // * 0.75
+                
+                // Repack into RGB565
+                final_pixel_color = (shade_r << 11) | (shade_g << 5) | shade_b;
+              }
             } else {
               final_pixel_color = flat_color; // Use flat color as fallback
             }
@@ -257,22 +295,27 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
             float fog_factor = (new_depth - FOG_START) / (FOG_END - FOG_START);
             fog_factor = constrain(fog_factor, 0.0f, 1.0f);
 
-            // Extract RGB components from BGR565 format correctly
-            uint8_t b = (final_pixel_color & 0x1F) << 3;        // Blue: bits 0-4, expand to 8-bit
-            uint8_t g = ((final_pixel_color >> 5) & 0x3F) << 2; // Green: bits 5-10, expand to 8-bit  
-            uint8_t r = ((final_pixel_color >> 11) & 0x1F) << 3; // Red: bits 11-15, expand to 8-bit
+            // For full fog (fog_factor >= 0.99)
+            if (fog_factor >= 0.99f) {
+              final_pixel_color = 0x8E1C;
+            } else {
+              // Extract RGB components from BGR565 format
+              uint8_t b = (final_pixel_color & 0x1F) << 3;        // Blue: bits 0-4, expand to 8-bit
+              uint8_t g = ((final_pixel_color >> 5) & 0x3F) << 2; // Green: bits 5-10, expand to 8-bit  
+              uint8_t r = ((final_pixel_color >> 11) & 0x1F) << 3; // Red: bits 11-15, expand to 8-bit
 
-            // Fog color (light gray) - 8-bit values
-            constexpr uint8_t fog_r = 175;
-            constexpr uint8_t fog_g = 175;
-            constexpr uint8_t fog_b = 255;
+              // Fog color
+              constexpr uint8_t fog_r = 142;
+              constexpr uint8_t fog_g = 193;
+              constexpr uint8_t fog_b = 230;
 
-            // Interpolate between original color and fog color
-            r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
-            g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
-            b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
+              // Interpolate between original color and fog color
+              r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
+              g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
+              b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
+              final_pixel_color = rgb_to_565(r, g, b);
+            }
 
-            final_pixel_color = rgb_to_565(r, g, b);
             buff[pixel_idx] = final_pixel_color; // Draw the pixel
             depth_buf[pixel_idx] = new_depth; // Update depth buffer
           }

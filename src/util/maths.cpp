@@ -26,6 +26,10 @@ float3 float3::normalize(const float3& vec) {
   return float3(vec.x / magnitude, vec.y / magnitude, vec.z / magnitude);
 }
 
+float float3::magnitude(const float3& vec) {
+  return std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+}
+
 float3 float3::operator+(const float3& other) const {
   return float3(x + other.x, y + other.y, z + other.z);
 }

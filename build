@@ -28,7 +28,7 @@ CXXFlags = [
 
 
 ELFFLAGS = [
-    "-L" + BIN_DIR, "-Ofast", "-Wl,--gc-sections", "-save-temps", "-T" + os.path.abspath(os.path.join(LIB_DIR, "variant/linker_scripts/gcc/flash_with_bootloader.ld")), "-Wl,-Map=" + os.path.join(BIN_DIR, PROG_NAME + ".map"), "--specs=nano.specs", "--specs=nosys.specs", "-mcpu=cortex-m4", "-mthumb", "-Wl,--cref", "-Wl,--check-sections", "-Wl,--gc-sections", "-Wl,--unresolved-symbols=report-all", "-Wl,--warn-common", "-Wl,--warn-section-align"
+    "-L" + BIN_DIR, "-Os", "-Wl,--gc-sections", "-T" + os.path.abspath(os.path.join(LIB_DIR, "variant/linker_scripts/gcc/flash_with_bootloader.ld")), "-Wl,-Map=" + os.path.join(BIN_DIR, PROG_NAME + ".map"), "--specs=nano.specs", "--specs=nosys.specs", "-mcpu=cortex-m4", "-mthumb", "-Wl,--cref", "-Wl,--check-sections", "-Wl,--gc-sections", "-Wl,--unresolved-symbols=report-all", "-Wl,--warn-common", "-Wl,--warn-section-align"
 ]
 
 
@@ -324,6 +324,16 @@ if __name__ == "__main__":
         os.makedirs(BIN_DIR)
     if not os.path.exists(OBJ_DIR):
         os.makedirs(OBJ_DIR)
+    
+    # Clean up any temporary files from previous builds with -save-temps
+    temp_extensions = ['*.ii', '*.s', '*.debug.temp.o']
+    for pattern in temp_extensions:
+        for temp_file in glob.glob(pattern):
+            try:
+                os.remove(temp_file)
+                print(f"Cleaned up: {temp_file}")
+            except OSError:
+                pass
     
     core_library_build()
     main_project_build()
