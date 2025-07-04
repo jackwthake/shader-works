@@ -126,7 +126,7 @@ void Scene::init() {
 
   generate_terrain();
 
-  camera.position = { -5.0f, 16.0f, -5.0f }; // Set initial camera position
+  camera.position = { 5.0f, 5.0f, 10.0f }; // Set initial camera position
   camera.yaw = -45 * DEG_TO_RAD; // Set initial yaw to 45 degrees
   camera.pitch = 0.0f; // Set initial pitch to 0
 
@@ -165,31 +165,43 @@ void Scene::update(float delta_time) {
 
 // Render the scene to the display buffer
 void Scene::render(uint16_t *buffer, float *depth_buffer) {
-  float min_x = fmaxf(0.0f, floorf(fminf(camera.position.x - MAX_DEPTH, 0)));
-  float max_x = fminf(camera.position.x + MAX_DEPTH, ceilf(fmaxf(camera.position.x + MAX_DEPTH, 0)));
-  float min_y = fmaxf(0.0f, floorf(fminf(camera.position.y - MAX_DEPTH, 0)));
-  float max_y = fminf(camera.position.y + MAX_DEPTH, ceilf(fmaxf(camera.position.y + MAX_DEPTH, 0)));
-  float min_z = fmaxf(0.0f, floorf(fminf(camera.position.z - MAX_DEPTH, 0)));
-  float max_z = fminf(camera.position.z + MAX_DEPTH, ceilf(fmaxf(camera.position.z + MAX_DEPTH, 0)));
+  // Get camera forward direction
+  float3 cam_right, cam_up, cam_fwd;
+  camera.get_basis_vectors(cam_right, cam_up, cam_fwd);
 
-  Serial.println("Rendering scene");
-  for (size_t z = min_z; z < max_z; ++z) {
-    for (size_t y = min_y; y < max_y; ++y) {
-      for (size_t x = min_x; x < max_x; ++x) {
+  Model model;
+  model.scale = { 0.5f, 0.5f, 0.5f }; // Scale cubes to 0.5 to prevent overlap
+  model.vertices = Scene::cube_vertices; // Use the predefined vertices
+  model.transform.pitch = 0.0f; // Reset pitch for each cube
+  model.transform.yaw = 0.0f; // Reset yaw for each cube
+
+  // Calculate proper bounds around the camera position
+  float min_x = fmaxf(0.0f, floorf(camera.position.x - MAX_DEPTH));
+  float max_x = fminf((float)MAP_WIDTH, ceilf(camera.position.x + MAX_DEPTH));
+  float min_y = fmaxf(0.0f, floorf(camera.position.y - MAX_DEPTH));
+  float max_y = fminf((float)MAP_HEIGHT, ceilf(camera.position.y + MAX_DEPTH));
+  float min_z = fmaxf(0.0f, floorf(camera.position.z - MAX_DEPTH));
+  float max_z = fminf((float)MAP_DEPTH, ceilf(camera.position.z + MAX_DEPTH));
+
+  for (size_t x = min_x; x < max_x; ++x) {
+    for (size_t z = min_z; z < max_z; ++z) {
+      for (size_t y = min_y; y < max_y; ++y) {
+        // Check if block is ahead of the player
+        float3 block_pos = { (float)x, (float)y, (float)z };
+        float3 to_block = block_pos - camera.position;
+        
+        // Skip blocks behind the camera (dot product < 0)
+        if (float3::dot(to_block, cam_fwd) < 0) {
+          continue;
+        }
+        
         block_type_t block = _map[x][z][y];
 
         if (block == block_type_t::AIR) {
           continue; // Skip air blocks
         }
 
-        Model model;
-        model.scale = { 0.5f, 0.5f, 0.5f }; // Scale cubes to 0.5 to prevent overlap
-        model.vertices = Scene::cube_vertices; // Use the predefined vertices
-
-        // Set the position of this cube in the world
         model.transform.position = { (float)x, (float)y, (float)z };
-        model.transform.yaw = 0;
-        model.transform.pitch = 0;
 
         // Assign pre-computed UV coordinates based on block type
         switch (block) {
@@ -220,7 +232,7 @@ void Scene::generate_terrain() {
   for (size_t z = 0; z < MAP_DEPTH; ++z) {
     for (size_t x = 0; x < MAP_WIDTH; ++x) {
       // Create a 2D sine wave based on both x and z coordinates
-      float height_float = sin((float)x * 0.2f) * sin((float)z * 0.2f) * 4.0f + 8.0f;
+      float height_float = sin((float)x * 0.2f) * sin((float)z * 0.2f) * 4.0f + (MAP_HEIGHT / 2.0f);
       
       // Clamp to valid range before casting
       if (height_float < 0.0f) height_float = 0.0f;
@@ -230,7 +242,10 @@ void Scene::generate_terrain() {
       
       // Double-check bounds (defensive programming)
       if (y < MAP_HEIGHT) {
-        _map[x][z][y] = block_type_t::GRASS;
+        if (y > 0 && y <= 8) // y = 0 is top of world
+          _map[x][z][y] = block_type_t::GRASS;
+        else
+          _map[x][z][y] = block_type_t::STONE;
       }
     }
   }

@@ -11,8 +11,8 @@
 
 using namespace std;
 
-#define EPSILON 0.0001f
-#define CUBE_VERTEX_COUNT 36
+constexpr float EPSILON = 0.0001f;
+constexpr int CUBE_VERTEX_COUNT = 36;
 
 
 // --- Constants for the Atlas ---
@@ -83,32 +83,6 @@ static bool point_in_triangle(const float2& a, const float2& b, const float2& c,
 
 
 /**
- * Converts world coordinates of a vertex to screen coordinates.
- * @param vertex The vertex in world coordinates.
- * @param transform The transformation to apply to the vertex.
- * @param dim The dimensions of the screen (width, height).
- * @return The screen coordinates of the vertex as a float2.
- */
-static float3 vertex_to_screen(const float3 &vertex, Transform &transform, Transform &cam, float2 dim) {
-  float3 vertex_world = transform.to_world_point(vertex);
-  float3 vertex_view = cam.to_local_point(vertex_world);
-  constexpr float fov = 1.0472; // 60 degrees in radians
-
-  if (vertex_view.z < EPSILON) {
-      return float3(0, 0, -1.0f); // Return -1.0f or similar to indicate "invalid" for the Z check
-  }
-
-  float screen_height_world = tan(fov / 2) * 2;
-  float pixels_per_world_unit = dim.y / screen_height_world / vertex_view.z;
-
-  float2 pixel_offset = float2(vertex_view.x, vertex_view.y) * pixels_per_world_unit;
-  float2 vertex_screen = (dim / 2) + pixel_offset;
-
-  return float3(vertex_screen.x, vertex_screen.y, vertex_view.z);
-}
-
-
-/**
  * Computes the UV coordinates for a tile in the texture atlas.
  * @param uvs The vector to store the computed UV coordinates.
  * @param tile_id The ID of the tile to compute UVs for.
@@ -163,6 +137,11 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
   int tex_height = ATLAS_HEIGHT_PX;
   bool use_texture = true;
 
+  // Pre-compute projection constants
+  constexpr float fov = 1.0472f; // 60 degrees in radians
+  const float screen_height_world = tan(fov / 2) * 2;
+  const float projection_scale = screen_dim.y / screen_height_world;
+
 
   // Loop through each triangle in the model
   for (int tri = 0; tri < CUBE_VERTEX_COUNT / 3; ++tri) {
@@ -170,27 +149,62 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
     float3 scaled_vertex_b = model.vertices[tri * 3 + 1] * model.scale;
     float3 scaled_vertex_c = model.vertices[tri * 3 + 2] * model.scale;
 
-    // Get the three vertices of the current triangle
-    // Transform vertices from model space to world space, then to view space, then to screen space
-    float3 a = vertex_to_screen(scaled_vertex_a, model.transform, cam, screen_dim);
-    float3 b = vertex_to_screen(scaled_vertex_b, model.transform, cam, screen_dim);
-    float3 c = vertex_to_screen(scaled_vertex_c, model.transform, cam, screen_dim);
+    // Transform vertices from model space to world space, then to view space
+    float3 world_a = model.transform.to_world_point(scaled_vertex_a);
+    float3 world_b = model.transform.to_world_point(scaled_vertex_b);
+    float3 world_c = model.transform.to_world_point(scaled_vertex_c);
+    
+    float3 view_a = cam.to_local_point(world_a);
+    float3 view_b = cam.to_local_point(world_b);
+    float3 view_c = cam.to_local_point(world_c);
+
+    // Basic frustum culling: skip triangle if any vertex is behind the camera (z <= 0)
+    if (view_a.z <= 0 || view_b.z <= 0 || view_c.z <= 0) continue;
+
+    // Use pre-computed projection constants
+    float pixels_per_world_unit_a = projection_scale / view_a.z;
+    float pixels_per_world_unit_b = projection_scale / view_b.z;
+    float pixels_per_world_unit_c = projection_scale / view_c.z;
+    
+    float2 pixel_offset_a = float2(view_a.x, view_a.y) * pixels_per_world_unit_a;
+    float2 pixel_offset_b = float2(view_b.x, view_b.y) * pixels_per_world_unit_b;
+    float2 pixel_offset_c = float2(view_c.x, view_c.y) * pixels_per_world_unit_c;
+    
+    float2 screen_a = (screen_dim / 2) + pixel_offset_a;
+    float2 screen_b = (screen_dim / 2) + pixel_offset_b;
+    float2 screen_c = (screen_dim / 2) + pixel_offset_c;
+    
+    float3 a = float3(screen_a.x, screen_a.y, view_a.z);
+    float3 b = float3(screen_b.x, screen_b.y, view_b.z);
+    float3 c = float3(screen_c.x, screen_c.y, view_c.z);
+
+    // Proper back-face culling using world-space triangle normal and camera forward vector
+    float3 world_edge1 = world_b - world_a;
+    float3 world_edge2 = world_c - world_a;
+    
+    // Compute triangle normal (cross product)
+    float3 triangle_normal;
+    triangle_normal.x = world_edge1.y * world_edge2.z - world_edge1.z * world_edge2.y;
+    triangle_normal.y = world_edge1.z * world_edge2.x - world_edge1.x * world_edge2.z;
+    triangle_normal.z = world_edge1.x * world_edge2.y - world_edge1.y * world_edge2.x;
+    
+    // Get camera forward vector (in world space)
+    float3 cam_right, cam_up, cam_forward;
+    cam.get_basis_vectors(cam_right, cam_up, cam_forward);
+    
+    // Check if triangle is facing away from camera using dot product
+    float dot_product = triangle_normal.x * cam_forward.x + triangle_normal.y * cam_forward.y + triangle_normal.z * cam_forward.z;
+    if (dot_product < 0) continue; // Triangle is facing away from camera
 
     // Get the UV coordinates for the current triangle's vertices
     float2 uv_a = model.uvs[tri * 3 + 0];
     float2 uv_b = model.uvs[tri * 3 + 1];
     float2 uv_c = model.uvs[tri * 3 + 2];
-
-    // Basic frustum culling: skip triangle if any vertex is behind the camera (z <= 0)
-    if (a.z <= 0 || b.z <= 0 || c.z <= 0) continue;
  
-    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (a.z, b.z, c.z)
-    // This gives us u/w and v/w, which we can interpolate linearly.
-    // At the pixel, we'll divide by the interpolated 1/w to get the correct u and v.
-    float2 uv_a_prime = uv_a / a.z; // u_a * (1/w_a), v_a * (1/w_a)
-    float2 uv_b_prime = uv_b / b.z; // u_b * (1/w_b), v_b * (1/w_b)
-    float2 uv_c_prime = uv_c / c.z; // u_c * (1/w_c), v_c * (1/w_c)
-
+    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w
+    float2 uv_a_prime = uv_a / a.z;
+    float2 uv_b_prime = uv_b / b.z;
+    float2 uv_c_prime = uv_c / c.z;
 
     // Compute triangle bounding box (clamped to screen boundaries)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
@@ -209,8 +223,8 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
         float3 weights; // Barycentric coordinates
         // Check if the current pixel is inside the triangle
         if (point_in_triangle({a.x, a.y}, {b.x, b.y}, {c.x, c.y}, p, weights)) {
-          // Interpolate depth using barycentric coordinates (this is 1/w_interpolated)
-          float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z); // new_depth is actual interpolated Z
+          // Interpolate depth using barycentric coordinates
+          float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
 
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
           int pixel_idx = y * Display::width + x;
@@ -222,15 +236,15 @@ void render_model(uint16_t *buff, float *depth_buf, Transform &cam, Model &model
               float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
               float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
 
-              // Divide by interpolated 1/w (new_depth is already 1/w_interpolated)
+              // Divide by interpolated 1/w to get correct perspective UVs
               float final_u = interpolated_u_prime * new_depth;
               float final_v = interpolated_v_prime * new_depth;
 
-              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates [0, tex_width-1], [0, tex_height-1]
+              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates
               int tex_x = static_cast<int>(final_u * tex_width);
               int tex_y = static_cast<int>(final_v * tex_height);
 
-              // Clamp texture coordinates to avoid out-of-bounds access (optional, but good practice)
+              // Clamp texture coordinates
               tex_x = constrain(tex_x, 0, tex_width - 1);
               tex_y = constrain(tex_y, 0, tex_height - 1);
 

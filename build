@@ -12,23 +12,23 @@ OBJ_DIR = os.path.relpath('./bin/obj/')
 
 PROG_NAME = "software-rasterizer"
 
-CXX = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-g++")
-CC = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-gcc")
-LD = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-ld")
-OBJ_COPY = './' + os.path.join(TOOLS_DIR, "arm-none-eabi-gcc/9-2019q4/bin/arm-none-eabi-objcopy")
+CXX = "arm-none-eabi-g++"
+CC = "arm-none-eabi-gcc"
+LD = "arm-none-eabi-ld"
+OBJ_COPY = "arm-none-eabi-objcopy"
 
 CFLAGS = [
-    "-mcpu=cortex-m4", "-mthumb", "-c", "-g", "-Os", "-Wall", "-std=gnu11", "-mfloat-abi=hard", "-ffunction-sections", "-fdata-sections", "-nostdlib", "-MMD", '-D__SKETCH_NAME__="""{PROG_NAME}"""'
+    "-mcpu=cortex-m4", "-mthumb", "-c", "-g", "-O3", "-Wall", "-std=gnu11", "-mfloat-abi=hard", "-flto", "-ffast-math", "-funroll-loops", "-ffunction-sections", "-fdata-sections", "-nostdlib", "-MMD", '-D__SKETCH_NAME__="""{PROG_NAME}"""'
 ]
 
 
 CXXFlags = [
-    "-mcpu=cortex-m4", "-mthumb", "-c", "-g", "-Os", "-Wall", "-std=gnu++11", "-ffunction-sections", "-fdata-sections", "-fno-threadsafe-statics", "-nostdlib", "-mfloat-abi=hard", "-fno-rtti", "-fno-exceptions", "-MMD", '-D__SKETCH_NAME__="""{PROG_NAME}"""'
+    "-mcpu=cortex-m4", "-mthumb", "-c", "-g", "-O3", "-Wall", "-std=gnu++11", "-ffunction-sections", "-fdata-sections", "-flto", "-ffast-math", "-funroll-loops", "-fno-threadsafe-statics", "-nostdlib", "-mfloat-abi=hard", "-fno-rtti", "-fno-exceptions", "-MMD", '-D__SKETCH_NAME__="""{PROG_NAME}"""'
 ]
 
 
 ELFFLAGS = [
-    "-L" + BIN_DIR, "-Os" "-Wl,--gc-sections", "-save-temps", "-T" + os.path.abspath(os.path.join(LIB_DIR, "variant/linker_scripts/gcc/flash_with_bootloader.ld")), "-Wl,-Map=" + os.path.join(BIN_DIR, PROG_NAME + ".map"), "--specs=nano.specs", "--specs=nosys.specs", "-mcpu=cortex-m4", "-mthumb", "-Wl,--cref", "-Wl,--check-sections", "-Wl,--gc-sections", "-Wl,--unresolved-symbols=report-all", "-Wl,--warn-common", "-Wl,--warn-section-align"
+    "-L" + BIN_DIR, "-Ofast", "-Wl,--gc-sections", "-save-temps", "-T" + os.path.abspath(os.path.join(LIB_DIR, "variant/linker_scripts/gcc/flash_with_bootloader.ld")), "-Wl,-Map=" + os.path.join(BIN_DIR, PROG_NAME + ".map"), "--specs=nano.specs", "--specs=nosys.specs", "-mcpu=cortex-m4", "-mthumb", "-Wl,--cref", "-Wl,--check-sections", "-Wl,--gc-sections", "-Wl,--unresolved-symbols=report-all", "-Wl,--warn-common", "-Wl,--warn-section-align"
 ]
 
 
