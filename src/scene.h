@@ -12,9 +12,9 @@ enum class block_type_t : uint8_t {
   DIRT = 2,
   GRASS = 3,
   SAND = 4,
-  WATER = 5,
-  WOOD = 6,
-  LEAVES = 7,
+  WOOD = 5,
+  LEAVES = 6,
+  WATER = 7,
   STONE_BRICKS = 8,
   COBBLESTONE = 9,
 };
@@ -48,6 +48,9 @@ class Scene {
     static constexpr size_t MAP_WIDTH = 32;
     static constexpr size_t MAP_DEPTH = 32;
     static constexpr size_t MAP_HEIGHT = 16;
+
+		//										 [    x    ][    z    ][    y     ]
+		static block_type_t map[MAP_WIDTH][MAP_DEPTH][MAP_HEIGHT];
   private:
     void generate_terrain();
 
@@ -60,4 +63,8 @@ class Scene {
     static float2 cube_uvs_grass[36];   // tile_id = 3 (grass)
     static float2 cube_uvs_stone[36];   // tile_id = 1 (stone)
     static float2 cube_uvs_dirt[36];    // tile_id = 2 (dirt)
+    static float2 cube_uvs_sand[36];    // tile_id = 4 (sand)
+    static float2 cube_uvs_wood[36];    // tile_id = 5 (wood)
+    static float2 cube_uvs_leaf[36];    // tile_id = 6 (leaf)
+    static float2 cube_uvs_water[36];    // tile_id = 7 (water)
 };

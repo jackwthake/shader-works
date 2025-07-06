@@ -3,23 +3,7 @@
 #include "device.h"
 #include "renderer.h"
 
-static block_type_t _map[Scene::MAP_WIDTH][Scene::MAP_DEPTH][Scene::MAP_HEIGHT];
-
-// Helper function to check if block needs rendering (occlusion culling)
-bool is_block_visible(size_t x, size_t z, size_t y) {
-  // If block is on the edge of the map, it's visible
-  if (x == 0 || x == Scene::MAP_WIDTH-1 || z == 0 || z == Scene::MAP_DEPTH-1 || y == 0 || y == Scene::MAP_HEIGHT-1) {
-    return true;
-  }
-  
-  // Check if all 6 adjacent blocks are solid (occluding this block)
-  return (_map[x-1][z][y] == block_type_t::AIR ||
-          _map[x+1][z][y] == block_type_t::AIR ||
-          _map[x][z-1][y] == block_type_t::AIR ||
-          _map[x][z+1][y] == block_type_t::AIR ||
-          _map[x][z][y-1] == block_type_t::AIR ||
-          _map[x][z][y+1] == block_type_t::AIR);
-}
+block_type_t Scene::map[Scene::MAP_WIDTH][Scene::MAP_DEPTH][Scene::MAP_HEIGHT];
 
 float3 Scene::cube_vertices[36] = {
   {-1.000000, 1.000000, -1.000000}, {-1.000000, 1.000000, 1.000000}, {1.000000, 1.000000, 1.000000}, 
@@ -36,7 +20,6 @@ float3 Scene::cube_vertices[36] = {
   {-1.000000, 1.000000, 1.000000}, {-1.000000, -1.000000, -1.000000}, {-1.000000, 1.000000, -1.000000}
 };
 
-
 // Pre-computed UV coordinates for different block types
 // Each cube has 6 faces * 2 triangles * 3 vertices = 36 UV coordinates
 // Face order: bottom, top, front, back, right, left (matching cube_vertices order)
@@ -51,13 +34,13 @@ static const float2 TILE_UVS[10][4] = {
   {{0.2f, 0.333333f}, {0.2f, 0.0f}, {0.3f, 0.0f}, {0.3f, 0.333333f}},
   // Tile 3 (stone)
   {{0.3f, 0.333333f}, {0.3f, 0.0f}, {0.4f, 0.0f}, {0.4f, 0.333333f}},
-  // Tile 4
+  // Tile 4 (sand)
   {{0.4f, 0.333333f}, {0.4f, 0.0f}, {0.5f, 0.0f}, {0.5f, 0.333333f}},
-  // Tile 5
+  // Tile 5 (wood)
   {{0.5f, 0.333333f}, {0.5f, 0.0f}, {0.6f, 0.0f}, {0.6f, 0.333333f}},
-  // Tile 6
+  // Tile 6 (leaves)
   {{0.6f, 0.333333f}, {0.6f, 0.0f}, {0.7f, 0.0f}, {0.7f, 0.333333f}},
-  // Tile 7
+  // Tile 7 (water)
   {{0.7f, 0.333333f}, {0.7f, 0.0f}, {0.8f, 0.0f}, {0.8f, 0.333333f}},
   // Tile 8
   {{0.8f, 0.333333f}, {0.8f, 0.0f}, {0.9f, 0.0f}, {0.9f, 0.333333f}},
@@ -65,13 +48,26 @@ static const float2 TILE_UVS[10][4] = {
   {{0.9f, 0.333333f}, {0.9f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.333333f}}
 };
 
+
+// Static UV coordinate arrays for different block types
+float2 Scene::cube_uvs_grass[36];
+float2 Scene::cube_uvs_stone[36];  
+float2 Scene::cube_uvs_dirt[36];
+float2 Scene::cube_uvs_sand[36];
+float2 Scene::cube_uvs_wood[36];
+float2 Scene::cube_uvs_leaf[36];
+float2 Scene::cube_uvs_water[36];
+
+// Static helper functions
+
 // Fast lookup function (no divisions, just array access)
-inline float2 get_tile_uv(int tile_id, int corner) {
+static inline float2 get_tile_uv(int tile_id, int corner) {
   return TILE_UVS[tile_id][corner];
 }
 
+
 // Generate UV coordinates for a full cube (6 faces, each with 2 triangles)
-void generate_cube_uvs(float2* uvs, int top_tile, int bottom_tile, int side_tile) {
+static void generate_cube_uvs(float2* uvs, int top_tile, int bottom_tile, int side_tile) {
   int uv_idx = 0;
   
   // Face 1: Bottom (triangles 0-1)
@@ -123,10 +119,22 @@ void generate_cube_uvs(float2* uvs, int top_tile, int bottom_tile, int side_tile
   uvs[uv_idx++] = get_tile_uv(side_tile, 3);
 }
 
-// Static UV coordinate arrays for different block types
-float2 Scene::cube_uvs_grass[36];
-float2 Scene::cube_uvs_stone[36];  
-float2 Scene::cube_uvs_dirt[36];
+
+// Checks if block needs rendering (occlusion culling)
+static bool is_block_visible(size_t x, size_t z, size_t y) {
+  // If block is on the edge of the map, it's visible
+  if (x == 0 || x == Scene::MAP_WIDTH-1 || z == 0 || z == Scene::MAP_DEPTH-1 || y == 0 || y == Scene::MAP_HEIGHT-1) {
+    return true;
+  }
+  
+  // Check if all 6 adjacent blocks are solid (occluding this block)
+  return (Scene::map[x-1][z][y] == block_type_t::AIR ||
+          Scene::map[x+1][z][y] == block_type_t::AIR ||
+          Scene::map[x][z-1][y] == block_type_t::AIR ||
+          Scene::map[x][z+1][y] == block_type_t::AIR ||
+          Scene::map[x][z][y-1] == block_type_t::AIR ||
+          Scene::map[x][z][y+1] == block_type_t::AIR);
+}
 
 
 // Initialize the scene, load resources, etc.
@@ -135,11 +143,16 @@ void Scene::init() {
   generate_cube_uvs(cube_uvs_grass, 2, 0, 1);  // grass: top=grass(2), bottom=dirt(0), sides=dirt(1)
   generate_cube_uvs(cube_uvs_stone, 3, 3, 3);  // stone: all faces stone(3)
   generate_cube_uvs(cube_uvs_dirt, 0, 0, 0);   // dirt: all faces dirt(0)
+  generate_cube_uvs(cube_uvs_sand, 4, 4, 4);   // sand: all faces sand(4)
+  generate_cube_uvs(cube_uvs_wood, 5, 5, 5);   // Wood: all faces bark(5) TODO: add bottom and top texture
+  generate_cube_uvs(cube_uvs_leaf, 6, 6, 6);   // Leaf: all faces Leaves(6)
+  generate_cube_uvs(cube_uvs_water, 7, 7, 7);  // Water: all faces Water(6) NOTE: Maybe just render the top face?
 
+	// Initialize map before generation
   for (size_t x = 0; x < MAP_WIDTH; ++x) {
     for (size_t z = 0; z < MAP_DEPTH; ++z) {
       for (size_t y = 0; y < MAP_HEIGHT; ++y) {
-        _map[x][z][y] = block_type_t::AIR; // Initialize all blocks to AIR
+        Scene::map[x][z][y] = block_type_t::AIR; // Initialize all blocks to AIR
       }
     }
   }
@@ -167,12 +180,11 @@ void Scene::update(float delta_time) {
   else if (read_joystick_y() > JOYSTICK_THRESH)
     move_delta += (cam_fwd * -1);
 
-  /** Button Test */
   uint32_t buttons = read_buttons();
   if (buttons & BUTTON_MASK_A) {
-    camera.position.y += 2 * delta_time;
+    camera.position.y -= 3 * delta_time;
   } else if (buttons & BUTTON_MASK_B) {
-    camera.position.y -= 2 * delta_time;
+    camera.position.y += 3 * delta_time;
   } else if (buttons & BUTTON_MASK_START) { // Strafe
     move_delta += cam_right;
   } if (buttons & BUTTON_MASK_SELECT) {
@@ -203,7 +215,7 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
   float min_z = fmaxf(0.0f, floorf(camera.position.z - MAX_DEPTH));
   float max_z = fminf((float)MAP_DEPTH, ceilf(camera.position.z + MAX_DEPTH));
 
-  // Reorder loops for better cache locality (y-z-x order matches memory layout _map[x][z][y])  
+	// loop through map
   for (size_t y = min_y; y < max_y; ++y) {
     for (size_t z = min_z; z < max_z; ++z) {
       for (size_t x = min_x; x < max_x; ++x) {
@@ -216,7 +228,7 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
           continue;
         }
         
-        // Improved frustum culling - check if block is within view frustum
+        // check if block is within view frustum
         float distance = float3::magnitude(to_block);
         if (distance > MAX_DEPTH) continue; // Distance culling
         
@@ -225,13 +237,10 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
         float projected_y = float3::dot(to_block, cam_up);
         float projected_z = float3::dot(to_block, cam_fwd);
         
-        // Less aggressive frustum culling with proper block size consideration
-        // FOV = 60 degrees, so half-angle = 30 degrees, tan(30°) ≈ 0.577f
-        // But we need to account for block size and be less aggressive
-        float frustum_half_width = projected_z * 0.8f; // Even wider to catch edge cases
-        float block_radius = 1.0f; // Increased margin for safety
+        float frustum_half_width = projected_z * 0.8f; // scaled to better catch blocks around the edge of the screen
+        float block_radius = 1.0f; // safety-margin
         
-        // More conservative check - only cull if block is clearly outside view
+        // only cull if block is clearly outside view
         if (projected_z > 0.1f) { // Only do frustum culling for blocks not too close
           if (fabsf(projected_x) > frustum_half_width + block_radius || 
               fabsf(projected_y) > frustum_half_width + block_radius) {
@@ -239,13 +248,13 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
           }
         }
         
-        block_type_t block = _map[x][z][y];
+        block_type_t block = Scene::map[x][z][y];
 
         if (block == block_type_t::AIR) {
           continue; // Skip air blocks
         }
         
-        // Occlusion culling: skip blocks that are completely surrounded
+        // Skip blocks that are completely surrounded
         if (!is_block_visible(x, z, y)) {
           continue;
         }
@@ -263,6 +272,17 @@ void Scene::render(uint16_t *buffer, float *depth_buffer) {
           case block_type_t::DIRT:
             model.uvs = Scene::cube_uvs_dirt;
             break;
+          case block_type_t::SAND:
+            model.uvs = Scene::cube_uvs_sand;
+            break;
+          case block_type_t::WOOD:
+            model.uvs = Scene::cube_uvs_wood;
+            break;
+          case block_type_t::LEAVES:
+            model.uvs = Scene::cube_uvs_leaf;
+            break;
+          case block_type_t::WATER:
+            model.uvs = Scene::cube_uvs_water;
           default:
             model.uvs = Scene::cube_uvs_stone; // Default to stone
             break;
@@ -292,9 +312,9 @@ void Scene::generate_terrain() {
       // Double-check bounds (defensive programming)
       if (y < MAP_HEIGHT) {
         if (y > 0 && y <= 8) // y = 0 is top of world
-          _map[x][z][y] = block_type_t::GRASS;
+          Scene::map[x][z][y] = block_type_t::GRASS;
         else
-          _map[x][z][y] = block_type_t::STONE;
+          Scene::map[x][z][y] = block_type_t::STONE;
       }
     }
   }
