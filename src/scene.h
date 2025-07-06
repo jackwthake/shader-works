@@ -49,8 +49,8 @@ class Scene {
     static constexpr size_t MAP_DEPTH = 32;
     static constexpr size_t MAP_HEIGHT = 16;
 
-		//										 [    x    ][    z    ][    y     ]
-		static block_type_t map[MAP_WIDTH][MAP_DEPTH][MAP_HEIGHT];
+    //										 [    x    ][    z    ][    y     ]
+    static block_type_t map[MAP_WIDTH][MAP_DEPTH][MAP_HEIGHT];
   private:
     void generate_terrain();
 
