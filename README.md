@@ -38,7 +38,7 @@ This project is a real-time 3D Minecraft clone written in C++ for the Adafruit P
 
 ### Setup and Build
     git clone --recursive https://github.com/jackwthake/software-rasterizer.git
-    cd your-repo-name
+    cd software-rasterizer
 
     # generate src/resources.inl, this must be ran any time files in res/ are updated
     python3 tools/bake.py
@@ -66,6 +66,7 @@ The project is organized as follows:
 ├── tools/              # Build tools and scripts
 │   └── bake.py         # Resource baking script
 ├── res/                # Resource files (textures)
+├── bin/                # Directory for final binary / intermediate files
 └── build               # Build script
 ```
 
