@@ -1,7 +1,4 @@
-main
 .vscode/
 .DS_Store
-main.dsYM/
-.pio/
 bin/
 src/resources.inl
