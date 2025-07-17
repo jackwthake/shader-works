@@ -1,14 +1,7 @@
-// SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2023, Alex Taradov <alex@taradov.com>. All rights reserved.
-
-//-----------------------------------------------------------------------------
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
+#include <unistd.h>
 #include <samd51j19a.h>
 
-#include "core/hal_gpio.h"
+#include "hw-abstract/hal_gpio.h"
 
 #define PERIOD 100
 

@@ -3,7 +3,7 @@ BUILD = bin
 BIN = bare-metal
 
 ##############################################################################
-.PHONY: all directory clean size
+.PHONY: all upload directory clean size
 
 CC = arm-none-eabi-gcc
 OBJCOPY = arm-none-eabi-objcopy
@@ -16,15 +16,16 @@ else
   MKDIR = mkdir
 endif
 
-CFLAGS += -W -Wall --std=gnu11 -Os -nostdlib
+CFLAGS += -Wextra -pedantic --std=gnu17 -Ofast -nostdlib
 CFLAGS += -fno-diagnostics-show-caret
 CFLAGS += -fdata-sections -ffunction-sections
+CFLAGS += -flto -ffast-math -funroll-loops
 CFLAGS += -funsigned-char -funsigned-bitfields
-CFLAGS += -mcpu=cortex-m4 -mthumb
+CFLAGS += -mcpu=cortex-m4 -mthumb -mtune=cortex-m4
 CFLAGS += -mfloat-abi=softfp -mfpu=fpv4-sp-d16
 CFLAGS += -MD -MP -MT $(BUILD)/$(*F).o -MF $(BUILD)/$(@F).d
 
-LDFLAGS += -mcpu=cortex-m4 -mthumb
+LDFLAGS += -mcpu=cortex-m4 -mthumb -flto
 LDFLAGS += -mfloat-abi=softfp -mfpu=fpv4-sp-d16
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -Wl,--script=linker/flash_with_bootloader.ld
@@ -34,7 +35,7 @@ INCLUDES += \
   -Isrc/
 
 SRCS += \
-	src/core/start.c \
+	src/hw-abstract/start.c \
   src/main.c
 
 DEFINES += \
