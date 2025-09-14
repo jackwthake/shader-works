@@ -2,17 +2,11 @@
 
 #include "def.h"
 
-#define WIN_WIDTH 480
-#define WIN_HEIGHT 240
-#define WIN_SCALE 4
-const unsigned char *WIN_TITLE = "CPU Renderer";
+struct game_state_t state = {0};
 
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
-u32 framebuffer[WIN_WIDTH * WIN_HEIGHT] = {0};
 
-int main(int argc, char *argv[]) {
-  bool running = true;
+/** Initialize SDL Modules, create window and renderer structs */
+static int system_init() {
   SDL_SetAppMetadata("CPU Renderer", "0.0.1", "com.jwt.renderer");
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -20,54 +14,74 @@ int main(int argc, char *argv[]) {
     return SDL_APP_FAILURE;
   }
 
-  if (!SDL_CreateWindowAndRenderer(WIN_TITLE, WIN_WIDTH * WIN_SCALE, WIN_HEIGHT * WIN_SCALE, 0, &window, &renderer)) {
+  if (!SDL_CreateWindowAndRenderer(WIN_TITLE, WIN_WIDTH * WIN_SCALE, WIN_HEIGHT * WIN_SCALE, 0, &state.window, &state.renderer)) {
     SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
     return SDL_APP_FAILURE;
   }
 
-  // create framebuffer
-  SDL_Texture* framebuffer_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIN_WIDTH, WIN_HEIGHT);
-  SDL_SetTextureScaleMode(framebuffer_tex, SDL_SCALEMODE_PIXELART);
+  return SDL_APP_SUCCESS;
+}
 
-  while (running) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_EVENT_QUIT) {
-        running = false;
-      }
+
+/** Poll and handle system events */
+static void system_poll_events() {
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
+    if (event.type == SDL_EVENT_QUIT) {
+      state.running = false;
     }
+  }
+}
 
-    const double now = ((double)SDL_GetTicks()) / 1000.0;  // convert from milliseconds to seconds.
+
+/** Cleanup and free SDL resources */
+static void system_cleanup() {
+  if (state.renderer) {
+    SDL_DestroyRenderer(state.renderer);
+    state.renderer = NULL;
+  }
+
+  if (state.window) {
+    SDL_DestroyWindow(state.window);
+    state.window = NULL;
+  }
+
+  SDL_Quit();
+}
+
+
+int main(int argc, char *argv[]) {
+  if (system_init() != SDL_APP_SUCCESS) {
+    return -1;
+  }
+
+  // create framebuffer
+  SDL_Texture* framebuffer_tex = SDL_CreateTexture(state.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIN_WIDTH, WIN_HEIGHT);
+  SDL_SetTextureScaleMode(framebuffer_tex, SDL_SCALEMODE_NEAREST);
+
+  state.running = true;
+  while (state.running) {
+    system_poll_events();
+
+    const double now = ((f64)SDL_GetTicks()) / 1000.0;  // convert from milliseconds to seconds.
 
     // clear the window to the draw color.
-    SDL_RenderClear(renderer);
+    SDL_RenderClear(state.renderer);
 
-    for (int y = 0; y < WIN_HEIGHT; y++) {
-      for (int x = 0; x < WIN_WIDTH; x++) {
-        int index = y * WIN_WIDTH + x;
+    for (i32 y = 0; y < WIN_HEIGHT; y++) {
+      for (i32 x = 0; x < WIN_WIDTH; x++) {
+        i32 index = y * WIN_WIDTH + x;
         // Simple pattern: moving color bars
-        framebuffer[index] = 0xFF000000 | ((u32)(x + now * 50) % 256 << 16) | ((u32)(y + now * 50) % 256 << 8) | ((u32)(x + y + now * 50) % 256 << 0);
+        state.framebuffer[index] = 0xFF000000 | ((u32)(x + now * 50) % 256 << 16) | ((u32)(y + now * 50) % 256 << 8) | ((u32)(x + y + now * 50) % 256 << 0);
       }
     }
 
     // Update framebuffer
-    SDL_UpdateTexture(framebuffer_tex, NULL, framebuffer, WIN_WIDTH * sizeof(u32));
-    SDL_RenderTexture(renderer, framebuffer_tex, NULL, NULL);
-    SDL_RenderPresent(renderer);
+    SDL_UpdateTexture(framebuffer_tex, NULL, state.framebuffer, WIN_WIDTH * sizeof(u32));
+    SDL_RenderTexture(state.renderer, framebuffer_tex, NULL, NULL);
+    SDL_RenderPresent(state.renderer);
   }
 
-
-  // Cleanup
-  if (renderer) {
-    SDL_DestroyRenderer(renderer);
-    renderer = NULL;
-  }
-
-  if (window) {
-    SDL_DestroyWindow(window);
-    window = NULL;
-  }
-
-  SDL_Quit();
+  system_cleanup();
   return 0;
 }
