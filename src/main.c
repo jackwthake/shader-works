@@ -18,7 +18,7 @@
 static int system_init(game_state_t* state) {
   assert(state != NULL);
 
-  SDL_SetAppMetadata("CPU Renderer", "0.0.1", "com.jwt.renderer");
+  SDL_SetAppMetadata(WIN_TITLE, "0.0.1", WIN_TITLE);
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
@@ -66,7 +66,7 @@ static void render_frame(game_state_t* state, transform_t* camera, model_t* cube
     state->depthbuffer[i] = FLT_MAX;
   }
 
-  render_model(state, camera, cube_model, default_shader, NULL, 0);
+  render_model(state, camera, cube_model, &default_shader);
 
   apply_fog_to_screen(state);
   // Update SDL texture and present
@@ -78,6 +78,11 @@ static void render_frame(game_state_t* state, transform_t* camera, model_t* cube
 // Cleanup and free SDL resources on exit
 static void system_cleanup(game_state_t* state) {
   assert(state != NULL);
+
+  if (state->framebuffer_tex) {
+    SDL_DestroyTexture(state->framebuffer_tex);
+    state->framebuffer_tex = NULL;
+  }
 
   if (state->renderer) {
     SDL_DestroyRenderer(state->renderer);
@@ -94,11 +99,6 @@ static void system_cleanup(game_state_t* state) {
 
 int main(int argc, char *argv[]) {
   game_state_t state = {0};
-
-  // Initialize depth buffer to maximum depth
-  for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
-    state.depthbuffer[i] = FLT_MAX;
-  }
 
   if (system_init(&state) != SDL_APP_SUCCESS) {
     return -1;
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
     // FPS counter
     frame_count++;
     if (current_time - fps_timer >= 1.0) {
-      SDL_Log("FPS: %d", frame_count);
+      SDL_Log("TPS: %d", frame_count);
       frame_count = 0;
       fps_timer = current_time;
     }
@@ -173,7 +173,6 @@ int main(int argc, char *argv[]) {
     SDL_Delay(1); // Small delay to prevent 100% CPU usage
   }
 
-  SDL_DestroyTexture(state.framebuffer_tex);
   system_cleanup(&state);
   return 0;
 }

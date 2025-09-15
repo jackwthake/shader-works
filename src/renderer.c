@@ -6,6 +6,14 @@
 
 #include "maths.h"
 
+// Default fragment shader that just returns the input color
+static inline u32 default_shader_func(u32 input_color, void *args, usize argc) {
+  return input_color;
+}
+
+// Built-in default shader that just returns the input color
+shader_t default_shader = { .func = default_shader_func, .args = NULL, .argc = 0 };
+
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
   return SDL_MapRGBA(SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, r, g, b, 255);
@@ -50,7 +58,7 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
 }
 
 // Transforms a vector using the provided basis vectors
-static float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 vec) {
+static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 vec) {
   return (float3){
     .x = vec.x * ihat.x + vec.y * jhat.x + vec.z * khat.x,
     .y = vec.x * ihat.y + vec.y * jhat.y + vec.z * khat.y,
@@ -175,11 +183,6 @@ void apply_fog_to_screen(game_state_t *state) {
   }
 }
 
-// Default fragment shader that just returns the input color
-u32 default_shader(u32 input_color, void *args, usize argc) {
-  return input_color;
-}
-
 // Initialize renderer state
 void init_renderer(game_state_t *state) {
   assert(state != NULL);
@@ -207,20 +210,16 @@ void update_camera(game_state_t *state, transform_t *cam) {
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,
 * back-face culling, and rasterizes triangles with depth testing.
 */
-void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_func frag_shader, void *shader_args, usize shader_argc) {
-  assert(state != NULL);
+void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_t *frag_shader) {
   assert(cam != NULL);
   assert(model != NULL);
   assert(model->vertices != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
+  assert(frag_shader != NULL && frag_shader->func != NULL);
 
   if (state->use_textures) {
     assert(state->texture_atlas != NULL);
     assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
-  }
-  
-  if (frag_shader == NULL) {
-    frag_shader = default_shader;
   }
   
   // Loop through each triangle in the model
@@ -343,8 +342,8 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
             } else {
               output_color = flat_color; // Use flat color if no texture
             }
-            
-            output_color = frag_shader(output_color, shader_args, shader_argc);
+
+            output_color = frag_shader->func(output_color, frag_shader->args, frag_shader->argc);
             apply_side_shading(&output_color, tri);
             
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel
@@ -354,4 +353,12 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
       }
     }
   }
+}
+
+shader_t make_shader(shader_func func, void *args, usize argc) {
+  return (shader_t) {
+    .func = func,
+    .args = args,
+    .argc = argc
+  };
 }

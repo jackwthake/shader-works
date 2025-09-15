@@ -36,23 +36,6 @@ typedef struct {
 } float3;
 
 typedef struct {
-  f32 yaw;
-  f32 pitch;
-  float3 position;
-} transform_t;
-
-typedef struct {
-  float3 *vertices; // List of vertices
-  float2 *uvs; // pointer to texture coordinates (static data)
-
-  usize num_vertices;
-  usize num_uvs;
-  
-  float3 scale;
-  transform_t transform;
-} model_t;
-
-typedef struct {
   bool running;
 
   SDL_Window *window;
