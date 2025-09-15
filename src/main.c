@@ -1,6 +1,7 @@
 #include <SDL3/SDL.h>
 #include <assert.h>
 #include <float.h>
+#include <math.h>
 
 #include "def.h"
 #include "renderer.h"
@@ -153,7 +154,7 @@ int main(int argc, char *argv[]) {
     SDL_RenderClear(state.renderer);
     render_frame(&state, &camera, &cube_model);
 
-    // Optional: FPS counter
+    // FPS counter
     frame_count++;
     if (current_time - fps_timer >= 1.0) {
       SDL_Log("FPS: %d", frame_count);

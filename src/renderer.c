@@ -78,7 +78,7 @@ u32 rgb_to_888(u8 r, u8 g, u8 b) {
 }
 
 // Clamp helper function
-static float clampf(float x, float min_val, float max_val) {
+static inline float clampf(float x, float min_val, float max_val) {
   if (x < min_val) return min_val;
   if (x > max_val) return max_val;
   return x;
@@ -247,28 +247,6 @@ void apply_fog_to_screen(game_state_t *state) {
     state->framebuffer[i] = apply_fog(state->framebuffer[i], state->depthbuffer[i]);
   }
 }
-
-// u32 interpolate_color_by_depth(u32 color_in, u32 color_target, f32 depth, f32 start_depth, f32 end_depth) {
-//   // Clamp and normalize depth to 0..1
-//   float t = (depth - start_depth) / (end_depth - start_depth);
-//   t = clampf(t, 0.0f, 1.0f);
-  
-//   // Extract RGB components from input colors
-//   uint8_t r_in, g_in, b_in;
-//   SDL_GetRGB(color_in, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &r_in, &g_in, &b_in);
-
-//   uint8_t r_target = (color_target >> 16) & 0xFF;
-//   uint8_t g_target = (color_target >> 8) & 0xFF;
-//   uint8_t b_target = color_target & 0xFF;
-  
-//   // Interpolate each channel
-//   uint8_t r_out = (uint8_t)(r_in + t * (r_target - r_in));
-//   uint8_t g_out = (uint8_t)(g_in + t * (g_target - g_in));
-//   uint8_t b_out = (uint8_t)(b_in + t * (b_target - b_in));
-  
-//   // Pack back into uint32_t (RGB888 format)
-//   return (r_out << 16) | (g_out << 8) | b_out;
-// }
 
 // Default fragment shader that just returns the input color
 u32 default_shader(u32 input_color, void *args, usize argc) {
