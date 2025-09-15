@@ -2,30 +2,87 @@
 
 #include <math.h>
 #include <assert.h>
+#include <float.h> // For FLT_MAX
 
 #include "maths.h"
 
+// Cube vertices in counter-clockwise (CCW) winding order
+// Each face is defined with outward-pointing normals
+// 36 vertices total (6 faces × 2 triangles × 3 vertices)
+// Face indices for reference:
+// Triangles 0-1:   Front face
+// Triangles 2-3:   Back face  
+// Triangles 4-5:   Left face
+// Triangles 6-7:   Right face
+// Triangles 8-9:   Top face
+// Triangles 10-11: Bottom face
 float3 cube_vertices[CUBE_VERTEX_COUNT] = {
-  {-0.500000, 0.500000, -0.500000}, {-0.500000, 0.500000, 0.500000}, {0.500000, 0.500000, 0.500000}, 
-  {-0.500000, 0.500000, -0.500000}, {0.500000, 0.500000, 0.500000}, {0.500000, 0.500000, -0.500000}, 
-  {0.500000, -0.500000, -0.500000}, {0.500000, -0.500000, 0.500000}, {-0.500000, -0.500000, 0.500000}, 
-  {0.500000, -0.500000, -0.500000}, {-0.500000, -0.500000, 0.500000}, {-0.500000, -0.500000, -0.500000}, 
-  {0.500000, 0.500000, 0.500000}, {0.500000, -0.500000, 0.500000}, {-0.500000, -0.500000, 0.500000}, 
-  {0.500000, 0.500000, 0.500000}, {-0.500000, -0.500000, 0.500000}, {-0.500000, 0.500000, 0.500000}, 
-  {-0.500000, 0.500000, -0.500000}, {-0.500000, -0.500000, -0.500000}, {0.500000, -0.500000, -0.500000}, 
-  {-0.500000, 0.500000, -0.500000}, {0.500000, -0.500000, -0.500000}, {0.500000, 0.500000, -0.500000}, 
-  {0.500000, 0.500000, -0.500000}, {0.500000, -0.500000, -0.500000}, {0.500000, -0.500000, 0.500000}, 
-  {0.500000, 0.500000, -0.500000}, {0.500000, -0.500000, 0.500000}, {0.500000, 0.500000, 0.500000}, 
-  {-0.500000, 0.500000, 0.500000}, {-0.500000, -0.500000, 0.500000}, {-0.500000, -0.500000, -0.500000}, 
-  {-0.500000, 0.500000, 0.500000}, {-0.500000, -0.500000, -0.500000}, {-0.500000, 0.500000, -0.500000}
+  // Front face (Z = +0.5) - looking at it from outside
+  {-0.5f, -0.5f,  0.5f},  // Bottom-left
+  { 0.5f, -0.5f,  0.5f},  // Bottom-right  
+  { 0.5f,  0.5f,  0.5f},  // Top-right
+  
+  {-0.5f, -0.5f,  0.5f},  // Bottom-left
+  { 0.5f,  0.5f,  0.5f},  // Top-right
+  {-0.5f,  0.5f,  0.5f},  // Top-left
+  
+  // Back face (Z = -0.5) - looking at it from outside  
+  { 0.5f, -0.5f, -0.5f},  // Bottom-right
+  {-0.5f, -0.5f, -0.5f},  // Bottom-left
+  {-0.5f,  0.5f, -0.5f},  // Top-left
+  
+  { 0.5f, -0.5f, -0.5f},  // Bottom-right
+  {-0.5f,  0.5f, -0.5f},  // Top-left
+  { 0.5f,  0.5f, -0.5f},  // Top-right
+  
+  // Left face (X = -0.5) - looking at it from outside
+  {-0.5f, -0.5f, -0.5f},  // Bottom-back
+  {-0.5f, -0.5f,  0.5f},  // Bottom-front
+  {-0.5f,  0.5f,  0.5f},  // Top-front
+  
+  {-0.5f, -0.5f, -0.5f},  // Bottom-back
+  {-0.5f,  0.5f,  0.5f},  // Top-front
+  {-0.5f,  0.5f, -0.5f},  // Top-back
+  
+  // Right face (X = +0.5) - looking at it from outside
+  { 0.5f, -0.5f,  0.5f},  // Bottom-front
+  { 0.5f, -0.5f, -0.5f},  // Bottom-back
+  { 0.5f,  0.5f, -0.5f},  // Top-back
+  
+  { 0.5f, -0.5f,  0.5f},  // Bottom-front
+  { 0.5f,  0.5f, -0.5f},  // Top-back
+  { 0.5f,  0.5f,  0.5f},  // Top-front
+  
+  // Top face (Y = +0.5) - looking down at it from above
+  {-0.5f,  0.5f,  0.5f},  // Front-left
+  { 0.5f,  0.5f,  0.5f},  // Front-right
+  { 0.5f,  0.5f, -0.5f},  // Back-right
+  
+  {-0.5f,  0.5f,  0.5f},  // Front-left
+  { 0.5f,  0.5f, -0.5f},  // Back-right
+  {-0.5f,  0.5f, -0.5f},  // Back-left
+  
+  // Bottom face (Y = -0.5) - looking up at it from below
+  {-0.5f, -0.5f, -0.5f},  // Back-left
+  { 0.5f, -0.5f, -0.5f},  // Back-right
+  { 0.5f, -0.5f,  0.5f},  // Front-right
+  
+  {-0.5f, -0.5f, -0.5f},  // Back-left
+  { 0.5f, -0.5f,  0.5f},  // Front-right
+  {-0.5f, -0.5f,  0.5f}   // Front-left
 };
 
-
-//TODO: Verify this format, the colors don't seem right
-static u32 rgb_to_888(const u8 r, const u8 g, const u8 b) {
-  return (0xFF << 24) | (r << 16) | (g << 8) | (b << 0);
+// Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
+u32 rgb_to_888(u8 r, u8 g, u8 b) {
+  return SDL_MapRGBA(SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, r, g, b, 255);
 }
 
+// Clamp helper function
+static float clampf(float x, float min_val, float max_val) {
+  if (x < min_val) return min_val;
+  if (x > max_val) return max_val;
+  return x;
+}
 
 /**
 * Calculates the signed area of a triangle defined by three points.
@@ -38,7 +95,6 @@ static u32 rgb_to_888(const u8 r, const u8 g, const u8 b) {
 static inline f32 signed_triangle_area(const float2 a, const float2 b, const float2 c) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
-
 
 /**
 * Helper function to check if a point is inside a triangle using barycentric coordinates.
@@ -66,7 +122,7 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
   return in_triangle;
 }
 
-
+// Transforms a vector using the provided basis vectors
 static float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 vec) {
   return (float3){
     vec.x * ihat.x + vec.y * jhat.x + vec.z * khat.x,
@@ -75,6 +131,7 @@ static float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 vec
   };
 }
 
+// Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
 static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
@@ -93,6 +150,7 @@ static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jh
   *khat = make_float3(-sy, cy * sp, cy * cp);
 }
 
+// Extracts the inverse basis vectors (right, up, forward) from a transform's yaw and pitch
 static void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
@@ -111,9 +169,10 @@ static void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, fl
   *khat = make_float3(sy * cp, -sp, cy * cp);
 }
 
+// Transform a point from local space to world space using the transform's basis vectors and position
 static float3 transform_to_world(transform_t *t, float3 p) {
   assert(t != NULL);
-
+  
   float3 ihat, jhat, khat;
   transform_get_basis_vectors(t, &ihat, &jhat, &khat);
   
@@ -122,9 +181,10 @@ static float3 transform_to_world(transform_t *t, float3 p) {
   return float3_add(rotated, t->position);
 }
 
+// Transform a point from world space to local space using the inverse of the transform's basis vectors and position
 static float3 transform_to_local_point(transform_t *t, float3 p) {
   assert(t != NULL);
-
+  
   float3 ihat, jhat, khat;
   transform_get_inverse_basis_vectors(t, &ihat, &jhat, &khat);
   
@@ -133,64 +193,92 @@ static float3 transform_to_local_point(transform_t *t, float3 p) {
   return transform_vector(ihat, jhat, khat, p_rel);
 }
 
-// Apply basic shading to north, northwest, and bottom faces
-// TODO: Only some of the faces are shaded, need to investigate why
+// Apply a more subtle shading for specific triangle faces
 static void apply_side_shading(u32 *color, int tri) {
   assert(color != NULL);
-  // Face order: bottom(0-1), top(2-3), front(4-5), back(6-7), right(8-9), left(10-11)
-  // Bottom face = triangles 0-1, North face = back face (triangles 6-7), Northwest face = left face (triangles 10-11)
-  if (tri == 0 || tri == 1 || tri == 6 || tri == 7 || tri == 10 || tri == 11) {
-    // Extract RGB components and darken by ~25%
-    uint8_t shade_r = ((*color >> 16) & 0xFF);
-    uint8_t shade_g = ((*color >> 8) & 0xFF);
-    uint8_t shade_b = (*color & 0xFF);
-    
-    // Apply 0.75 multiplier for shading (25% darker)
-    shade_r = (shade_r * 3) >> 2;  // * 0.75
-    shade_g = (shade_g * 3) >> 2;  // * 0.75  
-    shade_b = (shade_b * 3) >> 2;  // * 0.75
-    
+  
+  // Face order: bottom(10-11), top(8-9), front(0-1), back(2-3), right(6-7), left(4-5)
+  if (tri == 2 || tri == 3 || tri == 4 || tri == 5 || tri == 10 || tri == 11) {
+    // Extract RGB components
+    uint8_t shade_r, shade_g, shade_b;
+    SDL_GetRGB(*color, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &shade_r, &shade_g, &shade_b);
+
+    f32 brightness_factor = 0.75f;  // 25% darkening
+
+    shade_r = (u8)((f32)shade_r * brightness_factor);
+    shade_g = (u8)((f32)shade_g * brightness_factor);
+    shade_b = (u8)((f32)shade_b * brightness_factor);
+
     // Repack into RGB888
     *color = rgb_to_888(shade_r, shade_g, shade_b);
   }
 }
 
-static void apply_fog(u32 *color, f32 depth) {
-  assert(color != NULL);
+// Apply fog effect based on depth
+static u32 apply_fog(u32 color, f32 depth) {
   f32 fog_factor = (depth - FOG_START) / (FOG_END - FOG_START);
-  
+
   // Clamp fog factor
   if (fog_factor < 0.0f) fog_factor = 0.0f;
   if (fog_factor > 1.0f) fog_factor = 1.0f;
-  
+
   // For full fog (fog_factor >= 0.99)
   if (fog_factor >= 0.99f) {
-    *color = FOG_COLOR;
-  } else {
-    uint8_t r = (*color >> 16) & 0xFF;
-    uint8_t g = (*color >> 8) & 0xFF;  
-    uint8_t b = (*color & 0xFF);
-    
-    // Fog color
-    uint8_t fog_r = 52;
-    uint8_t fog_g = 72;
-    uint8_t fog_b = 102;
-    
-    // Interpolate between original color and fog color
-    r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
-    g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
-    b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
-    *color = rgb_to_888(r, g, b);
+    return rgb_to_888(FOG_R, FOG_G, FOG_B);
+  }
+
+  uint8_t r, g, b;
+  SDL_GetRGB(color, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &r, &g, &b);
+
+  // Interpolate between original color and fog color
+  r = (uint8_t)(r * (1.0f - fog_factor) + FOG_R * fog_factor);
+  g = (uint8_t)(g * (1.0f - fog_factor) + FOG_G * fog_factor);
+  b = (uint8_t)(b * (1.0f - fog_factor) + FOG_B * fog_factor);
+  return rgb_to_888(r, g, b);
+}
+
+void apply_fog_to_screen(game_state_t *state) {
+  assert(state != NULL);
+
+  for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
+    if (state->depthbuffer[i] == FLT_MAX) continue; // Skip untouched pixels
+
+    // Apply fog effect based on depth
+    state->framebuffer[i] = apply_fog(state->framebuffer[i], state->depthbuffer[i]);
   }
 }
 
+// u32 interpolate_color_by_depth(u32 color_in, u32 color_target, f32 depth, f32 start_depth, f32 end_depth) {
+//   // Clamp and normalize depth to 0..1
+//   float t = (depth - start_depth) / (end_depth - start_depth);
+//   t = clampf(t, 0.0f, 1.0f);
+  
+//   // Extract RGB components from input colors
+//   uint8_t r_in, g_in, b_in;
+//   SDL_GetRGB(color_in, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &r_in, &g_in, &b_in);
+
+//   uint8_t r_target = (color_target >> 16) & 0xFF;
+//   uint8_t g_target = (color_target >> 8) & 0xFF;
+//   uint8_t b_target = color_target & 0xFF;
+  
+//   // Interpolate each channel
+//   uint8_t r_out = (uint8_t)(r_in + t * (r_target - r_in));
+//   uint8_t g_out = (uint8_t)(g_in + t * (g_target - g_in));
+//   uint8_t b_out = (uint8_t)(b_in + t * (b_target - b_in));
+  
+//   // Pack back into uint32_t (RGB888 format)
+//   return (r_out << 16) | (g_out << 8) | b_out;
+// }
+
+// Default fragment shader that just returns the input color
 u32 default_shader(u32 input_color, void *args, usize argc) {
   return input_color;
 }
 
+// Initialize renderer state
 void init_renderer(game_state_t *state) {
   assert(state != NULL);
-
+  
   state->screen_dim = make_float2((f32)WIN_WIDTH, (f32)WIN_HEIGHT);
   state->frustum_bound = tanf(fov_over_2) * 1.4f;
   state->screen_height_world = tanf(fov_over_2) * 2;
@@ -201,7 +289,11 @@ void init_renderer(game_state_t *state) {
   state->cam_forward = make_float3(0, 0, 0);
 }
 
+// Update camera basis vectors based on its current transform
 void update_camera(game_state_t *state, transform_t *cam) {
+  assert(state != NULL);
+  assert(cam != NULL);
+  
   transform_get_basis_vectors(cam, &state->cam_right, &state->cam_up, &state->cam_forward);
 }
 
@@ -216,18 +308,18 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
   assert(model != NULL);
   assert(model->vertices != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
-
+  
   if (frag_shader == NULL) {
     frag_shader = default_shader;
   }
-
+  
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
     // Transform vertices from model space to world space, then to view space
     float3 world_a = transform_to_world(&model->transform, model->vertices[tri * 3 + 0]);
     float3 world_b = transform_to_world(&model->transform, model->vertices[tri * 3 + 1]);
     float3 world_c = transform_to_world(&model->transform, model->vertices[tri * 3 + 2]);
-
+    
     float3 view_a = transform_to_local_point(cam, world_a);
     float3 view_b = transform_to_local_point(cam, world_b);
     float3 view_c = transform_to_local_point(cam, world_c);
@@ -258,10 +350,8 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
     float3 view_direction = float3_sub(cam->position, triangle_center);
     
     // Check if triangle is facing toward camera
-    // If dot product > 0, triangle normal points toward camera (front-facing)
     float dot_product = float3_dot(triangle_normal, view_direction);
-    //TODO: This has been causing so many issues with faces disappearing, need to investigate further
-    // if (dot_product <= 0) continue; // Triangle is facing away from camera
+    if (dot_product <= 0) continue; // Triangle is facing away from camera
     
     // Use pre-computed projection constants
     float pixels_per_world_unit_a = state->projection_scale / view_a.z;
@@ -314,10 +404,9 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
             } else {
               output_color = flat_color; // Use flat color if no texture
             }
-
+            
             output_color = frag_shader(output_color, shader_args, shader_argc);
             apply_side_shading(&output_color, tri);
-            apply_fog(&output_color, new_depth);
             
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel
             state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer

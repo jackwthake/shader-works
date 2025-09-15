@@ -7,7 +7,9 @@
 #define MAX_DEPTH 12.0f
 #define FOG_START 2.0f
 #define FOG_END   11.5f  // End of fog effect
-#define FOG_COLOR 0x344866
+#define FOG_R 22
+#define FOG_G 35
+#define FOG_B 65
 
 #define EPSILON 0.0001f
 #define PI 3.14159265f
@@ -32,7 +34,10 @@ extern float3 cube_vertices[CUBE_VERTEX_COUNT];
 typedef u32 (*shader_func)(u32 input_color, void *args, usize argc);
 extern u32 default_shader(u32 input_color, void *args, usize argc);
 
+u32 rgb_to_888(u8 r, u8 g, u8 b);
+
 void init_renderer(game_state_t *state);
+void apply_fog_to_screen(game_state_t *state);
 void update_camera(game_state_t *state, transform_t *cam);
 void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_func frag_shader, void *shader_args, usize shader_argc);
 

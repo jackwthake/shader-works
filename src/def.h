@@ -57,6 +57,7 @@ typedef struct {
 
   SDL_Window *window;
   SDL_Renderer *renderer;
+  SDL_Texture* framebuffer_tex;
   u32 framebuffer[WIN_WIDTH * WIN_HEIGHT];
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
 
