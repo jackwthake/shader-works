@@ -24,6 +24,10 @@ float3 float3_scale(float3 v, float s) {
   return (float3){v.x * s, v.y * s, v.z * s};
 }
 
+float3 float3_divide(float3 v, float s) {
+  return (float3){v.x / s, v.y / s, v.z / s};
+}
+
 f32 float3_dot(float3 a, float3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
@@ -50,6 +54,10 @@ float2 float2_sub(float2 a, float2 b) {
 
 float2 float2_scale(float2 v, float s) {
   return (float2){v.x * s, v.y * s};
+}
+
+float2 float2_divide(float2 v, float s) {
+  return (float2){v.x / s, v.y / s};
 }
 
 f32 float2_dot(float2 a, float2 b) {

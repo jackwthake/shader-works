@@ -6,82 +6,9 @@
 
 #include "maths.h"
 
-// Cube vertices in counter-clockwise (CCW) winding order
-// Each face is defined with outward-pointing normals
-// 36 vertices total (6 faces × 2 triangles × 3 vertices)
-// Face indices for reference:
-// Triangles 0-1:   Front face
-// Triangles 2-3:   Back face  
-// Triangles 4-5:   Left face
-// Triangles 6-7:   Right face
-// Triangles 8-9:   Top face
-// Triangles 10-11: Bottom face
-float3 cube_vertices[CUBE_VERTEX_COUNT] = {
-  // Front face (Z = +0.5) - looking at it from outside
-  {-0.5f, -0.5f,  0.5f},  // Bottom-left
-  { 0.5f, -0.5f,  0.5f},  // Bottom-right  
-  { 0.5f,  0.5f,  0.5f},  // Top-right
-  
-  {-0.5f, -0.5f,  0.5f},  // Bottom-left
-  { 0.5f,  0.5f,  0.5f},  // Top-right
-  {-0.5f,  0.5f,  0.5f},  // Top-left
-  
-  // Back face (Z = -0.5) - looking at it from outside  
-  { 0.5f, -0.5f, -0.5f},  // Bottom-right
-  {-0.5f, -0.5f, -0.5f},  // Bottom-left
-  {-0.5f,  0.5f, -0.5f},  // Top-left
-  
-  { 0.5f, -0.5f, -0.5f},  // Bottom-right
-  {-0.5f,  0.5f, -0.5f},  // Top-left
-  { 0.5f,  0.5f, -0.5f},  // Top-right
-  
-  // Left face (X = -0.5) - looking at it from outside
-  {-0.5f, -0.5f, -0.5f},  // Bottom-back
-  {-0.5f, -0.5f,  0.5f},  // Bottom-front
-  {-0.5f,  0.5f,  0.5f},  // Top-front
-  
-  {-0.5f, -0.5f, -0.5f},  // Bottom-back
-  {-0.5f,  0.5f,  0.5f},  // Top-front
-  {-0.5f,  0.5f, -0.5f},  // Top-back
-  
-  // Right face (X = +0.5) - looking at it from outside
-  { 0.5f, -0.5f,  0.5f},  // Bottom-front
-  { 0.5f, -0.5f, -0.5f},  // Bottom-back
-  { 0.5f,  0.5f, -0.5f},  // Top-back
-  
-  { 0.5f, -0.5f,  0.5f},  // Bottom-front
-  { 0.5f,  0.5f, -0.5f},  // Top-back
-  { 0.5f,  0.5f,  0.5f},  // Top-front
-  
-  // Top face (Y = +0.5) - looking down at it from above
-  {-0.5f,  0.5f,  0.5f},  // Front-left
-  { 0.5f,  0.5f,  0.5f},  // Front-right
-  { 0.5f,  0.5f, -0.5f},  // Back-right
-  
-  {-0.5f,  0.5f,  0.5f},  // Front-left
-  { 0.5f,  0.5f, -0.5f},  // Back-right
-  {-0.5f,  0.5f, -0.5f},  // Back-left
-  
-  // Bottom face (Y = -0.5) - looking up at it from below
-  {-0.5f, -0.5f, -0.5f},  // Back-left
-  { 0.5f, -0.5f, -0.5f},  // Back-right
-  { 0.5f, -0.5f,  0.5f},  // Front-right
-  
-  {-0.5f, -0.5f, -0.5f},  // Back-left
-  { 0.5f, -0.5f,  0.5f},  // Front-right
-  {-0.5f, -0.5f,  0.5f}   // Front-left
-};
-
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
   return SDL_MapRGBA(SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, r, g, b, 255);
-}
-
-// Clamp helper function
-static inline float clampf(float x, float min_val, float max_val) {
-  if (x < min_val) return min_val;
-  if (x > max_val) return max_val;
-  return x;
 }
 
 /**
@@ -125,9 +52,9 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
 // Transforms a vector using the provided basis vectors
 static float3 transform_vector(float3 ihat, float3 jhat, float3 khat, float3 vec) {
   return (float3){
-    vec.x * ihat.x + vec.y * jhat.x + vec.z * khat.x,
-    vec.x * ihat.y + vec.y * jhat.y + vec.z * khat.y,
-    vec.x * ihat.z + vec.y * jhat.z + vec.z * khat.z
+    .x = vec.x * ihat.x + vec.y * jhat.x + vec.z * khat.x,
+    .y = vec.x * ihat.y + vec.y * jhat.y + vec.z * khat.y,
+    .z = vec.x * ihat.z + vec.y * jhat.z + vec.z * khat.z
   };
 }
 
@@ -286,6 +213,11 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
   assert(model != NULL);
   assert(model->vertices != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
+
+  if (state->use_textures) {
+    assert(state->texture_atlas != NULL);
+    assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
+  }
   
   if (frag_shader == NULL) {
     frag_shader = default_shader;
@@ -304,6 +236,7 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
     
     // Basic frustum culling: skip triangle if all vertices are behind camera
     if (view_a.z <= 0 && view_b.z <= 0 && view_c.z <= 0) continue;
+    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > MAX_DEPTH) continue; // Cull if too far away
     
     // Additional frustum culling - check if triangle is completely outside view frustum
     bool outside_left   = (view_a.x < -view_a.z * state->frustum_bound && view_b.x < -view_b.z * state->frustum_bound && view_c.x < -view_c.z * state->frustum_bound);
@@ -354,7 +287,17 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
     float max_x = fminf(WIN_WIDTH - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
     float max_y = fminf(WIN_HEIGHT - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
-    
+
+    // Get the UV coordinates for the current triangle's vertices
+    float2 uv_a = model->uvs[tri * 3 + 0];
+    float2 uv_b = model->uvs[tri * 3 + 1];
+    float2 uv_c = model->uvs[tri * 3 + 2];
+
+    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w
+    float2 uv_a_prime = float2_divide(uv_a, a.z);
+    float2 uv_b_prime = float2_divide(uv_b, b.z);
+    float2 uv_c_prime = float2_divide(uv_c, c.z);
+
     // Precompute color for this triangle (use different colors for debugging)
     uint32_t flat_color = rgb_to_888(255, 0, 255); // Magenta for all triangles
     
@@ -376,9 +319,27 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
           if (new_depth < state->depthbuffer[pixel_idx]) {
             uint32_t output_color;
             
-            if (state->use_textures && state->texture_atlas) {
-              // Texture code would go here
-              output_color = flat_color;
+            if (state->use_textures && state->texture_atlas != NULL) {
+              // Interpolate perspective-corrected UVs
+              float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
+              float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
+
+              // Divide by interpolated 1/w to get correct perspective UVs
+              float final_u = interpolated_u_prime * new_depth;
+              float final_v = interpolated_v_prime * new_depth;
+
+              // Map normalized UVs [0.0, 1.0] to texture pixel coordinates (optimized)
+              int tex_x = (int)(final_u * (f32)ATLAS_WIDTH_PX);
+              int tex_y = (int)(final_v * (f32)ATLAS_HEIGHT_PX);
+
+              // Fast clamp using bit operations and conditionals
+              tex_x = (tex_x < 0) ? 0 : ((tex_x > ATLAS_WIDTH_PX - 1) ? ATLAS_WIDTH_PX - 1 : tex_x);
+              tex_y = (tex_y < 0) ? 0 : ((tex_y > ATLAS_HEIGHT_PX - 1) ? ATLAS_HEIGHT_PX - 1 : tex_y);
+
+              // Skip Magenta pixels, transparency support
+              if (state->texture_atlas[tex_y * ATLAS_WIDTH_PX + tex_x] == 0xFF00FF) continue;
+
+              output_color = state->texture_atlas[tex_y * ATLAS_WIDTH_PX + tex_x];
             } else {
               output_color = flat_color; // Use flat color if no texture
             }

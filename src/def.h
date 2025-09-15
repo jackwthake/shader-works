@@ -7,8 +7,8 @@
 
 #include <SDL3/SDL.h>
 
-#define WIN_WIDTH 480
-#define WIN_HEIGHT 240
+#define WIN_WIDTH 400
+#define WIN_HEIGHT 250
 #define WIN_SCALE 4
 #define WIN_TITLE "CPU Renderer"
 
@@ -66,7 +66,7 @@ typedef struct {
   f32 screen_height_world, projection_scale, frustum_bound;
 
   bool use_textures;
-  u16 *texture_atlas; // pointer to texture atlas data (static data)
+  u32 *texture_atlas; // pointer to texture atlas data (static data)
 } game_state_t;
 
 #endif /* __DEF_H__ */

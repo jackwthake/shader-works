@@ -13,23 +13,12 @@
 
 #define EPSILON 0.0001f
 #define PI 3.14159265f
-#define CUBE_VERTEX_COUNT 36
 
 // --- Constants for the Atlas ---
-#define ATLAS_WIDTH_PX 80
-#define ATLAS_HEIGHT_PX 24
-#define TILE_WIDTH_PX 8
-#define TILE_HEIGHT_PX 8
-
-// Derived constants
-#define TILES_PER_ROW (ATLAS_WIDTH_PX / TILE_WIDTH_PX)
-#define TILES_PER_COL (ATLAS_HEIGHT_PX / TILE_HEIGHT_PX)
-#define TOTAL_TILES (TILES_PER_ROW * TILES_PER_COL)
-#define TILE_PIXEL_COUNT (TILE_WIDTH_PX * TILE_HEIGHT_PX)
+#define ATLAS_WIDTH_PX 8
+#define ATLAS_HEIGHT_PX 8
 
 #define fov_over_2 (1.0472f / 2.0f) // 60 degrees in radians / 2
-
-extern float3 cube_vertices[CUBE_VERTEX_COUNT];
 
 typedef u32 (*shader_func)(u32 input_color, void *args, usize argc);
 extern u32 default_shader(u32 input_color, void *args, usize argc);

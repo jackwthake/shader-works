@@ -7,8 +7,10 @@
 #include "renderer.h"
 #include "maths.h"
 
+#include "resources.inl"
+
 // Fixed timestep constants
-#define TARGET_TPS 20
+#define TARGET_TPS 20                      // Aim for 20 ticks per second
 #define FIXED_TIMESTEP (1.0 / TARGET_TPS)  // 50ms per tick
 #define MAX_FRAME_TIME 0.25                // Cap at 250ms to prevent spiral of death
 
@@ -104,10 +106,14 @@ int main(int argc, char *argv[]) {
 
   // Create framebuffer texture
   state.framebuffer_tex = SDL_CreateTexture(state.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIN_WIDTH, WIN_HEIGHT);
-  SDL_SetTextureScaleMode(state.framebuffer_tex, SDL_SCALEMODE_NEAREST);
   assert(state.framebuffer_tex != NULL);
 
+  // Use nearest-neighbor scaling for pixelated look
+  SDL_SetTextureScaleMode(state.framebuffer_tex, SDL_SCALEMODE_NEAREST);
+
   init_renderer(&state);
+
+  state.texture_atlas = files[0].data; // Use the first file as texture atlas
 
   // Initialize game objects
   model_t cube_model = {0};
@@ -115,6 +121,8 @@ int main(int argc, char *argv[]) {
   cube_model.num_vertices = CUBE_VERTEX_COUNT;
   cube_model.scale = make_float3(1.0f, 1.0f, 1.0f);
   cube_model.transform.position = make_float3(0.0f, 0.0f, -5.0f);
+  cube_model.uvs = cube_uvs;
+  cube_model.num_uvs = 36;
 
   transform_t camera = {0};
   camera.position = make_float3(0.0f, 0.0f, 0.0f);
@@ -122,7 +130,7 @@ int main(int argc, char *argv[]) {
   camera.pitch = 0.0f;
 
   update_camera(&state, &camera);
-  state.use_textures = false;
+  state.use_textures = true;
   state.running = true;
 
   // Fixed timestep loop variables
