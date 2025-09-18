@@ -16,24 +16,6 @@
 #define FIXED_TIMESTEP (1.0 / TARGET_TPS)  // 50ms per tick
 #define MAX_FRAME_TIME 0.25                // Cap at 250ms to prevent spiral of death
 
-// strobing color
-static u32 plane_frag_shader_func(u32 input_color, void *args, usize argc) {
-  // Get current time in seconds
-  f32 time = SDL_GetTicks() / 1000.0f;
-  
-  // Create waves based on time
-  f32 wave1 = sinf(time * 2.0f) * 0.5f + 0.5f;          // Slow wave
-  f32 wave2 = sinf(time * 5.0f) * 0.3f + 0.5f;          // Fast wave
-  f32 wave3 = cosf(time * 3.0f) * 0.4f + 0.6f;          // Medium wave
-  
-  // Create animated colors
-  u8 r = (u8)(wave1 * 255.0f * wave3);
-  u8 g = (u8)(wave2 * 180.0f * wave1);
-  u8 b = (u8)((1.0f - wave1) * 220.0f * wave2);
-  
-  return rgb_to_888(r, g, b);
-}
-
 // Initialize SDL Modules, create window and renderer structs
 static int system_init(game_state_t* state) {
   assert(state != NULL);
@@ -67,17 +49,25 @@ static void system_poll_events(game_state_t* state) {
 }
 
 // Update game logic with fixed timestep 
-static void update_game(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, f64 dt) {
+static void update_game(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, f64 dt) {
   // dt will always be FIXED_TIMESTEP
   
-  cube_model->transform.yaw += 1.0f * dt;
+  // rotate cube
+  cube_model->transform.yaw  += 1.0f * dt;
   cube_model->transform.pitch += 0.5f * dt;
-  cube_model->transform.position.z = 5.0f + sinf(SDL_GetTicks() / 1000.0f) * 2.0f;
+  
+  // slowly move cube back and forth
+  cube_model->transform.position.z = ((sinf(SDL_GetTicks() / 1000.0f) * 4.f) - 7.0f);
+
+  // slowly bob sphere and rotate
+  sphere_model->transform.position.y = (sinf(SDL_GetTicks() / 1000.0f) * 1.f) + 3.0f;
+  sphere_model->transform.yaw  += 0.5f * dt;
+  sphere_model->transform.pitch += 0.5f * dt;
 
   // wripple plane vertices based off of time
   for (int i = 0; i < plane_model->num_vertices; ++i) {
-    plane_model->vertices[i].y = (0.5f + sinf(SDL_GetTicks() / 500.0f + (plane_model->vertices[i].x * 2.f)) * 0.25f) /
-                                  (0.5f + cosf(SDL_GetTicks() / 200.0f + (plane_model->vertices[i].z * 2.f)) * 0.25f);
+    plane_model->vertices[i].y = (sinf(SDL_GetTicks() / 1000.0f + (plane_model->vertices[i].x)) * 0.25f) / 
+                                 (sinf(SDL_GetTicks() / 200.0f + (plane_model->vertices[i].x * 2.f)) / 4.0f + 1.0f);
   }
 
   // Update camera matrices
@@ -85,17 +75,20 @@ static void update_game(game_state_t* state, transform_t* camera, model_t* cube_
 }
 
 // Render the current frame
-static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model) {
+static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model) {
   // Clear framebuffer and reset depth buffer
   for(int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
     state->framebuffer[i] = rgb_to_888(FOG_R, FOG_G, FOG_B); // Clear to fog color
     state->depthbuffer[i] = FLT_MAX;
   }
   
-  usize rendered = render_model(state, camera, plane_model);
+  usize rendered = 0;
+  rendered += render_model(state, camera, plane_model); 
   rendered += render_model(state, camera, cube_model);
-
+  rendered += render_model(state, camera, sphere_model);
+  
   apply_fog_to_screen(state);
+
   // Update SDL texture and present
   SDL_UpdateTexture(state->framebuffer_tex, NULL, state->framebuffer, WIN_WIDTH * sizeof(u32));
   SDL_RenderTexture(state->renderer, state->framebuffer_tex, NULL, NULL);
@@ -141,34 +134,42 @@ int main(int argc, char *argv[]) {
   SDL_SetTextureScaleMode(state.framebuffer_tex, SDL_SCALEMODE_NEAREST);
   
   init_renderer(&state);
-  
   state.texture_atlas = files[0].data; // Use the first file as texture atlas
   
   // Initialize game objects
+  // Generate the cube model
   model_t cube_model = {0};
-  cube_model.vertices = cube_vertices;
-  cube_model.num_vertices = CUBE_VERTEX_COUNT;
-  cube_model.scale = make_float3(1.0f, 1.0f, 1.0f);
-  cube_model.transform.position = make_float3(0.0f, -1.0f, -5.0f);
-  cube_model.uvs = cube_uvs;
-  cube_model.num_uvs = 36;
-  cube_model.use_textures = true;
-  cube_model.frag_shader = &default_shader; // Use default shader
+  if (generate_cube(&cube_model, make_float3(0.0f, 2.0f, -6.0f), make_float3(1.0f, 1.0f, 1.0f)) != 0) {
+    SDL_Log("Failed to generate cube model");
+    system_cleanup(&state);
+    return -1;
+  }
 
+  cube_model.frag_shader = &default_shader; // Use default shader
+  cube_model.use_textures = true;
   
   model_t plane_model = {0};
-  if (generate_plane(&plane_model, (float2){15.0f, 15.0f}, (float2){1, 1}, (float3){0.0f, 4.0f, 3.0f}) != 0) {
+  if (generate_plane(&plane_model, (float2){20.0f, 20.0f}, (float2){1, 1}, (float3){0.0f, 0.0f, -10.0f}) != 0) {
     SDL_Log("Failed to generate plane model");
     system_cleanup(&state);
     return -1;
   }
 
-  shader_t plane_frag_shader = make_shader(plane_frag_shader_func, &plane_model.transform.position, sizeof(float3 *) / sizeof(void *));
-  plane_model.use_textures = false;
-  plane_model.frag_shader = &plane_frag_shader;
+  plane_model.frag_shader = &default_shader;
+  plane_model.use_textures = true;
+
+  model_t sphere_model = {0};
+  if (generate_sphere(&sphere_model, 1.0f, 16, 16, make_float3(2.0f, 3.0f, -6.0f)) != 0) {
+    SDL_Log("Failed to generate sphere model");
+    system_cleanup(&state);
+    return -1;
+  }
+
+  sphere_model.frag_shader = &default_shader;
+  sphere_model.use_textures = true;
   
   transform_t camera = {0};
-  camera.position = make_float3(0.0f, -1.0f, 0.0f);
+  camera.position = make_float3(0.0f, 2.0f, 0.0f);  // Place camera at origin
   camera.yaw = 0.0f;
   camera.pitch = 0.0f;
   
@@ -197,14 +198,14 @@ int main(int argc, char *argv[]) {
     
     // Fixed timestep updates
     while (accumulator >= FIXED_TIMESTEP) {
-      update_game(&state, &camera, &cube_model, &plane_model, FIXED_TIMESTEP);
+      update_game(&state, &camera, &cube_model, &plane_model, &sphere_model, FIXED_TIMESTEP);
       accumulator -= FIXED_TIMESTEP;
       tick_count++;
     }
     
     u64 frame_start = SDL_GetTicks();
     SDL_RenderClear(state.renderer);
-    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model);
+    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model, &sphere_model);
     u64 frame_end = SDL_GetTicks();
     
     // FPS counter
@@ -220,6 +221,12 @@ int main(int argc, char *argv[]) {
     
     SDL_Delay(1); // Small delay to prevent 100% CPU usage
   }
+  
+  // Cleanup model resources
+  free(cube_model.face_normals);
+  free(plane_model.vertices);
+  free(plane_model.uvs);
+  free(plane_model.face_normals);
   
   system_cleanup(&state);
   return 0;

@@ -11,6 +11,7 @@ float3 float3_sub(float3 a, float3 b);
 float3 float3_scale(float3 v, float s);
 float3 float3_divide(float3 v, float s);
 f32 float3_dot(float3 a, float3 b);
+float3 float3_cross(float3 a, float3 b);
 f32 float3_magnitude(float3 v);
 float3 float3_normalize(float3 v);
 

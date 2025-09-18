@@ -42,6 +42,13 @@ float3 float3_normalize(float3 v) {
   return float3_scale(v, 1.0f / mag);
 }
 
+float3 float3_cross(float3 a, float3 b) {
+  return (float3){
+    a.y * b.z - a.z * b.y,
+    a.z * b.x - a.x * b.z,
+    a.x * b.y - a.y * b.x
+  };
+}
 
 /** float2 implementation */
 float2 float2_add(float2 a, float2 b) {

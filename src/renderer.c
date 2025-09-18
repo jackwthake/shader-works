@@ -3,6 +3,8 @@
 #include <math.h>
 #include <assert.h>
 #include <float.h> // For FLT_MAX
+#include <stdlib.h>
+#include <SDL3/SDL.h>
 
 #include "maths.h"
 
@@ -16,8 +18,10 @@ shader_t default_shader = { .func = default_shader_func, .argv = NULL, .argc = 0
 
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
-  return SDL_MapRGBA(SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, r, g, b, 255);
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
+  return SDL_MapRGBA(format, NULL, r, g, b, 255);
 }
+
 
 /**
 * Calculates the signed area of a triangle defined by three points.
@@ -70,7 +74,7 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
 }
 
 // Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
-static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -132,7 +136,7 @@ static float3 transform_to_local_point(transform_t *t, float3 p) {
 }
 
 // Apply a more subtle shading for specific triangle faces
-static void apply_side_shading(u32 *color, int tri) {
+void apply_side_shading(u32 *color, int tri) {
   assert(color != NULL);
   
   // Face order: bottom(10-11), top(8-9), front(0-1), back(2-3), right(6-7), left(4-5)
@@ -241,35 +245,33 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
     float3 view_b = transform_to_local_point(cam, world_b);
     float3 view_c = transform_to_local_point(cam, world_c);
     
-    // Basic frustum culling: skip triangle if all vertices are behind camera
-    if (view_a.z <= 0 && view_b.z <= 0 && view_c.z <= 0) continue;
-    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > MAX_DEPTH) continue; // Cull if too far away
+    // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
+    if (view_a.z > 0 && view_b.z > 0 && view_c.z > 0) continue;
+    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > MAX_DEPTH)continue; // Cull if too far away
     
     // Additional frustum culling - check if triangle is completely outside view frustum
-    bool outside_left   = (view_a.x < -view_a.z * state->frustum_bound && view_b.x < -view_b.z * state->frustum_bound && view_c.x < -view_c.z * state->frustum_bound);
-    bool outside_right  = (view_a.x >  view_a.z * state->frustum_bound && view_b.x >  view_b.z * state->frustum_bound && view_c.x >  view_c.z * state->frustum_bound);
-    bool outside_top    = (view_a.y >  view_a.z * state->frustum_bound && view_b.y >  view_b.z * state->frustum_bound && view_c.y >  view_c.z * state->frustum_bound);
-    bool outside_bottom = (view_a.y < -view_a.z * state->frustum_bound && view_b.y < -view_b.z * state->frustum_bound && view_c.y < -view_c.z * state->frustum_bound);
-    
+    bool outside_left   = (view_a.x < view_a.z * state->frustum_bound && view_b.x < view_b.z * state->frustum_bound && view_c.x < view_c.z * state->frustum_bound);
+    bool outside_right  = (view_a.x > -view_a.z * state->frustum_bound && view_b.x > -view_b.z * state->frustum_bound && view_c.x > -view_c.z * state->frustum_bound);
+    bool outside_top    = (view_a.y > -view_a.z * state->frustum_bound && view_b.y > -view_b.z * state->frustum_bound && view_c.y > -view_c.z * state->frustum_bound);
+    bool outside_bottom = (view_a.y < view_a.z * state->frustum_bound && view_b.y < view_b.z * state->frustum_bound && view_c.y < view_c.z * state->frustum_bound);
+
     if (outside_left || outside_right || outside_top || outside_bottom) continue;
     
-    // Proper back-face culling using triangle normal and view direction
-    float3 world_edge1 = float3_sub(world_b, world_a);
-    float3 world_edge2 = float3_sub(world_c, world_a);
+    // Use pre-computed face normal for back-face culling
+    float3 model_normal = model->face_normals[tri];
     
-    // Compute triangle normal (cross product)
-    float3 triangle_normal;
-    triangle_normal.x = world_edge1.y * world_edge2.z - world_edge1.z * world_edge2.y;
-    triangle_normal.y = world_edge1.z * world_edge2.x - world_edge1.x * world_edge2.z;
-    triangle_normal.z = world_edge1.x * world_edge2.y - world_edge1.y * world_edge2.x;
+    // Transform face normal from model space to world space (rotation only)
+    float3 ihat, jhat, khat;
+    transform_get_basis_vectors(&model->transform, &ihat, &jhat, &khat);
+    float3 triangle_normal = transform_vector(ihat, jhat, khat, model_normal);
     
-    // Vector from triangle center to camera
+    // Vector from camera to triangle center
     float3 triangle_center = float3_scale(float3_add(float3_add(world_a, world_b), world_c), 1.0f/3.0f);
-    float3 view_direction = float3_sub(cam->position, triangle_center);
+    float3 view_direction = float3_normalize(float3_sub(triangle_center, cam->position));  // Point from camera to triangle
     
     // Check if triangle is facing toward camera
     float dot_product = float3_dot(triangle_normal, view_direction);
-    // if (dot_product <= 0) continue; // Triangle is facing away from camera
+    if (dot_product <= 0) continue; // Triangle is facing away from camera
     
     // Use pre-computed projection constants
     float pixels_per_world_unit_a = state->projection_scale / view_a.z;
@@ -319,7 +321,7 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
         // Check if the current pixel is inside the triangle
         if (point_in_triangle(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y), p, &weights)) {
           // Interpolate depth using barycentric coordinates
-          float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
+          float new_depth = -1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
           
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
           int pixel_idx = pixel_base + x; // Use precomputed row offset
@@ -332,8 +334,8 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
               float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
 
               // Divide by interpolated 1/w to get correct perspective UVs
-              float final_u = interpolated_u_prime * new_depth;
-              float final_v = interpolated_v_prime * new_depth;
+              float final_u = interpolated_u_prime * -new_depth;
+              float final_v = interpolated_v_prime * -new_depth;
 
               // Map normalized UVs [0.0, 1.0] to texture pixel coordinates (optimized)
               int tex_x = (int)(final_u * (f32)ATLAS_WIDTH_PX);
@@ -382,12 +384,15 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
   // Each quad becomes 2 triangles, so we need 6 vertices per quad
   usize num_quads = w_segs * d_segs;
   usize total_triangle_vertices = num_quads * 6;
+  usize total_triangles = num_quads * 2; // Each quad has 2 triangles
   
   model->vertices = malloc(total_triangle_vertices * sizeof(float3));
   model->uvs = malloc(total_triangle_vertices * sizeof(float2));
-  if (!model->vertices || !model->uvs) {
+  model->face_normals = malloc(total_triangles * sizeof(float3));
+  if (!model->vertices || !model->uvs || !model->face_normals) {
     free(model->vertices); 
-    free(model->uvs); 
+    free(model->uvs);
+    free(model->face_normals); 
     return -1;
   }
   
@@ -454,10 +459,259 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
   
   model->num_vertices = total_triangle_vertices;
   model->num_uvs = total_triangle_vertices;
+  model->num_faces = total_triangles;
   model->scale = (float3){1.0f, 1.0f, 1.0f};
+  
+  // Set up face normals for the plane
+  // Since it's a flat plane, all face normals point upward
+  float3 up_normal = { 0.0f, -1.0f, 0.0f };
+  for (usize i = 0; i < total_triangles; i++) {
+    model->face_normals[i] = up_normal;
+  }
   
   free(grid_verts);
   free(grid_uvs);
+  return 0;
+}
+
+int generate_cube(model_t* model, float3 position, float3 size) {
+  if (!model) return -1;
+  
+  const int CUBE_VERTS = 36;  // 6 faces * 2 triangles * 3 vertices
+  
+  // Allocate memory for vertices, UVs, and face normals
+  model->vertices = malloc(CUBE_VERTS * sizeof(float3));
+  model->uvs = malloc(CUBE_VERTS * sizeof(float2));
+  model->face_normals = malloc((CUBE_VERTS / 3) * sizeof(float3));
+  
+  if (!model->vertices || !model->uvs || !model->face_normals) {
+    free(model->vertices);
+    free(model->uvs);
+    free(model->face_normals);
+    return -1;
+  }
+
+  // Half extents for more intuitive vertex positioning
+  float3 half = {size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
+  
+  // Generate vertices for each face - maintain counter-clockwise winding order
+  int v = 0;  // vertex index
+  
+  // Front face (-Z, closest to camera)
+  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  
+  // Back face (+Z, furthest from camera)
+  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  
+  // Left face (+X)
+  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
+  
+  // Right face (-X)
+  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  
+  // Top face (+Y)
+  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  
+  // Bottom face (-Y)
+  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
+  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
+  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
+
+  // Generate UVs for each vertex
+  for (int i = 0; i < CUBE_VERTS; i += 6) {
+    // First triangle
+    model->uvs[i + 0] = (float2){0.0f, 0.0f};
+    model->uvs[i + 1] = (float2){1.0f, 0.0f};
+    model->uvs[i + 2] = (float2){1.0f, 1.0f};
+    // Second triangle
+    model->uvs[i + 3] = (float2){0.0f, 0.0f};
+    model->uvs[i + 4] = (float2){1.0f, 1.0f};
+    model->uvs[i + 5] = (float2){0.0f, 1.0f};
+  }
+  
+  // Generate face normals - one normal per triangle
+  for (int i = 0; i < CUBE_VERTS / 3; i++) {
+    // Corrected face normals for -Y up, -Z forward coordinate system
+    float3 normal;
+    if (i < 2)       normal = (float3){0.0f, 0.0f, 1.0f};   // Front face (-Z) - normal points toward camera
+    else if (i < 4)  normal = (float3){0.0f, 0.0f, -1.0f};  // Back face (+Z) - normal points away
+    else if (i < 6)  normal = (float3){-1.0f, 0.0f, 0.0f};  // Left face (+X) - normal points left
+    else if (i < 8)  normal = (float3){1.0f, 0.0f, 0.0f};   // Right face (-X) - normal points right
+    else if (i < 10) normal = (float3){0.0f, -1.0f, 0.0f};  // Top face (+Y) - normal points down (up in -Y system)
+    else             normal = (float3){0.0f, 1.0f, 0.0f};   // Bottom face (-Y) - normal points up (down in -Y system)
+    
+    model->face_normals[i] = normal;
+  }
+  
+  // Set up model parameters
+  model->num_vertices = CUBE_VERTS;
+  model->num_uvs = CUBE_VERTS;
+  model->num_faces = CUBE_VERTS / 3;
+  model->scale = size;  // Store original size in scale
+  
+  // Initialize the transform
+  model->transform.position = position;
+  model->transform.yaw = 0.0f;
+  model->transform.pitch = 0.0f;
+  
+  return 0;
+}
+
+int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 position) {
+  assert(model != NULL);
+  assert(segments >= 3);
+  assert(rings >= 2);
+  
+  // Calculate number of vertices and UVs needed
+  int num_vertices = (rings + 1) * (segments + 1);
+  int num_triangles = 2 * rings * segments;
+  
+  // Allocate memory for vertices, UVs, and face normals
+  model->vertices = (float3*)malloc(num_triangles * 3 * sizeof(float3)); // 3 vertices per triangle
+  model->uvs = (float2*)malloc(num_triangles * 3 * sizeof(float2));      // 3 UVs per triangle
+  model->face_normals = (float3*)malloc(num_triangles * sizeof(float3)); // 1 normal per triangle
+  
+  if (!model->vertices || !model->uvs || !model->face_normals) {
+    if (model->vertices) free(model->vertices);
+    if (model->uvs) free(model->uvs);
+    if (model->face_normals) free(model->face_normals);
+    return -1;
+  }
+  
+  // Generate temporary vertex and UV grids
+  float3* temp_vertices = (float3*)malloc(num_vertices * sizeof(float3));
+  float2* temp_uvs = (float2*)malloc(num_vertices * sizeof(float2));
+  
+  if (!temp_vertices || !temp_uvs) {
+    free(model->vertices);
+    free(model->uvs);
+    free(model->face_normals);
+    if (temp_vertices) free(temp_vertices);
+    if (temp_uvs) free(temp_uvs);
+    return -1;
+  }
+  
+  // Generate vertices
+  for (int ring = 0; ring <= rings; ring++) {
+    f32 phi = PI * ((f32)ring / (f32)rings); // Latitude [0, PI]
+    
+    for (int segment = 0; segment <= segments; segment++) {
+      f32 theta = 2.0f * PI * ((f32)segment / (f32)segments); // Longitude [0, 2PI]
+      
+      int idx = ring * (segments + 1) + segment;
+      
+      // Calculate normalized direction vector (also the normal direction)
+      f32 sin_phi = sinf(phi);
+      f32 cos_phi = cosf(phi);
+      f32 sin_theta = sinf(theta);
+      f32 cos_theta = cosf(theta);
+      
+      float3 normal = {
+        sin_phi * cos_theta,
+        cos_phi,
+        sin_phi * sin_theta
+      };
+      
+      // Scale by radius to get vertex position
+      temp_vertices[idx].x = normal.x * radius;
+      temp_vertices[idx].y = normal.y * radius;
+      temp_vertices[idx].z = normal.z * radius;
+      
+      // Generate UVs
+      temp_uvs[idx].x = (f32)segment / (f32)segments;
+      temp_uvs[idx].y = (f32)ring / (f32)rings;
+    }
+  }
+  
+  // Generate triangles and face normals
+  int vertex_index = 0;
+  int face_index = 0;
+  
+  for (int ring = 0; ring < rings; ring++) {
+    for (int segment = 0; segment < segments; segment++) {
+      int current = ring * (segments + 1) + segment;
+      int next = current + segments + 1;
+      
+      // --- First triangle of quad ---
+      float3 v0 = temp_vertices[current];
+      float3 v1 = temp_vertices[next];
+      float3 v2 = temp_vertices[current + 1];
+      
+      model->vertices[vertex_index]     = v0;
+      model->vertices[vertex_index + 1] = v1;
+      model->vertices[vertex_index + 2] = v2;
+      
+      model->uvs[vertex_index]     = temp_uvs[current];
+      model->uvs[vertex_index + 1] = temp_uvs[next];
+      model->uvs[vertex_index + 2] = temp_uvs[current + 1];
+      
+      float3 edge1 = float3_sub(v1, v0);
+      float3 edge2 = float3_sub(v2, v0);
+      model->face_normals[face_index] = float3_normalize(float3_cross(edge1, edge2));
+      face_index++;
+      
+      // --- Second triangle of quad ---
+      float3 v3 = temp_vertices[next];
+      float3 v4 = temp_vertices[next + 1];
+      float3 v5 = temp_vertices[current + 1];
+      
+      model->vertices[vertex_index + 3] = v1;
+      model->vertices[vertex_index + 4] = v4;
+      model->vertices[vertex_index + 5] = v2;
+      
+      model->uvs[vertex_index + 3] = temp_uvs[next];
+      model->uvs[vertex_index + 4] = temp_uvs[next + 1];
+      model->uvs[vertex_index + 5] = temp_uvs[current + 1];
+
+      edge1 = float3_sub(v4, v1);
+      edge2 = float3_sub(v2, v1);
+      model->face_normals[face_index] = float3_normalize(float3_cross(edge1, edge2));
+      face_index++;
+      
+      vertex_index += 6;
+    }
+  }
+  
+  free(temp_vertices);
+  free(temp_uvs);
+  
+  model->num_vertices = num_triangles * 3;
+  model->num_uvs = num_triangles * 3;
+  model->num_faces = num_triangles;
+  
+  model->transform.position = position;
+  model->transform.yaw = 0.0f;
+  model->transform.pitch = 0.0f;
+  model->scale = make_float3(1.0f, 1.0f, 1.0f);
+
   return 0;
 }
 
