@@ -16,6 +16,27 @@
 #define FIXED_TIMESTEP (1.0 / TARGET_TPS)  // 50ms per tick
 #define MAX_FRAME_TIME 0.25                // Cap at 250ms to prevent spiral of death
 
+static inline u32 frag_r_func(u32 input, void *argv, usize argc) {
+  if (input == 0x00000000)
+    return 0x00000000;
+  
+  return rgb_to_888(255, 100, 100);
+}
+
+static inline u32 frag_g_func(u32 input, void *argv, usize argc) {
+  if (input == 0x00000000)
+    return 0x00000000;
+  
+  return rgb_to_888(100, 255, 100);
+}
+
+static inline u32 frag_b_func(u32 input, void *argv, usize argc) {
+  if (input == 0x00000000)
+    return 0x00000000;
+  
+  return rgb_to_888(100, 100, 255);
+}
+
 // Initialize SDL Modules, create window and renderer structs
 static int system_init(game_state_t* state) {
   assert(state != NULL);
@@ -82,17 +103,42 @@ static usize render_frame(game_state_t* state, transform_t* camera, model_t* cub
     state->depthbuffer[i] = FLT_MAX;
   }
   
+  u64 plane_start, plane_end, cube_start, cube_end, sphere_start, sphere_end, fog_start, fog_end;
+  u64 sdl_calls_start, sdl_calls_end;
+
   usize rendered = 0;
+
+  plane_start = SDL_GetTicks();
   rendered += render_model(state, camera, plane_model); 
+  plane_end = SDL_GetTicks();
+
+  cube_start = SDL_GetTicks();
   rendered += render_model(state, camera, cube_model);
-  rendered += render_model(state, camera, sphere_model);
+  cube_end = SDL_GetTicks();
   
+  sphere_start = SDL_GetTicks();
+  rendered += render_model(state, camera, sphere_model);
+  sphere_end = SDL_GetTicks();
+  
+  fog_start = SDL_GetTicks();
   apply_fog_to_screen(state);
+  fog_end = SDL_GetTicks();
 
   // Update SDL texture and present
+  sdl_calls_start = SDL_GetTicks();
   SDL_UpdateTexture(state->framebuffer_tex, NULL, state->framebuffer, WIN_WIDTH * sizeof(u32));
   SDL_RenderTexture(state->renderer, state->framebuffer_tex, NULL, NULL);
   SDL_RenderPresent(state->renderer);
+  sdl_calls_end = SDL_GetTicks();
+
+  if (SDL_GetTicks() % 100 == 0) {
+    SDL_Log("[%llu] Frame Time Summary:", SDL_GetTicks());
+    SDL_Log("     Plane model took %llu ms to render", plane_end - plane_start);
+    SDL_Log("     Cube model took %llu ms to render", cube_end - cube_start);
+    SDL_Log("     Sphere model took %llu ms to render", sphere_end - sphere_start);
+    SDL_Log("     Fog effect took %llu ms to render", fog_end - fog_start);
+    SDL_Log("     SDL Renderer/Texture calls took %llu ms to update", sdl_calls_end - sdl_calls_start);
+  }
 
   return rendered;
 }
@@ -136,6 +182,10 @@ int main(int argc, char *argv[]) {
   init_renderer(&state);
   state.texture_atlas = files[0].data; // Use the first file as texture atlas
   
+  shader_t frag_r = make_shader(frag_r_func, NULL, 0);
+  shader_t frag_g = make_shader(frag_g_func, NULL, 0);
+  shader_t frag_b = make_shader(frag_b_func, NULL, 0);
+
   // Initialize game objects
   // Generate the cube model
   model_t cube_model = {0};
@@ -145,7 +195,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  cube_model.frag_shader = &default_shader; // Use default shader
+  cube_model.frag_shader = &frag_r; // Use default shader
   cube_model.use_textures = true;
   
   model_t plane_model = {0};
@@ -155,7 +205,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  plane_model.frag_shader = &default_shader;
+  plane_model.frag_shader = &frag_g;
   plane_model.use_textures = true;
 
   model_t sphere_model = {0};
@@ -165,7 +215,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  sphere_model.frag_shader = &default_shader;
+  sphere_model.frag_shader = &frag_b;
   sphere_model.use_textures = true;
   
   transform_t camera = {0};
