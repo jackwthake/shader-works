@@ -12,7 +12,7 @@ static inline u32 default_shader_func(u32 input_color, void *args, usize argc) {
 }
 
 // Built-in default shader that just returns the input color
-shader_t default_shader = { .func = default_shader_func, .args = NULL, .argc = 0 };
+shader_t default_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
@@ -46,7 +46,10 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
   bool in_triangle = (area_abp >= 0 && area_bcp >= 0 && area_cap >= 0) ||
   (area_abp <= 0 && area_bcp <= 0 && area_cap <= 0);
   
-  float inv_area_sum = 1.0f / (area_abp + area_bcp + area_cap);
+  float area_sum = (area_abp + area_bcp + area_cap);
+  area_sum = area_sum == 0 ? EPSILON : area_sum;
+
+  float inv_area_sum = 1.0f / (area_sum);
   float weight_a = area_bcp * inv_area_sum;
   float weight_b = area_cap * inv_area_sum;
   float weight_c = area_abp * inv_area_sum;
@@ -210,18 +213,23 @@ void update_camera(game_state_t *state, transform_t *cam) {
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,
 * back-face culling, and rasterizes triangles with depth testing.
 */
-void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_t *frag_shader) {
+usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
   assert(cam != NULL);
   assert(model != NULL);
   assert(model->vertices != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
-  assert(frag_shader != NULL && frag_shader->func != NULL);
+  assert(model->frag_shader != NULL);
 
-  if (state->use_textures) {
+  shader_t *frag_shader = model->frag_shader && model->frag_shader->valid ? model->frag_shader : &default_shader;
+  assert(frag_shader->func != NULL);
+  
+  if (model->use_textures) {
     assert(state->texture_atlas != NULL);
     assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
   }
   
+  usize tris_rendered = 0;
+
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
     // Transform vertices from model space to world space, then to view space
@@ -261,7 +269,7 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
     
     // Check if triangle is facing toward camera
     float dot_product = float3_dot(triangle_normal, view_direction);
-    if (dot_product <= 0) continue; // Triangle is facing away from camera
+    // if (dot_product <= 0) continue; // Triangle is facing away from camera
     
     // Use pre-computed projection constants
     float pixels_per_world_unit_a = state->projection_scale / view_a.z;
@@ -318,7 +326,7 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
           if (new_depth < state->depthbuffer[pixel_idx]) {
             uint32_t output_color;
             
-            if (state->use_textures && state->texture_atlas != NULL) {
+            if (model->use_textures && state->texture_atlas != NULL) {
               // Interpolate perspective-corrected UVs
               float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
               float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
@@ -343,22 +351,121 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
               output_color = flat_color; // Use flat color if no texture
             }
 
-            output_color = frag_shader->func(output_color, frag_shader->args, frag_shader->argc);
+            output_color = frag_shader->func(output_color, frag_shader->argv, frag_shader->argc);
+
             apply_side_shading(&output_color, tri);
             
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel
             state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
           }
+
         }
       }
     }
+
+    tris_rendered++;
   }
+
+  return tris_rendered;
 }
 
-shader_t make_shader(shader_func func, void *args, usize argc) {
+int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position) {
+  if (!model || segment_size.x <= 0 || segment_size.y <= 0) return -1;
+  
+  // Calculate number of segments from size and segment_size
+  usize w_segs = (usize)(size.x / segment_size.x);
+  usize d_segs = (usize)(size.y / segment_size.y);
+  
+  usize w = w_segs + 1, d = d_segs + 1;
+  usize grid_vertices = w * d;
+  
+  // Each quad becomes 2 triangles, so we need 6 vertices per quad
+  usize num_quads = w_segs * d_segs;
+  usize total_triangle_vertices = num_quads * 6;
+  
+  model->vertices = malloc(total_triangle_vertices * sizeof(float3));
+  model->uvs = malloc(total_triangle_vertices * sizeof(float2));
+  if (!model->vertices || !model->uvs) {
+    free(model->vertices); 
+    free(model->uvs); 
+    return -1;
+  }
+  
+  // Create temporary grid of vertices
+  float3 *grid_verts = malloc(grid_vertices * sizeof(float3));
+  float2 *grid_uvs = malloc(grid_vertices * sizeof(float2));
+  if (!grid_verts || !grid_uvs) {
+    free(model->vertices);
+    free(model->uvs);
+    free(grid_verts);
+    free(grid_uvs);
+    return -1;
+  }
+  
+  float wx = size.x / w_segs, dz = size.y / d_segs;
+  float sx = position.x - size.x * 0.5f, sz = position.z - size.y * 0.5f;
+  
+  // Generate grid vertices
+  for (usize z = 0; z < d; z++) {
+    for (usize x = 0; x < w; x++) {
+      usize i = z * w + x;
+      grid_verts[i] = (float3){sx + x * wx, position.y, sz + z * dz};
+      grid_uvs[i] = (float2){(float)x / w_segs, (float)z / d_segs};
+    }
+  }
+  
+  // Generate triangles from grid (CCW winding)
+  usize vertex_idx = 0;
+  for (usize z = 0; z < d_segs; z++) {
+    for (usize x = 0; x < w_segs; x++) {
+      // Get the four corners of current quad
+      usize tl = z * w + x;           // top-left
+      usize tr = z * w + (x + 1);     // top-right  
+      usize bl = (z + 1) * w + x;     // bottom-left
+      usize br = (z + 1) * w + (x + 1); // bottom-right
+      
+      // First triangle: TL -> BL -> TR (CCW)
+      model->vertices[vertex_idx] = grid_verts[tl];
+      model->uvs[vertex_idx] = grid_uvs[tl];
+      vertex_idx++;
+      
+      model->vertices[vertex_idx] = grid_verts[bl];
+      model->uvs[vertex_idx] = grid_uvs[bl];
+      vertex_idx++;
+      
+      model->vertices[vertex_idx] = grid_verts[tr];
+      model->uvs[vertex_idx] = grid_uvs[tr];
+      vertex_idx++;
+      
+      // Second triangle: TR -> BL -> BR (CCW)
+      model->vertices[vertex_idx] = grid_verts[tr];
+      model->uvs[vertex_idx] = grid_uvs[tr];
+      vertex_idx++;
+      
+      model->vertices[vertex_idx] = grid_verts[bl];
+      model->uvs[vertex_idx] = grid_uvs[bl];
+      vertex_idx++;
+      
+      model->vertices[vertex_idx] = grid_verts[br];
+      model->uvs[vertex_idx] = grid_uvs[br];
+      vertex_idx++;
+    }
+  }
+  
+  model->num_vertices = total_triangle_vertices;
+  model->num_uvs = total_triangle_vertices;
+  model->scale = (float3){1.0f, 1.0f, 1.0f};
+  
+  free(grid_verts);
+  free(grid_uvs);
+  return 0;
+}
+
+shader_t make_shader(shader_func func, void *argv, usize argc) {
   return (shader_t) {
     .func = func,
-    .args = args,
-    .argc = argc
+    .argv = argv,
+    .argc = argc,
+    .valid = true
   };
 }

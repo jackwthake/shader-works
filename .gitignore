@@ -1,3 +1,5 @@
 cpu_render
-bin/
+build/
 .vscode/
+cpu-render.code-workspace
+tasks.json

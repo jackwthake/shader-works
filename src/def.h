@@ -48,7 +48,6 @@ typedef struct {
   float2 screen_dim;
   f32 screen_height_world, projection_scale, frustum_bound;
 
-  bool use_textures;
   u32 *texture_atlas; // pointer to texture atlas data (static data)
 } game_state_t;
 
