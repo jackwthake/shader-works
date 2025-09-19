@@ -1,4 +1,4 @@
-#include "maths.h"
+#include "../include/cpu-render/maths.h"
 
 #include <math.h>
 
@@ -38,10 +38,17 @@ f32 float3_magnitude(float3 v) {
 
 float3 float3_normalize(float3 v) {
   f32 mag = float3_magnitude(v);
-  if (mag == 0) return (float3){0, 0, 0};
+  if (fabsf(mag) < EPSILON) return (float3){0, 0, 0};
   return float3_scale(v, 1.0f / mag);
 }
 
+float3 float3_cross(float3 a, float3 b) {
+  return (float3){
+    a.y * b.z - a.z * b.y,
+    a.z * b.x - a.x * b.z,
+    a.x * b.y - a.y * b.x
+  };
+}
 
 /** float2 implementation */
 float2 float2_add(float2 a, float2 b) {
@@ -70,6 +77,6 @@ f32 float2_magnitude(float2 v) {
 
 float2 float2_normalize(float2 v) {
   f32 mag = float2_magnitude(v);
-  if (mag == 0) return (float2){0, 0};
+  if (fabsf(mag) < EPSILON) return (float2){0, 0};
   return float2_scale(v, 1.0f / mag);
 }

@@ -1,23 +1,35 @@
-#include "renderer.h"
+#include "../include/cpu-render/renderer.h"
 
 #include <math.h>
 #include <assert.h>
 #include <float.h> // For FLT_MAX
+#include <stdlib.h>
+#include <SDL3/SDL.h>
 
-#include "maths.h"
+#include "../include/cpu-render/maths.h"
+
+// Default vertex shader that just returns the original vertex position
+static inline float3 default_vertex_shader_func(vertex_context_t context, void *args, usize argc) {
+  return context.original_vertex;
+}
 
 // Default fragment shader that just returns the input color
-static inline u32 default_shader_func(u32 input_color, void *args, usize argc) {
+static inline u32 default_shader_func(u32 input_color, fragment_context_t context, void *args, usize argc) {
   return input_color;
 }
 
+// Built-in default vertex shader that just returns the original vertex position
+vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .argv = NULL, .argc = 0, .valid = true };
+
 // Built-in default shader that just returns the input color
-shader_t default_shader = { .func = default_shader_func, .args = NULL, .argc = 0 };
+fragment_shader_t default_frag_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
-  return SDL_MapRGBA(SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, r, g, b, 255);
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
+  return SDL_MapRGBA(format, NULL, r, g, b, 255);
 }
+
 
 /**
 * Calculates the signed area of a triangle defined by three points.
@@ -46,7 +58,10 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
   bool in_triangle = (area_abp >= 0 && area_bcp >= 0 && area_cap >= 0) ||
   (area_abp <= 0 && area_bcp <= 0 && area_cap <= 0);
   
-  float inv_area_sum = 1.0f / (area_abp + area_bcp + area_cap);
+  float area_sum = (area_abp + area_bcp + area_cap);
+  area_sum = area_sum == 0 ? EPSILON : area_sum;
+
+  float inv_area_sum = 1.0f / (area_sum);
   float weight_a = area_bcp * inv_area_sum;
   float weight_b = area_cap * inv_area_sum;
   float weight_c = area_abp * inv_area_sum;
@@ -67,7 +82,7 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
 }
 
 // Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
-static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -128,30 +143,9 @@ static float3 transform_to_local_point(transform_t *t, float3 p) {
   return transform_vector(ihat, jhat, khat, p_rel);
 }
 
-// Apply a more subtle shading for specific triangle faces
-static void apply_side_shading(u32 *color, int tri) {
-  assert(color != NULL);
-  
-  // Face order: bottom(10-11), top(8-9), front(0-1), back(2-3), right(6-7), left(4-5)
-  if (tri == 2 || tri == 3 || tri == 4 || tri == 5 || tri == 10 || tri == 11) {
-    // Extract RGB components
-    uint8_t shade_r, shade_g, shade_b;
-    SDL_GetRGB(*color, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &shade_r, &shade_g, &shade_b);
-
-    f32 brightness_factor = 0.75f;  // 25% darkening
-
-    shade_r = (u8)((f32)shade_r * brightness_factor);
-    shade_g = (u8)((f32)shade_g * brightness_factor);
-    shade_b = (u8)((f32)shade_b * brightness_factor);
-
-    // Repack into RGB888
-    *color = rgb_to_888(shade_r, shade_g, shade_b);
-  }
-}
-
 // Apply fog effect based on depth
-static u32 apply_fog(u32 color, f32 depth) {
-  f32 fog_factor = (depth - FOG_START) / (FOG_END - FOG_START);
+static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
+  f32 fog_factor = (depth - fog_start) / (fog_end - fog_start);
 
   // Clamp fog factor
   if (fog_factor < 0.0f) fog_factor = 0.0f;
@@ -159,38 +153,45 @@ static u32 apply_fog(u32 color, f32 depth) {
 
   // For full fog (fog_factor >= 0.99)
   if (fog_factor >= 0.99f) {
-    return rgb_to_888(FOG_R, FOG_G, FOG_B);
+    return rgb_to_888(fog_r, fog_g, fog_b);
   }
 
   uint8_t r, g, b;
   SDL_GetRGB(color, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &r, &g, &b);
 
   // Interpolate between original color and fog color
-  r = (uint8_t)(r * (1.0f - fog_factor) + FOG_R * fog_factor);
-  g = (uint8_t)(g * (1.0f - fog_factor) + FOG_G * fog_factor);
-  b = (uint8_t)(b * (1.0f - fog_factor) + FOG_B * fog_factor);
+  r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
+  g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
+  b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
   return rgb_to_888(r, g, b);
 }
 
-void apply_fog_to_screen(game_state_t *state) {
+void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   assert(state != NULL);
 
-  for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
+  int total_pixels = (int)(state->screen_dim.x * state->screen_dim.y);
+  for (int i = 0; i < total_pixels; ++i) {
     if (state->depthbuffer[i] == FLT_MAX) continue; // Skip untouched pixels
 
     // Apply fog effect based on depth
-    state->framebuffer[i] = apply_fog(state->framebuffer[i], state->depthbuffer[i]);
+    state->framebuffer[i] = apply_fog(state->framebuffer[i], state->depthbuffer[i], fog_start, fog_end, fog_r, fog_g, fog_b);
   }
 }
 
 // Initialize renderer state
-void init_renderer(game_state_t *state) {
+void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth) {
   assert(state != NULL);
-  
-  state->screen_dim = make_float2((f32)WIN_WIDTH, (f32)WIN_HEIGHT);
+  assert(framebuffer != NULL);
+  assert(depthbuffer != NULL);
+
+  state->framebuffer = framebuffer;
+  state->depthbuffer = depthbuffer;
+  state->screen_dim = make_float2((f32)width, (f32)height);
+  state->atlas_dim = make_float2((f32)atlas_width, (f32)atlas_height);
   state->frustum_bound = tanf(fov_over_2) * 1.4f;
   state->screen_height_world = tanf(fov_over_2) * 2;
-  state->projection_scale = (float)WIN_WIDTH / state->screen_height_world;
+  state->projection_scale = (float)width / state->screen_height_world;
+  state->max_depth = max_depth;
   
   state->cam_right = make_float3(0, 0, 0);
   state->cam_up = make_float3(0, 0, 0);
@@ -198,7 +199,7 @@ void init_renderer(game_state_t *state) {
 }
 
 // Update camera basis vectors based on its current transform
-void update_camera(game_state_t *state, transform_t *cam) {
+void update_camera(renderer_t *state, transform_t *cam) {
   assert(state != NULL);
   assert(cam != NULL);
   
@@ -210,54 +211,111 @@ void update_camera(game_state_t *state, transform_t *cam) {
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,
 * back-face culling, and rasterizes triangles with depth testing.
 */
-void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_t *frag_shader) {
+usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
   assert(cam != NULL);
   assert(model != NULL);
   assert(model->vertices != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
-  assert(frag_shader != NULL && frag_shader->func != NULL);
+  assert(model->frag_shader != NULL);
 
-  if (state->use_textures) {
+  fragment_shader_t *frag_shader = model->frag_shader && model->frag_shader->valid ? model->frag_shader : &default_frag_shader;
+  assert(frag_shader->func != NULL);
+
+  vertex_shader_t *vertex_shader = model->vertex_shader && model->vertex_shader->valid ? model->vertex_shader : &default_vertex_shader;
+  assert(vertex_shader->func != NULL);
+  
+  if (model->use_textures) {
     assert(state->texture_atlas != NULL);
     assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
   }
   
+  usize tris_rendered = 0;
+
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
+    // Apply vertex shader to each vertex in model space
+    vertex_context_t vertex_ctx_a = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 0,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 0],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0)
+    };
+
+    vertex_context_t vertex_ctx_b = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 1,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 1],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0)
+    };
+
+    vertex_context_t vertex_ctx_c = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 2,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 2],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0)
+    };
+
+    // Call vertex shader to get transformed vertices
+    float3 transformed_a = vertex_shader->func(vertex_ctx_a, vertex_shader->argv, vertex_shader->argc);
+    float3 transformed_b = vertex_shader->func(vertex_ctx_b, vertex_shader->argv, vertex_shader->argc);
+    float3 transformed_c = vertex_shader->func(vertex_ctx_c, vertex_shader->argv, vertex_shader->argc);
+
     // Transform vertices from model space to world space, then to view space
-    float3 world_a = transform_to_world(&model->transform, model->vertices[tri * 3 + 0]);
-    float3 world_b = transform_to_world(&model->transform, model->vertices[tri * 3 + 1]);
-    float3 world_c = transform_to_world(&model->transform, model->vertices[tri * 3 + 2]);
+    float3 world_a = transform_to_world(&model->transform, transformed_a);
+    float3 world_b = transform_to_world(&model->transform, transformed_b);
+    float3 world_c = transform_to_world(&model->transform, transformed_c);
     
     float3 view_a = transform_to_local_point(cam, world_a);
     float3 view_b = transform_to_local_point(cam, world_b);
     float3 view_c = transform_to_local_point(cam, world_c);
     
-    // Basic frustum culling: skip triangle if all vertices are behind camera
-    if (view_a.z <= 0 && view_b.z <= 0 && view_c.z <= 0) continue;
-    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > MAX_DEPTH) continue; // Cull if too far away
+    // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
+    if (view_a.z > 0 && view_b.z > 0 && view_c.z > 0) continue;
+    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > state->max_depth)continue; // Cull if too far away
     
     // Additional frustum culling - check if triangle is completely outside view frustum
-    bool outside_left   = (view_a.x < -view_a.z * state->frustum_bound && view_b.x < -view_b.z * state->frustum_bound && view_c.x < -view_c.z * state->frustum_bound);
-    bool outside_right  = (view_a.x >  view_a.z * state->frustum_bound && view_b.x >  view_b.z * state->frustum_bound && view_c.x >  view_c.z * state->frustum_bound);
-    bool outside_top    = (view_a.y >  view_a.z * state->frustum_bound && view_b.y >  view_b.z * state->frustum_bound && view_c.y >  view_c.z * state->frustum_bound);
-    bool outside_bottom = (view_a.y < -view_a.z * state->frustum_bound && view_b.y < -view_b.z * state->frustum_bound && view_c.y < -view_c.z * state->frustum_bound);
-    
+    bool outside_left   = (view_a.x < view_a.z * state->frustum_bound && view_b.x < view_b.z * state->frustum_bound && view_c.x < view_c.z * state->frustum_bound);
+    bool outside_right  = (view_a.x > -view_a.z * state->frustum_bound && view_b.x > -view_b.z * state->frustum_bound && view_c.x > -view_c.z * state->frustum_bound);
+    bool outside_top    = (view_a.y > -view_a.z * state->frustum_bound && view_b.y > -view_b.z * state->frustum_bound && view_c.y > -view_c.z * state->frustum_bound);
+    bool outside_bottom = (view_a.y < view_a.z * state->frustum_bound && view_b.y < view_b.z * state->frustum_bound && view_c.y < view_c.z * state->frustum_bound);
+
     if (outside_left || outside_right || outside_top || outside_bottom) continue;
     
-    // Proper back-face culling using triangle normal and view direction
-    float3 world_edge1 = float3_sub(world_b, world_a);
-    float3 world_edge2 = float3_sub(world_c, world_a);
+    // Use pre-computed face normal for back-face culling
+    float3 model_normal = model->face_normals[tri];
     
-    // Compute triangle normal (cross product)
-    float3 triangle_normal;
-    triangle_normal.x = world_edge1.y * world_edge2.z - world_edge1.z * world_edge2.y;
-    triangle_normal.y = world_edge1.z * world_edge2.x - world_edge1.x * world_edge2.z;
-    triangle_normal.z = world_edge1.x * world_edge2.y - world_edge1.y * world_edge2.x;
+    // Transform face normal from model space to world space (rotation only)
+    float3 ihat, jhat, khat;
+    transform_get_basis_vectors(&model->transform, &ihat, &jhat, &khat);
+    float3 triangle_normal = transform_vector(ihat, jhat, khat, model_normal);
     
-    // Vector from triangle center to camera
+    // Vector from camera to triangle center
     float3 triangle_center = float3_scale(float3_add(float3_add(world_a, world_b), world_c), 1.0f/3.0f);
-    float3 view_direction = float3_sub(cam->position, triangle_center);
+    float3 view_direction = float3_normalize(float3_sub(triangle_center, cam->position));  // Point from camera to triangle
     
     // Check if triangle is facing toward camera
     float dot_product = float3_dot(triangle_normal, view_direction);
@@ -283,26 +341,30 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
     
     // Compute triangle bounding box (clamped to screen boundaries)
     float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
-    float max_x = fminf(WIN_WIDTH - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
+    float max_x = fminf(state->screen_dim.x - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
-    float max_y = fminf(WIN_HEIGHT - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
+    float max_y = fminf(state->screen_dim.y - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
     // Get the UV coordinates for the current triangle's vertices
     float2 uv_a = model->uvs[tri * 3 + 0];
     float2 uv_b = model->uvs[tri * 3 + 1];
     float2 uv_c = model->uvs[tri * 3 + 2];
 
-    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w
-    float2 uv_a_prime = float2_divide(uv_a, a.z);
-    float2 uv_b_prime = float2_divide(uv_b, b.z);
-    float2 uv_c_prime = float2_divide(uv_c, c.z);
+    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (with epsilon to prevent divide by zero)
+    float safe_a_z = (fabsf(a.z) < EPSILON) ? (a.z < 0 ? -EPSILON : EPSILON) : a.z;
+    float safe_b_z = (fabsf(b.z) < EPSILON) ? (b.z < 0 ? -EPSILON : EPSILON) : b.z;
+    float safe_c_z = (fabsf(c.z) < EPSILON) ? (c.z < 0 ? -EPSILON : EPSILON) : c.z;
+
+    float2 uv_a_prime = float2_divide(uv_a, safe_a_z);
+    float2 uv_b_prime = float2_divide(uv_b, safe_b_z);
+    float2 uv_c_prime = float2_divide(uv_c, safe_c_z);
 
     // Precompute color for this triangle (use different colors for debugging)
     uint32_t flat_color = rgb_to_888(255, 0, 255); // Magenta for all triangles
     
     // Rasterize only within the computed bounding box
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
-      int pixel_base = y * WIN_WIDTH; // Precompute row offset
+      int pixel_base = y * (int)state->screen_dim.x; // Precompute row offset
       
       for (int x = (int)min_x; x <= (int)max_x; ++x) {
         float2 p = { (float)x, (float)y }; // Current pixel coordinate
@@ -310,55 +372,110 @@ void render_model(game_state_t *state, transform_t *cam, model_t *model, shader_
         float3 weights; // Barycentric coordinates
         // Check if the current pixel is inside the triangle
         if (point_in_triangle(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y), p, &weights)) {
-          // Interpolate depth using barycentric coordinates
-          float new_depth = 1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
+          // Interpolate depth using barycentric coordinates (with safe Z values)
+          float new_depth = -1.0f / (weights.x / safe_a_z + weights.y / safe_b_z + weights.z / safe_c_z);
           
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
           int pixel_idx = pixel_base + x; // Use precomputed row offset
           if (new_depth < state->depthbuffer[pixel_idx]) {
             uint32_t output_color;
             
-            if (state->use_textures && state->texture_atlas != NULL) {
+            if (model->use_textures && state->texture_atlas != NULL) {
               // Interpolate perspective-corrected UVs
               float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
               float interpolated_v_prime = weights.x * uv_a_prime.y + weights.y * uv_b_prime.y + weights.z * uv_c_prime.y;
 
               // Divide by interpolated 1/w to get correct perspective UVs
-              float final_u = interpolated_u_prime * new_depth;
-              float final_v = interpolated_v_prime * new_depth;
+              float final_u = interpolated_u_prime * -new_depth;
+              float final_v = interpolated_v_prime * -new_depth;
 
               // Map normalized UVs [0.0, 1.0] to texture pixel coordinates (optimized)
-              int tex_x = (int)(final_u * (f32)ATLAS_WIDTH_PX);
-              int tex_y = (int)(final_v * (f32)ATLAS_HEIGHT_PX);
+              int tex_x = (int)(final_u * (f32)state->atlas_dim.x);
+              int tex_y = (int)(final_v * (f32)state->atlas_dim.y);
 
               // Fast clamp using bit operations and conditionals
-              tex_x = (tex_x < 0) ? 0 : ((tex_x > ATLAS_WIDTH_PX - 1) ? ATLAS_WIDTH_PX - 1 : tex_x);
-              tex_y = (tex_y < 0) ? 0 : ((tex_y > ATLAS_HEIGHT_PX - 1) ? ATLAS_HEIGHT_PX - 1 : tex_y);
+              tex_x = (tex_x < 0) ? 0 : ((tex_x > state->atlas_dim.x - 1) ? state->atlas_dim.x - 1 : tex_x);
+              tex_y = (tex_y < 0) ? 0 : ((tex_y > state->atlas_dim.y - 1) ? state->atlas_dim.y - 1 : tex_y);
 
               // Skip Magenta pixels, transparency support
-              if (state->texture_atlas[tex_y * ATLAS_WIDTH_PX + tex_x] == 0xFF00FF) continue;
+              if (state->texture_atlas[tex_y * (int)state->atlas_dim.x + tex_x] == 0xFF00FF) continue;
 
-              output_color = state->texture_atlas[tex_y * ATLAS_WIDTH_PX + tex_x];
+              output_color = state->texture_atlas[tex_y * (int)state->atlas_dim.x + tex_x];
             } else {
               output_color = flat_color; // Use flat color if no texture
             }
 
-            output_color = frag_shader->func(output_color, frag_shader->args, frag_shader->argc);
-            apply_side_shading(&output_color, tri);
-            
+            // Populate shader context
+            fragment_context_t shader_ctx = {0};
+
+            // Interpolate world position using barycentric coordinates
+            shader_ctx.world_pos = float3_add(
+              float3_add(
+                float3_scale(world_a, weights.x),
+                float3_scale(world_b, weights.y)
+              ),
+              float3_scale(world_c, weights.z)
+            );
+
+            // Screen position
+            shader_ctx.screen_pos = make_float2((float)x, (float)y);
+
+            // UV coordinates (interpolated if available)
+            if (model->use_textures && model->uvs != NULL) {
+              float2 uv_a = model->uvs[tri * 3 + 0];
+              float2 uv_b = model->uvs[tri * 3 + 1];
+              float2 uv_c = model->uvs[tri * 3 + 2];
+
+              shader_ctx.uv = make_float2(
+                weights.x * uv_a.x + weights.y * uv_b.x + weights.z * uv_c.x,
+                weights.x * uv_a.y + weights.y * uv_b.y + weights.z * uv_c.y
+              );
+            } else {
+              shader_ctx.uv = make_float2(0.0f, 0.0f);
+            }
+
+            // Depth
+            shader_ctx.depth = new_depth;
+
+            // Face normal (already transformed to world space)
+            shader_ctx.normal = triangle_normal;
+
+            // View direction (from fragment to camera)
+            shader_ctx.view_dir = float3_normalize(float3_sub(cam->position, shader_ctx.world_pos));
+
+            // Time
+            shader_ctx.time = SDL_GetTicks() / 1000.0f;
+
+            output_color = frag_shader->func(output_color, shader_ctx, frag_shader->argv, frag_shader->argc);
+
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel
             state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
           }
+
         }
       }
     }
+
+    tris_rendered++;
   }
+
+  return tris_rendered;
 }
 
-shader_t make_shader(shader_func func, void *args, usize argc) {
-  return (shader_t) {
+fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {
+  return (fragment_shader_t) {
     .func = func,
-    .args = args,
-    .argc = argc
+    .argv = argv,
+    .argc = argc,
+    .valid = true
+  };
+}
+
+vertex_shader_t make_vertex_shader(vertex_shader_func func, void *argv, usize argc) {
+  return (vertex_shader_t) {
+    .func = func,
+    .argv = argv,
+    .argc = argc,
+    .valid = true
   };
 }
