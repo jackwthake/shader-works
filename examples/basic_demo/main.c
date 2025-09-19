@@ -26,7 +26,7 @@ static inline u32 frag_g_func(u32 input, fragment_context_t context, void *argv,
     return 0x00000000;
 
   // Pixelated, fast-scrolling noise using quantized world position and time
-  float pixel_size = 0.2f; // Controls pixelation
+  float pixel_size = 0.1f; // Controls pixelation
   float quant_x = floorf(context.world_pos.x / pixel_size) * pixel_size;
   float quant_y = floorf(context.world_pos.y / pixel_size) * pixel_size;
   float quant_z = floorf(context.world_pos.z / pixel_size) * pixel_size;
@@ -115,6 +115,51 @@ static inline float3 sphere_blob_vertex_shader(vertex_context_t context, void *a
   return vertex;
 }
 
+// Billboard vertex shader - makes quads always face the camera
+static inline float3 billboard_vertex_shader(vertex_context_t context, void *argv, usize argc) {
+  float3 vertex = context.original_vertex;
+
+  // Get camera vectors from context
+  float3 cam_right = context.cam_right;
+  float3 cam_up = context.cam_up;
+
+  // Billboard position is stored in the model transform
+  // The vertex coordinates represent offsets from the billboard center
+  float3 world_pos = float3_add(
+    float3_add(
+      float3_scale(cam_right, vertex.x),  // X offset using camera right vector
+      float3_scale(cam_up, vertex.y)     // Y offset using camera up vector
+    ),
+    make_float3(0.0f, 0.0f, 0.0f)        // Billboard center will be added by transform
+  );
+
+  return world_pos;
+}
+
+// Particle fragment shader - creates a circular particle (no transparency available)
+static inline u32 particle_frag_func(u32 input, fragment_context_t context, void *argv, usize argc) {
+  // Create circular particle by calculating distance from center
+  float2 uv = context.uv;
+  float2 center = make_float2(0.5f, 0.5f);
+  float2 diff = float2_sub(uv, center);
+  float dist = float2_magnitude(diff);
+
+  // Create color variation based on distance from center
+  float intensity = 1.0f - (dist / 0.5f); // 1.0 at center, 0.0 at edge
+  intensity = fmaxf(0.1f, intensity); // Keep minimum brightness to avoid pure black
+
+  // Add time-based pulsing effect
+  float pulse = (sinf(context.time * 3.0f) + 1.0f) * 0.5f; // 0 to 1
+  intensity *= (0.7f + pulse * 0.3f); // Pulse between 70% and 100%
+
+  // Create warm particle colors - always visible
+  u8 r = (u8)(255 * intensity);
+  u8 g = (u8)(180 * intensity);
+  u8 b = (u8)(60 * intensity);
+
+  return rgb_to_888(r, g, b);
+}
+
 // Initialize SDL Modules, create window and renderer structs
 static int system_init(game_state_t* state) {
   assert(state != NULL);
@@ -147,8 +192,8 @@ static void system_poll_events(game_state_t* state) {
   }
 }
 
-// Update game logic with fixed timestep 
-static void update_game(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, f64 dt) {
+// Update game logic with fixed timestep
+static void update_game(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, model_t* billboard_model, f64 dt) {
   // dt will always be FIXED_TIMESTEP
   
   // rotate cube
@@ -163,35 +208,46 @@ static void update_game(game_state_t* state, transform_t* camera, model_t* cube_
   sphere_model->transform.yaw  += 0.5f * dt;
   sphere_model->transform.pitch += 0.5f * dt;
 
+  // Animate billboard particle - floating motion
+  float time = SDL_GetTicks() / 1000.0f;
+  billboard_model->transform.position.x = sinf(time * 0.5f) * 2.0f;
+  billboard_model->transform.position.y = 3.0f + sinf(time * 1.0f) * 0.5f;
+  billboard_model->transform.position.z = -5.0f + cosf(time * 0.3f) * 1.0f;
+
   // Update camera matrices
   update_camera(&state->renderer_state, camera);
 }
 
 // Render the current frame
-static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model) {
+static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, model_t* billboard_model) {
   // Clear framebuffer and reset depth buffer
   for(int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
     state->framebuffer[i] = rgb_to_888(FOG_R, FOG_G, FOG_B); // Clear to fog color
     state->depthbuffer[i] = FLT_MAX;
   }
   
-  u64 plane_start, plane_end, cube_start, cube_end, sphere_start, sphere_end, fog_start, fog_end;
+  u64 plane_start, plane_end, cube_start, cube_end, sphere_start, sphere_end, billboard_start, billboard_end, fog_start, fog_end;
   u64 sdl_calls_start, sdl_calls_end;
 
   usize rendered = 0;
 
   plane_start = SDL_GetTicks();
-  rendered += render_model(&state->renderer_state, camera, plane_model); 
+  rendered += render_model(&state->renderer_state, camera, plane_model);
   plane_end = SDL_GetTicks();
 
   cube_start = SDL_GetTicks();
   rendered += render_model(&state->renderer_state, camera, cube_model);
   cube_end = SDL_GetTicks();
-  
+
   sphere_start = SDL_GetTicks();
   rendered += render_model(&state->renderer_state, camera, sphere_model);
   sphere_end = SDL_GetTicks();
-  
+
+  // Render billboard LAST so it appears on top (before fog)
+  billboard_start = SDL_GetTicks();
+  rendered += render_model(&state->renderer_state, camera, billboard_model);
+  billboard_end = SDL_GetTicks();
+
   fog_start = SDL_GetTicks();
   apply_fog_to_screen(&state->renderer_state, FOG_START, FOG_END, FOG_R, FOG_G, FOG_B);
   fog_end = SDL_GetTicks();
@@ -208,6 +264,7 @@ static usize render_frame(game_state_t* state, transform_t* camera, model_t* cub
     SDL_Log("     Plane model took %llu ms to render", plane_end - plane_start);
     SDL_Log("     Cube model took %llu ms to render", cube_end - cube_start);
     SDL_Log("     Sphere model took %llu ms to render", sphere_end - sphere_start);
+    SDL_Log("     Billboard particle took %llu ms to render", billboard_end - billboard_start);
     SDL_Log("     Fog effect took %llu ms to render", fog_end - fog_start);
     SDL_Log("     SDL Renderer/Texture calls took %llu ms to update", sdl_calls_end - sdl_calls_start);
   }
@@ -259,10 +316,12 @@ int main(int argc, char *argv[]) {
   fragment_shader_t frag_r = make_fragment_shader(frag_r_func, NULL, 0);
   fragment_shader_t frag_g = make_fragment_shader(frag_g_func, NULL, 0);
   fragment_shader_t frag_b = make_fragment_shader(frag_b_func, NULL, 0);
+  fragment_shader_t particle_frag = make_fragment_shader(particle_frag_func, NULL, 0);
 
   // Create vertex shaders
   vertex_shader_t plane_ripple_vs = make_vertex_shader(plane_ripple_vertex_shader, NULL, 0);
   vertex_shader_t sphere_blob_vs = make_vertex_shader(sphere_blob_vertex_shader, NULL, 0);
+  vertex_shader_t billboard_vs = make_vertex_shader(billboard_vertex_shader, NULL, 0);
 
   // Initialize game objects
   // Generate the cube model
@@ -298,7 +357,19 @@ int main(int argc, char *argv[]) {
   sphere_model.frag_shader = &frag_b;
   sphere_model.vertex_shader = &sphere_blob_vs; // Use blob vertex shader
   sphere_model.use_textures = true;
-  
+
+  // Create billboard particle - normal size now that it's working
+  model_t billboard_model = {0};
+  if (generate_billboard(&billboard_model, make_float2(1.0f, 1.0f), make_float3(0.0f, 2.0f, -4.0f)) != 0) {
+    SDL_Log("Failed to generate billboard model");
+    system_cleanup(&state);
+    return -1;
+  }
+
+  billboard_model.frag_shader = &particle_frag;
+  billboard_model.vertex_shader = &billboard_vs; // Use camera-facing vertex shader
+  billboard_model.use_textures = false;
+
   transform_t camera = {0};
   camera.position = make_float3(0.0f, 2.0f, 0.0f);  // Place camera at origin
   camera.yaw = 0.0f;
@@ -329,14 +400,14 @@ int main(int argc, char *argv[]) {
     
     // Fixed timestep updates
     while (accumulator >= FIXED_TIMESTEP) {
-      update_game(&state, &camera, &cube_model, &plane_model, &sphere_model, FIXED_TIMESTEP);
+      update_game(&state, &camera, &cube_model, &plane_model, &sphere_model, &billboard_model, FIXED_TIMESTEP);
       accumulator -= FIXED_TIMESTEP;
       tick_count++;
     }
     
     u64 frame_start = SDL_GetTicks();
     SDL_RenderClear(state.renderer);
-    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model, &sphere_model);
+    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model, &sphere_model, &billboard_model);
     u64 frame_end = SDL_GetTicks();
     
     // FPS counter
@@ -357,6 +428,7 @@ int main(int argc, char *argv[]) {
   delete_model(&cube_model);
   delete_model(&plane_model);
   delete_model(&sphere_model);
+  delete_model(&billboard_model);
 
   system_cleanup(&state);
   return 0;

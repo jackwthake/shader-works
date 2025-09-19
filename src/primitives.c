@@ -351,6 +351,66 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   return 0;
 }
 
+int generate_billboard(model_t* model, float2 size, float3 position) {
+  if (!model) return -1;
+
+  const int BILLBOARD_VERTS = 6;  // 2 triangles * 3 vertices each
+
+  // Allocate memory for vertices, UVs, and face normals
+  model->vertices = malloc(BILLBOARD_VERTS * sizeof(float3));
+  model->uvs = malloc(BILLBOARD_VERTS * sizeof(float2));
+  model->face_normals = malloc(2 * sizeof(float3));  // 2 triangles
+
+  if (!model->vertices || !model->uvs || !model->face_normals) {
+    free(model->vertices);
+    free(model->uvs);
+    free(model->face_normals);
+    return -1;
+  }
+
+  // Half extents for quad positioning
+  float half_width = size.x * 0.5f;
+  float half_height = size.y * 0.5f;
+
+  // Generate quad vertices facing the camera (camera looks down -Z with -Y up)
+  // Triangle 1: counter-clockwise winding when viewed from camera position
+  model->vertices[0] = (float3){-half_width, -half_height, 0.0f};  // bottom-left
+  model->vertices[1] = (float3){ half_width, -half_height, 0.0f};  // bottom-right
+  model->vertices[2] = (float3){-half_width,  half_height, 0.0f};  // top-left
+
+  // Triangle 2: counter-clockwise winding when viewed from camera position
+  model->vertices[3] = (float3){ half_width, -half_height, 0.0f};  // bottom-right
+  model->vertices[4] = (float3){ half_width,  half_height, 0.0f};  // top-right
+  model->vertices[5] = (float3){-half_width,  half_height, 0.0f};  // top-left
+
+  // Generate UVs for texture mapping (matching new vertex order)
+  model->uvs[0] = (float2){0.0f, 1.0f};  // bottom-left
+  model->uvs[1] = (float2){1.0f, 1.0f};  // bottom-right
+  model->uvs[2] = (float2){0.0f, 0.0f};  // top-left
+
+  model->uvs[3] = (float2){1.0f, 1.0f};  // bottom-right
+  model->uvs[4] = (float2){1.0f, 0.0f};  // top-right
+  model->uvs[5] = (float2){0.0f, 0.0f};  // top-left
+
+  // Face normals point toward camera (camera looks down -Z, so billboard faces -Z)
+  float3 normal = {0.0f, 0.0f, -1.0f};
+  model->face_normals[0] = normal;
+  model->face_normals[1] = normal;
+
+  // Set up model parameters
+  model->num_vertices = BILLBOARD_VERTS;
+  model->num_uvs = BILLBOARD_VERTS;
+  model->num_faces = 2;
+  model->scale = (float3){1.0f, 1.0f, 1.0f};
+
+  // Initialize the transform
+  model->transform.position = position;
+  model->transform.yaw = 0.0f;
+  model->transform.pitch = 0.0f;
+
+  return 0;
+}
+
 void delete_model(model_t* model) {
   if (!model) return;
 

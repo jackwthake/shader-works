@@ -34,6 +34,7 @@ typedef struct {
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position);
 int generate_cube(model_t* model, float3 position, float3 size);
 int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 position);
+int generate_billboard(model_t* model, float2 size, float3 position);
 
 // Model cleanup
 void delete_model(model_t* model);

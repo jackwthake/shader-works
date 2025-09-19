@@ -14,7 +14,7 @@
 
 // Fog constants
 #define MAX_DEPTH 15.0f
-#define FOG_START 5.0f
+#define FOG_START 3.0f
 #define FOG_END   14.5f
 #define FOG_R 22
 #define FOG_G 35
@@ -32,7 +32,7 @@ typedef struct {
   SDL_Renderer *renderer;
   SDL_Texture* framebuffer_tex;
 
-  // Rendering buffers
+  // Rendering buffers, used by cpu-render
   u32 framebuffer[WIN_WIDTH * WIN_HEIGHT];
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
 
