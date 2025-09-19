@@ -25,11 +25,16 @@ vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .a
 fragment_shader_t default_frag_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
-u32 rgb_to_888(u8 r, u8 g, u8 b) {
+u32 rgb_to_u32(u8 r, u8 g, u8 b) {
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
   return SDL_MapRGBA(format, NULL, r, g, b, 255);
 }
 
+// Converts packed 32-bit RGBA8888 format to RGB components (0-255), portablely using SDL
+void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b) {
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
+  SDL_GetRGB(color, format, NULL, r, g, b);
+}
 
 /**
 * Calculates the signed area of a triangle defined by three points.
@@ -82,7 +87,7 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
 }
 
 // Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
-void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -153,7 +158,7 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
 
   // For full fog (fog_factor >= 0.99)
   if (fog_factor >= 0.99f) {
-    return rgb_to_888(fog_r, fog_g, fog_b);
+    return rgb_to_u32(fog_r, fog_g, fog_b);
   }
 
   uint8_t r, g, b;
@@ -163,7 +168,7 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
   r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
   g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
   b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
-  return rgb_to_888(r, g, b);
+  return rgb_to_u32(r, g, b);
 }
 
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
@@ -228,61 +233,41 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
     assert(state->texture_atlas != NULL);
     assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
   }
-  
+
   usize tris_rendered = 0;
+
+  // Apply vertex shader to each vertex in model space
+  vertex_context_t vertex_ctx = {
+    .cam_position = cam->position,
+    .cam_forward = state->cam_forward,
+    .cam_right = state->cam_right,
+    .cam_up = state->cam_up,
+    .projection_scale = state->projection_scale,
+    .frustum_bound = state->frustum_bound,
+    .screen_dim = state->screen_dim,
+    .time = SDL_GetTicks() / 1000.0f,
+  };
+
+  fragment_context_t frag_ctx = {0};
+  frag_ctx.time = SDL_GetTicks() / 1000.0f;
 
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
-    // Apply vertex shader to each vertex in model space
-    vertex_context_t vertex_ctx_a = {
-      .cam_position = cam->position,
-      .cam_forward = state->cam_forward,
-      .cam_right = state->cam_right,
-      .cam_up = state->cam_up,
-      .projection_scale = state->projection_scale,
-      .frustum_bound = state->frustum_bound,
-      .screen_dim = state->screen_dim,
-      .time = SDL_GetTicks() / 1000.0f,
-      .vertex_index = 0,
-      .triangle_index = tri,
-      .original_vertex = model->vertices[tri * 3 + 0],
-      .original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0)
-    };
-
-    vertex_context_t vertex_ctx_b = {
-      .cam_position = cam->position,
-      .cam_forward = state->cam_forward,
-      .cam_right = state->cam_right,
-      .cam_up = state->cam_up,
-      .projection_scale = state->projection_scale,
-      .frustum_bound = state->frustum_bound,
-      .screen_dim = state->screen_dim,
-      .time = SDL_GetTicks() / 1000.0f,
-      .vertex_index = 1,
-      .triangle_index = tri,
-      .original_vertex = model->vertices[tri * 3 + 1],
-      .original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0)
-    };
-
-    vertex_context_t vertex_ctx_c = {
-      .cam_position = cam->position,
-      .cam_forward = state->cam_forward,
-      .cam_right = state->cam_right,
-      .cam_up = state->cam_up,
-      .projection_scale = state->projection_scale,
-      .frustum_bound = state->frustum_bound,
-      .screen_dim = state->screen_dim,
-      .time = SDL_GetTicks() / 1000.0f,
-      .vertex_index = 2,
-      .triangle_index = tri,
-      .original_vertex = model->vertices[tri * 3 + 2],
-      .original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0)
-    };
-
     // Call vertex shader to get transformed vertices
-    float3 transformed_a = vertex_shader->func(vertex_ctx_a, vertex_shader->argv, vertex_shader->argc);
-    float3 transformed_b = vertex_shader->func(vertex_ctx_b, vertex_shader->argv, vertex_shader->argc);
-    float3 transformed_c = vertex_shader->func(vertex_ctx_c, vertex_shader->argv, vertex_shader->argc);
+    vertex_ctx.vertex_index = 0; // reset for each triangle
+    vertex_ctx.original_vertex = model->vertices[tri * 3 + 0];
+    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0);
+    float3 transformed_a = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
+    
+    vertex_ctx.vertex_index = 1; // update vertex info
+    vertex_ctx.original_vertex = model->vertices[tri * 3 + 1];
+    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0);
+    float3 transformed_b = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
+
+    vertex_ctx.vertex_index = 2; // update vertex info
+    vertex_ctx.original_vertex = model->vertices[tri * 3 + 2];
+    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0);
+    float3 transformed_c = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
 
     // Transform vertices from model space to world space, then to view space
     float3 world_a = transform_to_world(&model->transform, transformed_a);
@@ -360,7 +345,9 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
     float2 uv_c_prime = float2_divide(uv_c, safe_c_z);
 
     // Precompute color for this triangle (use different colors for debugging)
-    uint32_t flat_color = rgb_to_888(255, 0, 255); // Magenta for all triangles
+    uint32_t flat_color = rgb_to_u32(255, 0, 255); // Magenta for all triangles
+
+    frag_ctx.normal = triangle_normal;
     
     // Rasterize only within the computed bounding box
     for (int y = (int)min_y; y <= (int)max_y; ++y) {
@@ -397,19 +384,13 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
               tex_x = (tex_x < 0) ? 0 : ((tex_x > state->atlas_dim.x - 1) ? state->atlas_dim.x - 1 : tex_x);
               tex_y = (tex_y < 0) ? 0 : ((tex_y > state->atlas_dim.y - 1) ? state->atlas_dim.y - 1 : tex_y);
 
-              // Skip Magenta pixels, transparency support
-              if (state->texture_atlas[tex_y * (int)state->atlas_dim.x + tex_x] == 0xFF00FF) continue;
-
               output_color = state->texture_atlas[tex_y * (int)state->atlas_dim.x + tex_x];
             } else {
               output_color = flat_color; // Use flat color if no texture
             }
 
-            // Populate shader context
-            fragment_context_t shader_ctx = {0};
-
             // Interpolate world position using barycentric coordinates
-            shader_ctx.world_pos = float3_add(
+            frag_ctx.world_pos = float3_add(
               float3_add(
                 float3_scale(world_a, weights.x),
                 float3_scale(world_b, weights.y)
@@ -418,7 +399,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
             );
 
             // Screen position
-            shader_ctx.screen_pos = make_float2((float)x, (float)y);
+            frag_ctx.screen_pos = make_float2((float)x, (float)y);
 
             // UV coordinates (interpolated if available)
             if (model->use_textures && model->uvs != NULL) {
@@ -426,27 +407,21 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
               float2 uv_b = model->uvs[tri * 3 + 1];
               float2 uv_c = model->uvs[tri * 3 + 2];
 
-              shader_ctx.uv = make_float2(
+              frag_ctx.uv = make_float2(
                 weights.x * uv_a.x + weights.y * uv_b.x + weights.z * uv_c.x,
                 weights.x * uv_a.y + weights.y * uv_b.y + weights.z * uv_c.y
               );
             } else {
-              shader_ctx.uv = make_float2(0.0f, 0.0f);
+              frag_ctx.uv = make_float2(0.0f, 0.0f);
             }
 
-            // Depth
-            shader_ctx.depth = new_depth;
+            frag_ctx.depth = new_depth;
+            frag_ctx.view_dir = float3_normalize(float3_sub(cam->position, frag_ctx.world_pos));
 
-            // Face normal (already transformed to world space)
-            shader_ctx.normal = triangle_normal;
-
-            // View direction (from fragment to camera)
-            shader_ctx.view_dir = float3_normalize(float3_sub(cam->position, shader_ctx.world_pos));
-
-            // Time
-            shader_ctx.time = SDL_GetTicks() / 1000.0f;
-
-            output_color = frag_shader->func(output_color, shader_ctx, frag_shader->argv, frag_shader->argc);
+            if((output_color = frag_shader->func(output_color, frag_ctx, frag_shader->argv, frag_shader->argc)) 
+                                            == rgb_to_u32(255, 0, 255)) {
+              continue; // Discard pixel if shader returns transparent color
+            }
 
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel
             state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
@@ -462,6 +437,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
   return tris_rendered;
 }
 
+// Helper functions to create shaders
 fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {
   return (fragment_shader_t) {
     .func = func,

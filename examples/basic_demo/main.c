@@ -17,7 +17,7 @@ static inline u32 frag_r_func(u32 input, fragment_context_t context, void *argv,
   if (input == 0x00000000)
     return 0x00000000;
 
-  return rgb_to_888(255, 100, 100);
+  return rgb_to_u32(255, 100, 100);
 }
 
 // soft green shader with noise based on depth
@@ -42,7 +42,7 @@ static inline u32 frag_g_func(u32 input, fragment_context_t context, void *argv,
   u8 g = (u8)fmaxf(0.0f, fminf(255.0f, 200.0f + noise * 80.0f));
   u8 b = (u8)fmaxf(0.0f, fminf(150.0f, 30.0f + noise * 60.0f));
 
-  return rgb_to_888(r, g, b);
+  return rgb_to_u32(r, g, b);
 }
 
 // soft blue shader with depth and time-based animation
@@ -58,7 +58,7 @@ static inline u32 frag_b_func(u32 input, fragment_context_t context, void *argv,
   u8 g = (u8)(100 + (1.0f - depth_factor) * 155);
   u8 b = (u8)(255 - depth_factor * 100);
 
-  return rgb_to_888(r, g, b);
+  return rgb_to_u32(r, g, b);
 }
 
 // Vertex shader for plane ripple effect
@@ -136,28 +136,21 @@ static inline float3 billboard_vertex_shader(vertex_context_t context, void *arg
   return world_pos;
 }
 
-// Particle fragment shader - creates a circular particle (no transparency available)
+// Particle fragment shader - circular particle
 static inline u32 particle_frag_func(u32 input, fragment_context_t context, void *argv, usize argc) {
-  // Create circular particle by calculating distance from center
-  float2 uv = context.uv;
-  float2 center = make_float2(0.5f, 0.5f);
-  float2 diff = float2_sub(uv, center);
-  float dist = float2_magnitude(diff);
+  // Center the UV coordinates around (0.5, 0.5)
+  f32 dx = context.uv.x - 0.5f;
+  f32 dy = context.uv.y - 0.5f;
+  f32 dist = sqrtf(dx * dx + dy * dy);
 
-  // Create color variation based on distance from center
-  float intensity = 1.0f - (dist / 0.5f); // 1.0 at center, 0.0 at edge
-  intensity = fmaxf(0.1f, intensity); // Keep minimum brightness to avoid pure black
+  // Use maximum radius to fill most of the billboard
+  f32 radius = 0.5f;
 
-  // Add time-based pulsing effect
-  float pulse = (sinf(context.time * 3.0f) + 1.0f) * 0.5f; // 0 to 1
-  intensity *= (0.7f + pulse * 0.3f); // Pulse between 70% and 100%
+  // Hard circle cutoff - discard pixels outside circle
+  if (dist > radius)
+    return rgb_to_u32(255, 0, 255); // Transparent (discard pixel)
 
-  // Create warm particle colors - always visible
-  u8 r = (u8)(255 * intensity);
-  u8 g = (u8)(180 * intensity);
-  u8 b = (u8)(60 * intensity);
-
-  return rgb_to_888(r, g, b);
+  return input; // Use input texture color
 }
 
 // Initialize SDL Modules, create window and renderer structs
@@ -222,7 +215,7 @@ static void update_game(game_state_t* state, transform_t* camera, model_t* cube_
 static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, model_t* billboard_model) {
   // Clear framebuffer and reset depth buffer
   for(int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
-    state->framebuffer[i] = rgb_to_888(FOG_R, FOG_G, FOG_B); // Clear to fog color
+    state->framebuffer[i] = rgb_to_u32(FOG_R, FOG_G, FOG_B); // Clear to fog color
     state->depthbuffer[i] = FLT_MAX;
   }
   
@@ -368,7 +361,7 @@ int main(int argc, char *argv[]) {
 
   billboard_model.frag_shader = &particle_frag;
   billboard_model.vertex_shader = &billboard_vs; // Use camera-facing vertex shader
-  billboard_model.use_textures = false;
+  billboard_model.use_textures = true;
 
   transform_t camera = {0};
   camera.position = make_float3(0.0f, 2.0f, 0.0f);  // Place camera at origin

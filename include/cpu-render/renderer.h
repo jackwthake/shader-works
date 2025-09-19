@@ -23,8 +23,11 @@ typedef struct {
   u32 *texture_atlas; // pointer to texture atlas data (static data)
 } renderer_t;
 
+// Utility functions for color conversion
+u32 rgb_to_u32(u8 r, u8 g, u8 b);
+void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
+
 // Core renderer functions
-u32 rgb_to_888(u8 r, u8 g, u8 b);
 void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth);
 void update_camera(renderer_t *state, transform_t *cam);
 usize render_model(renderer_t *state, transform_t *cam, model_t *model);
