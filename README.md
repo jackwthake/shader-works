@@ -24,7 +24,7 @@ cd Software-Rasterizer
 
 # Builds
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=RELEASE ..
 cmake --build . -j 8
 
 # Run demo
