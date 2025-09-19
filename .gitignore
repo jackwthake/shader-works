@@ -1,6 +1,0 @@
-cpu_render
-build/
-.vscode/
-cpu-render.code-workspace
-tasks.json
-.gitignore
