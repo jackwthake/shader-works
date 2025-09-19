@@ -8,13 +8,21 @@
 
 #include "maths.h"
 
+// Default vertex shader that just returns the original vertex position
+static inline float3 default_vertex_shader_func(vertex_context_t context, void *args, usize argc) {
+  return context.original_vertex;
+}
+
 // Default fragment shader that just returns the input color
 static inline u32 default_shader_func(u32 input_color, shader_context_t context, void *args, usize argc) {
   return input_color;
 }
 
+// Built-in default vertex shader that just returns the original vertex position
+vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .argv = NULL, .argc = 0, .valid = true };
+
 // Built-in default shader that just returns the input color
-shader_t default_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
+fragment_shader_t default_frag_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_888(u8 r, u8 g, u8 b) {
@@ -224,8 +232,11 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
   assert(model->frag_shader != NULL);
 
-  shader_t *frag_shader = model->frag_shader && model->frag_shader->valid ? model->frag_shader : &default_shader;
+  fragment_shader_t *frag_shader = model->frag_shader && model->frag_shader->valid ? model->frag_shader : &default_frag_shader;
   assert(frag_shader->func != NULL);
+
+  vertex_shader_t *vertex_shader = model->vertex_shader && model->vertex_shader->valid ? model->vertex_shader : &default_vertex_shader;
+  assert(vertex_shader->func != NULL);
   
   if (model->use_textures) {
     assert(state->texture_atlas != NULL);
@@ -236,10 +247,61 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
 
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
+    // Apply vertex shader to each vertex in model space
+    vertex_context_t vertex_ctx_a = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 0,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 0],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0)
+    };
+
+    vertex_context_t vertex_ctx_b = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 1,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 1],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0)
+    };
+
+    vertex_context_t vertex_ctx_c = {
+      .cam_position = cam->position,
+      .cam_forward = state->cam_forward,
+      .cam_right = state->cam_right,
+      .cam_up = state->cam_up,
+      .projection_scale = state->projection_scale,
+      .frustum_bound = state->frustum_bound,
+      .screen_dim = state->screen_dim,
+      .time = SDL_GetTicks() / 1000.0f,
+      .vertex_index = 2,
+      .triangle_index = tri,
+      .original_vertex = model->vertices[tri * 3 + 2],
+      .original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0)
+    };
+
+    // Call vertex shader to get transformed vertices
+    float3 transformed_a = vertex_shader->func(vertex_ctx_a, vertex_shader->argv, vertex_shader->argc);
+    float3 transformed_b = vertex_shader->func(vertex_ctx_b, vertex_shader->argv, vertex_shader->argc);
+    float3 transformed_c = vertex_shader->func(vertex_ctx_c, vertex_shader->argv, vertex_shader->argc);
+
     // Transform vertices from model space to world space, then to view space
-    float3 world_a = transform_to_world(&model->transform, model->vertices[tri * 3 + 0]);
-    float3 world_b = transform_to_world(&model->transform, model->vertices[tri * 3 + 1]);
-    float3 world_c = transform_to_world(&model->transform, model->vertices[tri * 3 + 2]);
+    float3 world_a = transform_to_world(&model->transform, transformed_a);
+    float3 world_b = transform_to_world(&model->transform, transformed_b);
+    float3 world_c = transform_to_world(&model->transform, transformed_c);
     
     float3 view_a = transform_to_local_point(cam, world_a);
     float3 view_b = transform_to_local_point(cam, world_b);
@@ -302,10 +364,14 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
     float2 uv_b = model->uvs[tri * 3 + 1];
     float2 uv_c = model->uvs[tri * 3 + 2];
 
-    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w
-    float2 uv_a_prime = float2_divide(uv_a, a.z);
-    float2 uv_b_prime = float2_divide(uv_b, b.z);
-    float2 uv_c_prime = float2_divide(uv_c, c.z);
+    // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (with epsilon to prevent divide by zero)
+    float safe_a_z = (fabsf(a.z) < EPSILON) ? (a.z < 0 ? -EPSILON : EPSILON) : a.z;
+    float safe_b_z = (fabsf(b.z) < EPSILON) ? (b.z < 0 ? -EPSILON : EPSILON) : b.z;
+    float safe_c_z = (fabsf(c.z) < EPSILON) ? (c.z < 0 ? -EPSILON : EPSILON) : c.z;
+
+    float2 uv_a_prime = float2_divide(uv_a, safe_a_z);
+    float2 uv_b_prime = float2_divide(uv_b, safe_b_z);
+    float2 uv_c_prime = float2_divide(uv_c, safe_c_z);
 
     // Precompute color for this triangle (use different colors for debugging)
     uint32_t flat_color = rgb_to_888(255, 0, 255); // Magenta for all triangles
@@ -320,8 +386,8 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
         float3 weights; // Barycentric coordinates
         // Check if the current pixel is inside the triangle
         if (point_in_triangle(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y), p, &weights)) {
-          // Interpolate depth using barycentric coordinates
-          float new_depth = -1.0f / (weights.x / a.z + weights.y / b.z + weights.z / c.z);
+          // Interpolate depth using barycentric coordinates (with safe Z values)
+          float new_depth = -1.0f / (weights.x / safe_a_z + weights.y / safe_b_z + weights.z / safe_c_z);
           
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
           int pixel_idx = pixel_base + x; // Use precomputed row offset
@@ -756,8 +822,17 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   return 0;
 }
 
-shader_t make_shader(shader_func func, void *argv, usize argc) {
-  return (shader_t) {
+fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {
+  return (fragment_shader_t) {
+    .func = func,
+    .argv = argv,
+    .argc = argc,
+    .valid = true
+  };
+}
+
+vertex_shader_t make_vertex_shader(vertex_shader_func func, void *argv, usize argc) {
+  return (vertex_shader_t) {
     .func = func,
     .argv = argv,
     .argc = argc,

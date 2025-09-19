@@ -16,6 +16,7 @@
 #define FIXED_TIMESTEP (1.0 / TARGET_TPS)  // 50ms per tick
 #define MAX_FRAME_TIME 0.25                // Cap at 250ms to prevent spiral of death
 
+// Simple red shader
 static inline u32 frag_r_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
@@ -23,13 +24,32 @@ static inline u32 frag_r_func(u32 input, shader_context_t context, void *argv, u
   return rgb_to_888(255, 100, 100);
 }
 
+// soft green shader with noise based on depth
 static inline u32 frag_g_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
 
-  return rgb_to_888(100, 255, 100);
+  // Pixelated, fast-scrolling noise using quantized world position and time
+  float pixel_size = 0.2f; // Controls pixelation
+  float quant_x = floorf(context.world_pos.x / pixel_size) * pixel_size;
+  float quant_y = floorf(context.world_pos.y / pixel_size) * pixel_size;
+  float quant_z = floorf(context.world_pos.z / pixel_size) * pixel_size;
+
+  float noise_x = sinf(quant_x * 8.0f + context.time * 15.0f) *
+                  cosf(quant_z * 6.0f + context.time * 14.0f);
+  float noise_y = sinf(quant_y * 10.0f + context.time * 16.0f) *
+                  cosf(quant_x * 7.0f);
+
+  float noise = (noise_x + noise_y) * 0.5f;
+
+  u8 r = (u8)fmaxf(0.0f, fminf(170.0f, 50.0f + noise * 100.0f));
+  u8 g = (u8)fmaxf(0.0f, fminf(255.0f, 200.0f + noise * 80.0f));
+  u8 b = (u8)fmaxf(0.0f, fminf(150.0f, 30.0f + noise * 60.0f));
+
+  return rgb_to_888(r, g, b);
 }
 
+// soft blue shader with depth and time-based animation
 static inline u32 frag_b_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
@@ -43,6 +63,17 @@ static inline u32 frag_b_func(u32 input, shader_context_t context, void *argv, u
   u8 b = (u8)(255 - depth_factor * 100);
 
   return rgb_to_888(r, g, b);
+}
+
+// Vertex shader for plane ripple effect
+static inline float3 plane_ripple_vertex_shader(vertex_context_t context, void *argv, usize argc) {
+  float3 vertex = context.original_vertex;
+
+  // Apply the same ripple effect that was previously done in CPU
+  vertex.y = (sinf(context.time + vertex.x) * 0.25f) /
+             (sinf(context.time * 5.0f + (vertex.x * 2.0f)) / 4.0f + 1.0f);
+
+  return vertex;
 }
 
 // Initialize SDL Modules, create window and renderer structs
@@ -92,12 +123,6 @@ static void update_game(game_state_t* state, transform_t* camera, model_t* cube_
   sphere_model->transform.position.y = (sinf(SDL_GetTicks() / 1000.0f) * 1.f) + 3.0f;
   sphere_model->transform.yaw  += 0.5f * dt;
   sphere_model->transform.pitch += 0.5f * dt;
-
-  // wripple plane vertices based off of time
-  for (int i = 0; i < plane_model->num_vertices; ++i) {
-    plane_model->vertices[i].y = (sinf(SDL_GetTicks() / 1000.0f + (plane_model->vertices[i].x)) * 0.25f) / 
-                                 (sinf(SDL_GetTicks() / 200.0f + (plane_model->vertices[i].x * 2.f)) / 4.0f + 1.0f);
-  }
 
   // Update camera matrices
   update_camera(state, camera);
@@ -190,9 +215,12 @@ int main(int argc, char *argv[]) {
   init_renderer(&state);
   state.texture_atlas = files[0].data; // Use the first file as texture atlas
   
-  shader_t frag_r = make_shader(frag_r_func, NULL, 0);
-  shader_t frag_g = make_shader(frag_g_func, NULL, 0);
-  shader_t frag_b = make_shader(frag_b_func, NULL, 0);
+  fragment_shader_t frag_r = make_fragment_shader(frag_r_func, NULL, 0);
+  fragment_shader_t frag_g = make_fragment_shader(frag_g_func, NULL, 0);
+  fragment_shader_t frag_b = make_fragment_shader(frag_b_func, NULL, 0);
+
+  // Create vertex shaders
+  vertex_shader_t plane_ripple_vs = make_vertex_shader(plane_ripple_vertex_shader, NULL, 0);
 
   // Initialize game objects
   // Generate the cube model
@@ -203,7 +231,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  cube_model.frag_shader = &frag_r; // Use default shader
+  cube_model.frag_shader = &frag_r;
+  cube_model.vertex_shader = &default_vertex_shader; // Use default vertex shader
   cube_model.use_textures = true;
   
   model_t plane_model = {0};
@@ -214,6 +243,7 @@ int main(int argc, char *argv[]) {
   }
 
   plane_model.frag_shader = &frag_g;
+  plane_model.vertex_shader = &plane_ripple_vs; // Use ripple vertex shader
   plane_model.use_textures = true;
 
   model_t sphere_model = {0};
@@ -224,6 +254,7 @@ int main(int argc, char *argv[]) {
   }
 
   sphere_model.frag_shader = &frag_b;
+  sphere_model.vertex_shader = &default_vertex_shader; // Use default vertex shader
   sphere_model.use_textures = true;
   
   transform_t camera = {0};
@@ -282,10 +313,15 @@ int main(int argc, char *argv[]) {
   
   // Cleanup model resources
   free(cube_model.face_normals);
+  free(cube_model.uvs);
+  free(cube_model.vertices);
   free(plane_model.vertices);
   free(plane_model.uvs);
   free(plane_model.face_normals);
-  
+  free(sphere_model.vertices);
+  free(sphere_model.uvs);
+  free(sphere_model.face_normals);
+
   system_cleanup(&state);
   return 0;
 }

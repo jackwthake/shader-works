@@ -30,14 +30,46 @@ typedef struct {
   float time;          // Frame time for animations
 } shader_context_t;
 
-typedef u32 (*shader_func)(u32 input_color, shader_context_t context, void *args, usize argc);
+typedef struct {
+  // Camera information
+  float3 cam_position;      // Camera world position
+  float3 cam_forward;       // Camera forward vector
+  float3 cam_right;         // Camera right vector
+  float3 cam_up;            // Camera up vector
+
+  // Projection parameters
+  float projection_scale;   // For perspective projection
+  float frustum_bound;      // View frustum boundaries
+  float2 screen_dim;        // Screen dimensions
+
+  // Timing
+  float time;               // Current time
+
+  // Per-vertex data
+  int vertex_index;         // Which vertex in the model (0, 1, 2 within triangle)
+  int triangle_index;       // Which triangle this vertex belongs to
+
+  // Original vertex data
+  float3 original_vertex;   // Original vertex position in model space
+  float2 original_uv;       // Original UV coordinates
+} vertex_context_t;
+
+typedef u32 (*fragment_shader_func)(u32 input_color, shader_context_t context, void *args, usize argc);
+typedef float3 (*vertex_shader_func)(vertex_context_t context, void *args, usize argc);
 
 typedef struct {
   bool valid; // internally set
   usize argc;
   void *argv;
-  shader_func func;
-} shader_t;
+  fragment_shader_func func;
+} fragment_shader_t;
+
+typedef struct {
+  bool valid; // internally set
+  usize argc;
+  void *argv;
+  vertex_shader_func func;
+} vertex_shader_t;
 
 typedef struct {
   f32 yaw;
@@ -53,15 +85,17 @@ typedef struct {
   usize num_vertices;
   usize num_uvs;
   usize num_faces; // Number of triangle faces (num_vertices/3)
-  
+
   float3 scale;
   transform_t transform;
 
   bool use_textures;
-  shader_t *frag_shader;
+  vertex_shader_t *vertex_shader;
+  fragment_shader_t *frag_shader;
 } model_t;
 
-extern shader_t default_shader;
+extern vertex_shader_t default_vertex_shader;
+extern fragment_shader_t default_frag_shader;
 
 u32 rgb_to_888(u8 r, u8 g, u8 b);
 
@@ -75,7 +109,9 @@ int generate_cube(model_t* model, float3 position, float3 size);
 int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 position);
 
 // --- shaders ---
-shader_t make_shader(shader_func func, void *argv, usize argc);
+vertex_shader_t make_vertex_shader(vertex_shader_func func, void *argv, usize argc);
+fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc);
+
 void apply_fog_to_screen(game_state_t *state); // built in fog shader
 
 #endif // RENDERER_H
