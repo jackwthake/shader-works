@@ -20,7 +20,17 @@
 #define ATLAS_WIDTH_PX 8
 #define ATLAS_HEIGHT_PX 8
 
-typedef u32 (*shader_func)(u32 input_color, void *args, usize argc);
+typedef struct {
+  float3 world_pos;     // Interpolated world position of this specific pixel
+  float2 screen_pos;    // Pixel coordinates on screen
+  float2 uv;           // Texture coordinates
+  float depth;         // Z-depth value (new_depth from render pipeline)
+  float3 normal;       // Face normal
+  float3 view_dir;     // Direction from fragment to camera
+  float time;          // Frame time for animations
+} shader_context_t;
+
+typedef u32 (*shader_func)(u32 input_color, shader_context_t context, void *args, usize argc);
 
 typedef struct {
   bool valid; // internally set

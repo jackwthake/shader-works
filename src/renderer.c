@@ -9,7 +9,7 @@
 #include "maths.h"
 
 // Default fragment shader that just returns the input color
-static inline u32 default_shader_func(u32 input_color, void *args, usize argc) {
+static inline u32 default_shader_func(u32 input_color, shader_context_t context, void *args, usize argc) {
   return input_color;
 }
 
@@ -353,7 +353,48 @@ usize render_model(game_state_t *state, transform_t *cam, model_t *model) {
               output_color = flat_color; // Use flat color if no texture
             }
 
-            output_color = frag_shader->func(output_color, frag_shader->argv, frag_shader->argc);
+            // Populate shader context
+            shader_context_t shader_ctx = {0};
+
+            // Interpolate world position using barycentric coordinates
+            shader_ctx.world_pos = float3_add(
+              float3_add(
+                float3_scale(world_a, weights.x),
+                float3_scale(world_b, weights.y)
+              ),
+              float3_scale(world_c, weights.z)
+            );
+
+            // Screen position
+            shader_ctx.screen_pos = make_float2((float)x, (float)y);
+
+            // UV coordinates (interpolated if available)
+            if (model->use_textures && model->uvs != NULL) {
+              float2 uv_a = model->uvs[tri * 3 + 0];
+              float2 uv_b = model->uvs[tri * 3 + 1];
+              float2 uv_c = model->uvs[tri * 3 + 2];
+
+              shader_ctx.uv = make_float2(
+                weights.x * uv_a.x + weights.y * uv_b.x + weights.z * uv_c.x,
+                weights.x * uv_a.y + weights.y * uv_b.y + weights.z * uv_c.y
+              );
+            } else {
+              shader_ctx.uv = make_float2(0.0f, 0.0f);
+            }
+
+            // Depth
+            shader_ctx.depth = new_depth;
+
+            // Face normal (already transformed to world space)
+            shader_ctx.normal = triangle_normal;
+
+            // View direction (from fragment to camera)
+            shader_ctx.view_dir = float3_normalize(float3_sub(cam->position, shader_ctx.world_pos));
+
+            // Time
+            shader_ctx.time = SDL_GetTicks() / 1000.0f;
+
+            output_color = frag_shader->func(output_color, shader_ctx, frag_shader->argv, frag_shader->argc);
 
             apply_side_shading(&output_color, tri);
             

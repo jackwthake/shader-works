@@ -16,25 +16,33 @@
 #define FIXED_TIMESTEP (1.0 / TARGET_TPS)  // 50ms per tick
 #define MAX_FRAME_TIME 0.25                // Cap at 250ms to prevent spiral of death
 
-static inline u32 frag_r_func(u32 input, void *argv, usize argc) {
+static inline u32 frag_r_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
-  
+
   return rgb_to_888(255, 100, 100);
 }
 
-static inline u32 frag_g_func(u32 input, void *argv, usize argc) {
+static inline u32 frag_g_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
-  
+
   return rgb_to_888(100, 255, 100);
 }
 
-static inline u32 frag_b_func(u32 input, void *argv, usize argc) {
+static inline u32 frag_b_func(u32 input, shader_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
-  
-  return rgb_to_888(100, 100, 255);
+
+  // Demonstrate context usage - animate color based on depth and time
+  float depth_factor = fmaxf(0.0f, fminf(1.0f, context.depth / 10.0f));
+  float time_wave = (sinf(context.time * 2.0f) + 1.0f) * 0.5f;
+
+  u8 r = (u8)(100 + depth_factor * 155 * time_wave);
+  u8 g = (u8)(100 + (1.0f - depth_factor) * 155);
+  u8 b = (u8)(255 - depth_factor * 100);
+
+  return rgb_to_888(r, g, b);
 }
 
 // Initialize SDL Modules, create window and renderer structs
