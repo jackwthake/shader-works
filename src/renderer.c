@@ -366,6 +366,18 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
           int pixel_idx = pixel_base + x; // Use precomputed row offset
           if (new_depth < state->depthbuffer[pixel_idx]) {
             uint32_t output_color;
+
+            if (state->wireframe_mode) {
+              if (weights.x < 0.02f || weights.y < 0.02f || weights.z < 0.02f) {
+                output_color = rgb_to_u32(0, 0, 0); // Black for wireframe edges
+                state->framebuffer[pixel_idx] = output_color; // Draw the pixel
+                state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
+              } else {
+                continue; // Skip pixel if not near an edge
+              }
+
+              continue;
+            }
             
             if (model->use_textures && state->texture_atlas != NULL) {
               // Interpolate perspective-corrected UVs

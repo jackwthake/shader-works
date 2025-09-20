@@ -305,7 +305,8 @@ int main(int argc, char *argv[]) {
   init_renderer(&state.renderer_state, WIN_WIDTH, WIN_HEIGHT, ATLAS_WIDTH_PX, 
                 ATLAS_HEIGHT_PX, state.framebuffer, state.depthbuffer, MAX_DEPTH);
   state.renderer_state.texture_atlas = files[0].data; // Use the first file as texture atlas
-  
+  state.renderer_state.wireframe_mode = true; // Start in normal rendering mode
+
   fragment_shader_t frag_r = make_fragment_shader(frag_r_func, NULL, 0);
   fragment_shader_t frag_g = make_fragment_shader(frag_g_func, NULL, 0);
   fragment_shader_t frag_b = make_fragment_shader(frag_b_func, NULL, 0);

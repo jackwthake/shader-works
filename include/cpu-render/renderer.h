@@ -20,6 +20,8 @@ typedef struct {
   f32 screen_height_world, projection_scale, frustum_bound;
   f32 max_depth;
 
+  bool wireframe_mode; // If true, render in wireframe mode
+
   u32 *texture_atlas; // pointer to texture atlas data (static data)
 } renderer_t;
 
