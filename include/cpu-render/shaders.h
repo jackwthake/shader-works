@@ -4,15 +4,24 @@
 #include <stdbool.h>
 #include "maths.h"
 
+typedef struct {
+  float3 position, direction;
+  u32 color;
+
+  bool is_directional;
+} light_t;
+
 // Shader context structures
 typedef struct {
   float3 world_pos;     // Interpolated world position of this specific pixel
   float2 screen_pos;    // Pixel coordinates on screen
-  float2 uv;           // Texture coordinates
-  float depth;         // Z-depth value (new_depth from render pipeline)
-  float3 normal;       // Face normal
-  float3 view_dir;     // Direction from fragment to camera
-  float time;          // Frame time for animations
+  float2 uv;            // Texture coordinates
+  float depth;          // Z-depth value (new_depth from render pipeline)
+  float3 normal;        // Face normal
+  float3 view_dir;      // Direction from fragment to camera
+  float time;           // Frame time for animations
+  light_t *light;       // Light information
+  usize light_count;    // Number of lights
 } fragment_context_t;
 
 typedef struct {
@@ -37,6 +46,8 @@ typedef struct {
   // Original vertex data
   float3 original_vertex;   // Original vertex position in model space
   float2 original_uv;       // Original UV coordinates
+
+  float3 *original_normal;  // Original normal vector
 } vertex_context_t;
 
 // Shader function pointers

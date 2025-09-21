@@ -32,7 +32,7 @@ void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
 // Core renderer functions
 void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth);
 void update_camera(renderer_t *state, transform_t *cam);
-usize render_model(renderer_t *state, transform_t *cam, model_t *model);
+usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count);
 
 // Built-in effects
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);

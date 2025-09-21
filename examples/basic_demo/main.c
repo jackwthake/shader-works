@@ -12,12 +12,24 @@
 #include "def.h"
 #include "resources.inl"
 
+static inline float get_brightness(float3 light_dir, float3 normal) {
+  float brightness = float3_dot(float3_normalize(light_dir), float3_normalize(normal));
+  return fmaxf(0.0f, fminf(1.0f, brightness));
+}
+
 // Simple red shader
 static inline u32 frag_r_func(u32 input, fragment_context_t context, void *argv, usize argc) {
   if (input == 0x00000000)
     return 0x00000000;
 
-  return rgb_to_u32(255, 100, 100);
+  float brightness = get_brightness(context.light->direction, context.normal);
+  if (brightness < 0.1f) brightness = 0.1f; // Minimum ambient light
+
+  u8 r = (u8)(brightness * 255);
+  u8 g = (u8)(brightness * 100);
+  u8 b = (u8)(brightness * 100);
+
+  return rgb_to_u32(r, g, b);
 }
 
 // soft green shader with noise based on depth
@@ -38,9 +50,16 @@ static inline u32 frag_g_func(u32 input, fragment_context_t context, void *argv,
 
   float noise = (noise_x + noise_y) * 0.5f;
 
+  float brightness = get_brightness(context.light->direction, context.normal);
+  if (brightness < 0.1f) brightness = 0.1f; // Minimum ambient light
+
   u8 r = (u8)fmaxf(0.0f, fminf(170.0f, 50.0f + noise * 100.0f));
   u8 g = (u8)fmaxf(0.0f, fminf(255.0f, 200.0f + noise * 80.0f));
   u8 b = (u8)fmaxf(0.0f, fminf(150.0f, 30.0f + noise * 60.0f));
+
+  r *= brightness;
+  g *= brightness;
+  b *= brightness;
 
   return rgb_to_u32(r, g, b);
 }
@@ -54,9 +73,16 @@ static inline u32 frag_b_func(u32 input, fragment_context_t context, void *argv,
   float depth_factor = fmaxf(0.0f, fminf(1.0f, context.depth / 10.0f));
   float time_wave = (sinf(context.time * 2.0f) + 1.0f) * 0.5f;
 
+  float brightness = get_brightness(context.light->direction, context.normal);
+  if (brightness < 0.1f) brightness = 0.1f;
+
   u8 r = (u8)(100 + depth_factor * 155 * time_wave);
   u8 g = (u8)(100 + (1.0f - depth_factor) * 155);
   u8 b = (u8)(255 - depth_factor * 100);
+
+  r *= brightness;
+  g *= brightness;
+  b *= brightness;
 
   return rgb_to_u32(r, g, b);
 }
@@ -68,6 +94,21 @@ static inline float3 plane_ripple_vertex_shader(vertex_context_t context, void *
   // Apply the same ripple effect that was previously done in CPU
   vertex.y = (sinf(context.time + vertex.x) * 0.25f) /
              (sinf(context.time * 5.0f + (vertex.x * 2.0f)) / 4.0f + 1.0f);
+
+  // Update normal to reflect the rippled surface
+  float delta = 0.01f;
+  float3 p_dx = (float3){ vertex.x + delta, 0, vertex.z };
+  float3 p_dz = (float3){ vertex.x, 0, vertex.z + delta };
+  p_dx.y = (sinf(context.time + p_dx.x) * 0.25f) /
+           (sinf(context.time * 5.0f + (p_dx.x * 2.0f)) / 4.0f + 1.0f);
+  p_dz.y = (sinf(context.time + p_dz.x) * 0.25f) /
+           (sinf(context.time * 5.0f + (p_dz.x * 2.0f)) / 4.0f + 1.0f);
+  float3 tangent = float3_sub(p_dx, vertex);
+  float3 bitangent = float3_sub(p_dz, vertex);
+  float3 normal = float3_cross(tangent, bitangent);
+  normal = float3_normalize(normal);
+  // Store the modified normal back into the vertex (abusing original_vertex for demo purposes)
+  *context.original_normal = normal;
 
   return vertex;
 }
@@ -212,7 +253,7 @@ static void update_game(game_state_t* state, transform_t* camera, model_t* cube_
 }
 
 // Render the current frame
-static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, model_t* billboard_model) {
+static usize render_frame(game_state_t* state, transform_t* camera, model_t* cube_model, model_t* plane_model, model_t* sphere_model, model_t* billboard_model, light_t* light) {
   // Clear framebuffer and reset depth buffer
   for(int i = 0; i < WIN_WIDTH * WIN_HEIGHT; ++i) {
     state->framebuffer[i] = rgb_to_u32(FOG_R, FOG_G, FOG_B); // Clear to fog color
@@ -225,20 +266,20 @@ static usize render_frame(game_state_t* state, transform_t* camera, model_t* cub
   usize rendered = 0;
 
   plane_start = SDL_GetTicks();
-  rendered += render_model(&state->renderer_state, camera, plane_model);
+  rendered += render_model(&state->renderer_state, camera, plane_model, light, 1);
   plane_end = SDL_GetTicks();
 
   cube_start = SDL_GetTicks();
-  rendered += render_model(&state->renderer_state, camera, cube_model);
+  rendered += render_model(&state->renderer_state, camera, cube_model, light, 1);
   cube_end = SDL_GetTicks();
 
   sphere_start = SDL_GetTicks();
-  rendered += render_model(&state->renderer_state, camera, sphere_model);
+  rendered += render_model(&state->renderer_state, camera, sphere_model, light, 1);
   sphere_end = SDL_GetTicks();
 
   // Render billboard LAST so it appears on top (before fog)
   billboard_start = SDL_GetTicks();
-  rendered += render_model(&state->renderer_state, camera, billboard_model);
+  rendered += render_model(&state->renderer_state, camera, billboard_model, NULL, 0);
   billboard_end = SDL_GetTicks();
 
   fog_start = SDL_GetTicks();
@@ -305,7 +346,7 @@ int main(int argc, char *argv[]) {
   init_renderer(&state.renderer_state, WIN_WIDTH, WIN_HEIGHT, ATLAS_WIDTH_PX, 
                 ATLAS_HEIGHT_PX, state.framebuffer, state.depthbuffer, MAX_DEPTH);
   state.renderer_state.texture_atlas = files[0].data; // Use the first file as texture atlas
-  state.renderer_state.wireframe_mode = true; // Start in normal rendering mode
+  state.renderer_state.wireframe_mode = false; // Start in normal rendering mode
 
   fragment_shader_t frag_r = make_fragment_shader(frag_r_func, NULL, 0);
   fragment_shader_t frag_g = make_fragment_shader(frag_g_func, NULL, 0);
@@ -364,6 +405,11 @@ int main(int argc, char *argv[]) {
   billboard_model.vertex_shader = &billboard_vs; // Use camera-facing vertex shader
   billboard_model.use_textures = true;
 
+  light_t light = {
+    .direction = make_float3(-1.0f, -1.0f, -1.0f),
+    .is_directional = true
+  };
+
   transform_t camera = {0};
   camera.position = make_float3(0.0f, 2.0f, 0.0f);  // Place camera at origin
   camera.yaw = 0.0f;
@@ -401,7 +447,7 @@ int main(int argc, char *argv[]) {
     
     u64 frame_start = SDL_GetTicks();
     SDL_RenderClear(state.renderer);
-    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model, &sphere_model, &billboard_model);
+    usize tris_rendered = render_frame(&state, &camera, &cube_model, &plane_model, &sphere_model, &billboard_model, &light);
     u64 frame_end = SDL_GetTicks();
     
     // FPS counter

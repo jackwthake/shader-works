@@ -216,7 +216,7 @@ void update_camera(renderer_t *state, transform_t *cam) {
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,
 * back-face culling, and rasterizes triangles with depth testing.
 */
-usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
+usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count) {
   assert(cam != NULL);
   assert(model != NULL);
   assert(model->vertices != NULL);
@@ -250,6 +250,8 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
 
   fragment_context_t frag_ctx = {0};
   frag_ctx.time = SDL_GetTicks() / 1000.0f;
+  frag_ctx.light = lights;
+  frag_ctx.light_count = light_count;
 
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
@@ -257,16 +259,20 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model) {
     vertex_ctx.vertex_index = 0; // reset for each triangle
     vertex_ctx.original_vertex = model->vertices[tri * 3 + 0];
     vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0);
+    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
+    vertex_ctx.triangle_index = tri;
     float3 transformed_a = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
     
     vertex_ctx.vertex_index = 1; // update vertex info
     vertex_ctx.original_vertex = model->vertices[tri * 3 + 1];
     vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0);
+    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
     float3 transformed_b = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
 
     vertex_ctx.vertex_index = 2; // update vertex info
     vertex_ctx.original_vertex = model->vertices[tri * 3 + 2];
     vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0);
+    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
     float3 transformed_c = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
 
     // Transform vertices from model space to world space, then to view space
