@@ -76,5 +76,6 @@ fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, us
 // Built-in shaders
 extern vertex_shader_t default_vertex_shader;
 extern fragment_shader_t default_frag_shader;
+extern fragment_shader_t default_lighting_frag_shader;
 
 #endif // CPU_RENDER_SHADERS_H

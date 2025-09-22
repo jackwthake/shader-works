@@ -8,22 +8,6 @@
 
 #include "../include/cpu-render/maths.h"
 
-// Default vertex shader that just returns the original vertex position
-static inline float3 default_vertex_shader_func(vertex_context_t context, void *args, usize argc) {
-  return context.original_vertex;
-}
-
-// Default fragment shader that just returns the input color
-static inline u32 default_shader_func(u32 input_color, fragment_context_t context, void *args, usize argc) {
-  return input_color;
-}
-
-// Built-in default vertex shader that just returns the original vertex position
-vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .argv = NULL, .argc = 0, .valid = true };
-
-// Built-in default shader that just returns the input color
-fragment_shader_t default_frag_shader = { .func = default_shader_func, .argv = NULL, .argc = 0, .valid = true };
-
 // Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
 u32 rgb_to_u32(u8 r, u8 g, u8 b) {
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
@@ -310,7 +294,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
     
     // Check if triangle is facing toward camera
     float dot_product = float3_dot(triangle_normal, view_direction);
-    if (dot_product <= 0) continue; // Triangle is facing away from camera
+    if (dot_product <= EPSILON) continue; // Triangle is facing away from camera
     
     // Use pre-computed projection constants
     float pixels_per_world_unit_a = state->projection_scale / view_a.z;
@@ -378,8 +362,6 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
                 output_color = rgb_to_u32(0, 0, 0); // Black for wireframe edges
                 state->framebuffer[pixel_idx] = output_color; // Draw the pixel
                 state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
-              } else {
-                continue; // Skip pixel if not near an edge
               }
 
               continue;
@@ -453,23 +435,4 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   }
 
   return tris_rendered;
-}
-
-// Helper functions to create shaders
-fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {
-  return (fragment_shader_t) {
-    .func = func,
-    .argv = argv,
-    .argc = argc,
-    .valid = true
-  };
-}
-
-vertex_shader_t make_vertex_shader(vertex_shader_func func, void *argv, usize argc) {
-  return (vertex_shader_t) {
-    .func = func,
-    .argv = argv,
-    .argc = argc,
-    .valid = true
-  };
 }

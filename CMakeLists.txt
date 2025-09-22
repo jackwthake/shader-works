@@ -16,6 +16,7 @@ add_library(cpu_render_lib STATIC
     src/renderer.c
     src/maths.c
     src/primitives.c
+    src/shaders.c
 )
 
 # Set include directories for the library
