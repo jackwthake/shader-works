@@ -123,19 +123,19 @@ static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_
   context->original_uv = model->use_textures ? v0->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
   context->triangle_index = tri;
-  *out_a = shader->func(*context, shader->argv, shader->argc);
+  *out_a = shader->func(context, shader->argv, shader->argc);
 
   context->vertex_index = 1;
   context->original_vertex = v1->position;
   context->original_uv = model->use_textures ? v1->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
-  *out_b = shader->func(*context, shader->argv, shader->argc);
+  *out_b = shader->func(context, shader->argv, shader->argc);
 
   context->vertex_index = 2;
   context->original_vertex = v2->position;
   context->original_uv = model->use_textures ? v2->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
-  *out_c = shader->func(*context, shader->argv, shader->argc);
+  *out_c = shader->func(context, shader->argv, shader->argc);
 }
 
 // Basic frustum culling: returns true if triangle is completely outside the frustum
@@ -358,22 +358,25 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
         if (point_in_triangle(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y), p, &weights)) {
           // Interpolate depth using barycentric coordinates (with safe Z values)
           float new_depth = -1.0f / (weights.x / safe_a_z + weights.y / safe_b_z + weights.z / safe_c_z);
-          
+
           // Z-buffering: check if this pixel is closer than what's already drawn at this position
           int pixel_idx = pixel_base + x; // Use precomputed row offset
           if (new_depth < state->depthbuffer[pixel_idx]) {
             uint32_t output_color;
 
             if (state->wireframe_mode) {
+              // Always update depth buffer for entire triangle to block back faces
+              state->depthbuffer[pixel_idx] = new_depth;
+
+              // Only draw visible pixels at triangle edges
               if (weights.x < 0.02f || weights.y < 0.02f || weights.z < 0.02f) {
                 output_color = rgb_to_u32(0, 0, 0); // Black for wireframe edges
-                state->framebuffer[pixel_idx] = output_color; // Draw the pixel
-                state->depthbuffer[pixel_idx] = new_depth; // Update depth buffer
+                state->framebuffer[pixel_idx] = output_color; // Draw the edge pixel
               }
-
               continue;
             }
-            
+
+            // Normal shaded rendering path
             if (model->use_textures && state->texture_atlas != NULL) {
               // Interpolate perspective-corrected UVs
               float interpolated_u_prime = weights.x * uv_a_prime.x + weights.y * uv_b_prime.x + weights.z * uv_c_prime.x;
@@ -421,9 +424,9 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
             frag_ctx.depth = new_depth;
             frag_ctx.view_dir = float3_normalize(float3_sub(cam->position, frag_ctx.world_pos));
 
-            if((output_color = frag_shader->func(output_color, frag_ctx, frag_shader->argv, frag_shader->argc)) 
+            if((output_color = frag_shader->func(output_color, &frag_ctx, frag_shader->argv, frag_shader->argc))
                                             == rgb_to_u32(255, 0, 255)) {
-              continue; // Discard pixel if shader returns transparent color
+              continue; // Discard pixel if shader returns transparent color (don't update depth)
             }
 
             state->framebuffer[pixel_idx] = output_color; // Draw the pixel

@@ -34,6 +34,17 @@ static void system_poll_events(game_state_t* state) {
     if (event.type == SDL_EVENT_QUIT) {
       state->running = false;
     }
+
+    if (event.type == SDL_EVENT_KEY_DOWN) {
+      if (event.key.key == SDLK_ESCAPE) {
+        state->running = false;
+      }
+
+      if (event.key.key == SDLK_W) {
+        state->renderer_state.wireframe_mode = !state->renderer_state.wireframe_mode;
+        printf("Wireframe mode: %s\n", state->renderer_state.wireframe_mode ? "ON" : "OFF");
+      }
+    }
   }
 }
 
@@ -96,10 +107,10 @@ static usize render_frame(game_state_t* state, transform_t* camera, model_t* cub
   }
 
   usize rendered = 0;
-  rendered += render_model(&state->renderer_state, camera, plane_model, lights, light_count);
+  rendered += render_model(&state->renderer_state, camera, billboard_model, NULL, 0);
   rendered += render_model(&state->renderer_state, camera, cube_model, lights, light_count);
   rendered += render_model(&state->renderer_state, camera, sphere_model, lights, light_count);
-  rendered += render_model(&state->renderer_state, camera, billboard_model, NULL, 0);
+  rendered += render_model(&state->renderer_state, camera, plane_model, lights, light_count);
 
   apply_fog_to_screen(&state->renderer_state, FOG_START, FOG_END, FOG_R, FOG_G, FOG_B);
 

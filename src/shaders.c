@@ -4,21 +4,19 @@
 #include <math.h>
 
 // Default vertex shader that just returns the original vertex position
-static inline float3 default_vertex_shader_func(vertex_context_t context, void *args, usize argc) {
-  return context.original_vertex;
+static inline float3 default_vertex_shader_func(vertex_context_t *context, void *args, usize argc) {
+  return context->original_vertex;
 }
 
 // Default fragment shader that just returns the input color
-static inline u32 default_frag_shader_func(u32 input_color, fragment_context_t context, void *args, usize argc) {
+static inline u32 default_frag_shader_func(u32 input_color, fragment_context_t *context, void *args, usize argc) {
   return input_color;
 }
 
 // Default lighting fragment shader that applies simple directional lighting
-static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_context_t context, void *args, usize argc) {
+static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_context_t *context, void *args, usize argc) {
   if (input_color == 0x00000000)
     return 0x00000000;
-
-  float brightness;
 
   // Extract surface color components
   u8 surface_r, surface_g, surface_b;
@@ -26,7 +24,7 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
 
   float final_r, final_g, final_b;
 
-  if (context.light_count == 0) {
+  if (context->light_count == 0) {
     // No lights, use full surface color
     final_r = surface_r;
     final_g = surface_g;
@@ -37,19 +35,19 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
     final_g = surface_g * 0.1f;
     final_b = surface_b * 0.1f;
 
-    for (int i = 0; i < context.light_count; i++) {
+    for (int i = 0; i < context->light_count; i++) {
       float light_contribution;
-      if (context.light[i].is_directional) {
+      if (context->light[i].is_directional) {
         // Directional light
-        light_contribution = float3_dot(float3_normalize(context.light[i].direction), float3_normalize(context.normal));
+        light_contribution = float3_dot(float3_normalize(context->light[i].direction), float3_normalize(context->normal));
       } else {
         // Point light - calculate direction from light to fragment
-        float3 light_dir = float3_sub(context.world_pos, context.light[i].position);
+        float3 light_dir = float3_sub(context->world_pos, context->light[i].position);
         float distance = float3_magnitude(light_dir);
         light_dir = float3_divide(light_dir, distance); // normalize manually to reuse distance
 
         // Calculate lighting contribution
-        light_contribution = float3_dot(light_dir, float3_normalize(context.normal));
+        light_contribution = float3_dot(light_dir, float3_normalize(context->normal));
 
         // Add distance falloff (gentler falloff)
         light_contribution = light_contribution / (1.0f + distance * 0.1f);
@@ -59,7 +57,7 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
 
       // Extract light color components
       u8 light_r, light_g, light_b;
-      u32_to_rgb(context.light[i].color, &light_r, &light_g, &light_b);
+      u32_to_rgb(context->light[i].color, &light_r, &light_g, &light_b);
 
       // Add colored light contribution
       final_r += surface_r * (light_r / 255.0f) * light_contribution;

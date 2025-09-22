@@ -13,17 +13,17 @@
 typedef struct {
   u32 *framebuffer;
   f32 *depthbuffer;
+  u32 *texture_atlas; // pointer to texture atlas data (static data)
+
+  f32 time;             // Time since renderer initialization
+  u64 start_time;       // Start time in milliseconds
+  f32 max_depth;
+
+  u32 wireframe_mode; // If true, render in wireframe mode, packed as u32 for alignment
 
   float3 cam_right, cam_up, cam_forward;
   float2 screen_dim, atlas_dim;
   f32 screen_height_world, projection_scale, frustum_bound;
-  f32 max_depth;
-  f32 time;             // Time since renderer initialization
-  u64 start_time;       // Start time in milliseconds
-
-  bool wireframe_mode; // If true, render in wireframe mode
-
-  u32 *texture_atlas; // pointer to texture atlas data (static data)
 } renderer_t;
 
 // User-defined color conversion functions (must be implemented by client)

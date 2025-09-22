@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   framebuffer_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WIN_WIDTH, WIN_HEIGHT);
   SDL_SetTextureScaleMode(framebuffer_tex, SDL_SCALEMODE_NEAREST);
 
-  // Initialize CPU renderer
+  // Initialize shader-works renderer
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, MAX_DEPTH);
 
   // Initialize game objects

@@ -51,8 +51,8 @@ typedef struct {
 } vertex_context_t;
 
 // Shader function pointers
-typedef u32 (*fragment_shader_func)(u32 input_color, fragment_context_t context, void *args, usize argc);
-typedef float3 (*vertex_shader_func)(vertex_context_t context, void *args, usize argc);
+typedef u32 (*fragment_shader_func)(u32 input_color, fragment_context_t *context, void *args, usize argc);
+typedef float3 (*vertex_shader_func)(vertex_context_t *context, void *args, usize argc);
 
 // Shader structures
 typedef struct {
