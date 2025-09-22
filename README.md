@@ -18,12 +18,42 @@ A **pure software 3D rasterizer** written in C11 that implements a complete grap
 - **Cross-Platform**: SDL3 integration for broad compatibility
 
 ## Quick Start
+```c
+#include <cpu-render/renderer.h>
+#include <cpu-render/primitives.h>
 
-### Prerequisites
+int main() {
+  // Setup window and framebuffer...
 
-- C11-compatible compiler
-- CMake 3.10+
-- Git (for submodules)
+  uint32_t framebuffer[WIDTH * HEIGHT];
+  float depthbuffer[WIDTH * HEIGHT];
+  renderer_t renderer_state = {0};
+
+  init_renderer(&renderer_state, WIDTH, HEIGHT, 0, 0,
+                framebuffer, depthbuffer, MAX_DEPTH);
+
+  transform_t camera = {0};
+  update_camera(&renderer_state, &camera);
+
+  model_t cube = {0};
+  generate_cube(&cube, make_float3(0, 0, -5), make_float3(1, 1, 1));
+
+  while (running) {
+    // Clear buffers
+    for(int i = 0; i < WIDTH * HEIGHT; ++i) {
+      framebuffer[i] = 0x000000;
+      depthbuffer[i] = FLT_MAX;
+    }
+
+    render_model(&renderer_state, &camera, &cube, NULL, 0);
+
+    // Present framebuffer to screen...
+  }
+
+  delete_model(&cube);
+  return 0;
+}
+```
 
 ### Building
 
