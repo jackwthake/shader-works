@@ -35,3 +35,4 @@ target_link_libraries(cpu_render_lib PUBLIC m)
 
 # Add examples subdirectory
 add_subdirectory(examples/basic_demo)
+add_subdirectory(examples/full_test)

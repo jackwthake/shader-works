@@ -197,7 +197,6 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
   return rgb_to_u32(r, g, b);
 }
 
-
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   assert(state != NULL);
 
@@ -353,7 +352,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
     float2 uv_c_prime = float2_divide(uv_c, safe_c_z);
 
     // Precompute color for this triangle (use different colors for debugging)
-    uint32_t flat_color = rgb_to_u32(255, 0, 255); // Magenta for all triangles
+    uint32_t flat_color = rgb_to_u32(255, 10, 255); // Magenta for all triangles
 
     frag_ctx.normal = triangle_normal;
     

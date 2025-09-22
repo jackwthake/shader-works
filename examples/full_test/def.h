@@ -37,6 +37,14 @@ typedef struct {
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
 
   renderer_t renderer_state; // from cpu-render/renderer.h
+
+  // Performance counters
+  u32 frame_count;
+  u32 tick_count;
+  f64 last_fps_time;
+  f64 last_tps_time;
+  f64 current_fps;
+  f64 current_tps;
 } game_state_t;
 
 #endif /* __DEF_H__ */
