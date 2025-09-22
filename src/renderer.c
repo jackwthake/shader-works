@@ -132,6 +132,48 @@ static float3 transform_to_local_point(transform_t *t, float3 p) {
   return transform_vector(ihat, jhat, khat, p_rel);
 }
 
+// Apply the vertex shader to a triangle's vertices
+static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_context_t *context, usize tri, float3 *out_a, float3 *out_b, float3 *out_c) {
+  assert(model != NULL);
+  assert(shader != NULL && shader->valid);
+  assert(context != NULL);
+  assert(out_a != NULL && out_b != NULL && out_c != NULL);
+
+  context->vertex_index = 0; // reset for each triangle
+  context->original_vertex = model->vertices[tri * 3 + 0];
+  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0);
+  context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
+  context->triangle_index = tri;
+  *out_a = shader->func(*context, shader->argv, shader->argc);
+
+  context->vertex_index = 1; // update vertex info
+  context->original_vertex = model->vertices[tri * 3 + 1];
+  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0);
+  context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
+  *out_b = shader->func(*context, shader->argv, shader->argc);
+
+  context->vertex_index = 2; // update vertex info
+  context->original_vertex = model->vertices[tri * 3 + 2];
+  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0);
+  context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
+  *out_c = shader->func(*context, shader->argv, shader->argc);
+}
+
+// Basic frustum culling: returns true if triangle is completely outside the frustum
+static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_bound, f32 max_depth) {
+ // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
+  if (a.z > 0 && b.z > 0 && c.z > 0) return true;
+  if (fmax(a.z, fmax(b.z, c.z)) > max_depth) return true; // Cull if too far away
+
+  // Additional frustum culling - check if triangle is completely outside view frustum
+  bool outside_left   = (a.x < a.z * frustum_bound && b.x < b.z * frustum_bound && c.x < c.z * frustum_bound);
+  bool outside_right  = (a.x > -a.z * frustum_bound && b.x > -b.z * frustum_bound && c.x > -c.z * frustum_bound);
+  bool outside_top    = (a.y > -a.z * frustum_bound && b.y > -b.z * frustum_bound && c.y > -c.z * frustum_bound);
+  bool outside_bottom = (a.y < a.z * frustum_bound && b.y < b.z * frustum_bound && c.y < c.z * frustum_bound);
+
+  return outside_left || outside_right || outside_top || outside_bottom;
+}
+
 // Apply fog effect based on depth
 static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   f32 fog_factor = (depth - fog_start) / (fog_end - fog_start);
@@ -154,6 +196,7 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
   b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
   return rgb_to_u32(r, g, b);
 }
+
 
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   assert(state != NULL);
@@ -240,24 +283,8 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   // Loop through each triangle in the model
   for (int tri = 0; tri < model->num_vertices / 3; ++tri) {
     // Call vertex shader to get transformed vertices
-    vertex_ctx.vertex_index = 0; // reset for each triangle
-    vertex_ctx.original_vertex = model->vertices[tri * 3 + 0];
-    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0);
-    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
-    vertex_ctx.triangle_index = tri;
-    float3 transformed_a = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
-    
-    vertex_ctx.vertex_index = 1; // update vertex info
-    vertex_ctx.original_vertex = model->vertices[tri * 3 + 1];
-    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0);
-    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
-    float3 transformed_b = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
-
-    vertex_ctx.vertex_index = 2; // update vertex info
-    vertex_ctx.original_vertex = model->vertices[tri * 3 + 2];
-    vertex_ctx.original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0);
-    vertex_ctx.original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
-    float3 transformed_c = vertex_shader->func(vertex_ctx, vertex_shader->argv, vertex_shader->argc);
+    float3 transformed_a, transformed_b, transformed_c;
+    apply_vertex_shader(model, vertex_shader, &vertex_ctx, tri, &transformed_a, &transformed_b, &transformed_c);
 
     // Transform vertices from model space to world space, then to view space
     float3 world_a = transform_to_world(&model->transform, transformed_a);
@@ -267,19 +294,10 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
     float3 view_a = transform_to_local_point(cam, world_a);
     float3 view_b = transform_to_local_point(cam, world_b);
     float3 view_c = transform_to_local_point(cam, world_c);
-    
-    // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
-    if (view_a.z > 0 && view_b.z > 0 && view_c.z > 0) continue;
-    if (fmax(view_a.z, fmax(view_b.z, view_c.z)) > state->max_depth)continue; // Cull if too far away
-    
-    // Additional frustum culling - check if triangle is completely outside view frustum
-    bool outside_left   = (view_a.x < view_a.z * state->frustum_bound && view_b.x < view_b.z * state->frustum_bound && view_c.x < view_c.z * state->frustum_bound);
-    bool outside_right  = (view_a.x > -view_a.z * state->frustum_bound && view_b.x > -view_b.z * state->frustum_bound && view_c.x > -view_c.z * state->frustum_bound);
-    bool outside_top    = (view_a.y > -view_a.z * state->frustum_bound && view_b.y > -view_b.z * state->frustum_bound && view_c.y > -view_c.z * state->frustum_bound);
-    bool outside_bottom = (view_a.y < view_a.z * state->frustum_bound && view_b.y < view_b.z * state->frustum_bound && view_c.y < view_c.z * state->frustum_bound);
 
-    if (outside_left || outside_right || outside_top || outside_bottom) continue;
-    
+    if (frustum_cull_triangle(view_a, view_b, view_c, state->frustum_bound, state->max_depth))
+      continue; // Triangle is outside the view frustum
+
     // Use pre-computed face normal for back-face culling
     float3 model_normal = model->face_normals[tri];
     
