@@ -1,5 +1,5 @@
-#include <cpu-render/shaders.h>
-#include <cpu-render/renderer.h>
+#include <shader-works/shaders.h>
+#include <shader-works/renderer.h>
 
 #include <math.h>
 

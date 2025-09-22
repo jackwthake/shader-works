@@ -2,8 +2,8 @@
 #include <float.h>
 #include <math.h>
 
-#include <cpu-render/renderer.h>
-#include <cpu-render/maths.h>
+#include <shader-works/renderer.h>
+#include <shader-works/maths.h>
 
 #include "shaders.h"
 

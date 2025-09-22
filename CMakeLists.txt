@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(cpu_render)
+project(shader-works C)
 
 # Set the output directory for built objects.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/")
@@ -11,8 +11,8 @@ set(CMAKE_C_FLAGS_RelWithDebInfo "-O3 -march=native -g")
 # SDL is only needed for examples
 add_subdirectory(examples/lib/SDL EXCLUDE_FROM_ALL)
 
-# Create the cpu_render library
-add_library(cpu_render_lib STATIC
+# Create the shader-works library
+add_library(shader-works-lib STATIC
     src/renderer.c
     src/maths.c
     src/primitives.c
@@ -20,17 +20,17 @@ add_library(cpu_render_lib STATIC
 )
 
 # Set include directories for the library
-target_include_directories(cpu_render_lib PUBLIC
+target_include_directories(shader-works-lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(cpu_render_lib PRIVATE
+target_include_directories(shader-works-lib PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Core library only needs math library
-target_link_libraries(cpu_render_lib PUBLIC m)
+target_link_libraries(shader-works-lib PUBLIC m)
 
 # Add examples subdirectory
 add_subdirectory(examples/basic_demo)

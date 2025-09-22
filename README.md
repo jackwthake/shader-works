@@ -1,15 +1,16 @@
-<h1 align="center">Software Rasterizer</h1>
+<h1 align="center">Shader Works</h1>
 <p align="center">
   <br>
   <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
-  <img src="https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a" alt="" />
+  <img src="https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a" alt="Demo prohect in wireframe mode" />
 </p>
 
-A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
+A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on portability and performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
 
 ## Features
 
 - **Complete Software Pipeline**: Full 3D rendering implementation from vertex transformation to pixel output
+- **As Portable As It Gets**: Just bring your own frame buffer, depth buffer, and color conversion functions
 - **Function Pointer Shaders**: Extensible vertex and fragment shader system with rich context structures
 - **Barycentric Rasterization**: Triangle rasterization using barycentric coordinates with depth testing
 - **Transform-Based Camera**: Clean camera system using position + yaw/pitch rather than view matrices
@@ -20,8 +21,8 @@ A **pure software 3D rasterizer** written in C11 that implements a complete grap
 
 ## Quick Start
 ```c
-#include <cpu-render/renderer.h>
-#include <cpu-render/primitives.h>
+#include <shader-works/renderer.h>
+#include <shader-works/primitives.h>
 
 // Required: implement color conversion for your target pixel format
 uint32_t rgb_to_u32(uint8_t r, uint8_t g, uint8_t b) {
@@ -86,12 +87,6 @@ cmake --build . -j 8
 ./basic_demo
 ```
 
-### Build Configurations
-
-- **Release**: `cmake -DCMAKE_BUILD_TYPE=RELEASE ..` (optimized for performance)
-- **Debug**: `cmake -DCMAKE_BUILD_TYPE=DEBUG ..` (debugging symbols, no optimization)
-- **RelWithDebInfo**: `cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..` (uses `-O3 -march=native -g`)
-
 ## Architecture
 
 ### Core Components
@@ -101,7 +96,7 @@ cmake --build . -j 8
 - **Shader System**: Extensible vertex and fragment shader architecture
 
 ### Technical Details
-- **API**: Clean C11 interface with modular design (`cpu_render_lib`)
+- **API**: Clean C11 interface with modular design (`shader-works-lib`)
 - **Dependencies**: SDL3 for platform abstraction (included as submodule)
 - **Memory Model**: Client-provided framebuffer and depth buffer for flexibility
 - **Threading**: Single-threaded design optimized for cache efficiency

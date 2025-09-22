@@ -1,4 +1,4 @@
-#include "../include/cpu-render/primitives.h"
+#include <shader-works/primitives.h>
 
 #include <stdlib.h>
 #include <assert.h>

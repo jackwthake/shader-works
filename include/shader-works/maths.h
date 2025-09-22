@@ -1,5 +1,5 @@
-#ifndef CPU_RENDER_MATHS_H
-#define CPU_RENDER_MATHS_H
+#ifndef SHADER_WORKS_MATHS_H
+#define SHADER_WORKS_MATHS_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -51,4 +51,4 @@ f32 float2_dot(float2 a, float2 b);
 f32 float2_magnitude(float2 v);
 float2 float2_normalize(float2 v);
 
-#endif // CPU_RENDER_MATHS_H
+#endif // SHADER_WORKS_MATHS_H

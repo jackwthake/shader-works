@@ -3,11 +3,11 @@
 #include <float.h>
 #include <math.h>
 
-#include <cpu-render/renderer.h>
-#include <cpu-render/maths.h>
-#include <cpu-render/primitives.h>
+#include <shader-works/renderer.h>
+#include <shader-works/maths.h>
+#include <shader-works/primitives.h>
 
-// Color conversion functions using SDL (required by cpu-render)
+// Color conversion functions using SDL (required by shader-works)
 u32 rgb_to_u32(u8 r, u8 g, u8 b) {
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
   return SDL_MapRGBA(format, NULL, r, g, b, 255);
@@ -21,7 +21,7 @@ void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b) {
 #define WIN_WIDTH 400
 #define WIN_HEIGHT 250
 #define WIN_SCALE 4
-#define WIN_TITLE "Basic Demo"
+#define WIN_TITLE "Shader Works - Basic Demo"
 #define MAX_DEPTH 15
 
 int main(int argc, char *argv[]) {
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   SDL_Renderer *renderer;
   SDL_Texture* framebuffer_tex;
 
-  // Rendering buffers, used by cpu-render
+  // Rendering buffers, used by shader-works
   u32 framebuffer[WIN_WIDTH * WIN_HEIGHT];
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
 

@@ -1,10 +1,10 @@
-#ifndef CPU_RENDER_RENDERER_H
-#define CPU_RENDER_RENDERER_H
+#ifndef SHADER_WORKS_RENDERER_H
+#define SHADER_WORKS_RENDERER_H
 
 #include <stdbool.h>
-#include "maths.h"
-#include "shaders.h"
-#include "primitives.h"
+#include <shader-works/maths.h>
+#include <shader-works/shaders.h>
+#include <shader-works/primitives.h>
 
 // Rendering constants
 #define fov_over_2 (1.0472f / 2.0f) // 60 degrees in radians / 2
@@ -39,4 +39,4 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 // Built-in effects
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
 
-#endif // CPU_RENDER_RENDERER_H
+#endif // SHADER_WORKS_RENDERER_H

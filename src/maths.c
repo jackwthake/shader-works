@@ -1,4 +1,4 @@
-#include "../include/cpu-render/maths.h"
+#include <shader-works/maths.h>
 
 #include <math.h>
 
