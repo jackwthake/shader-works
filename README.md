@@ -97,7 +97,7 @@ cmake --build . -j 8
 
 ### Technical Details
 - **API**: Clean C11 interface with modular design (`shader-works-lib`)
-- **Dependencies**: SDL3 for platform abstraction (included as submodule)
+- **Dependencies**: SDL3 for demo projects (included as submodule)
 - **Memory Model**: Client-provided framebuffer and depth buffer for flexibility
 - **Threading**: Single-threaded design optimized for cache efficiency
 - **Precision**: 32-bit floating point throughout the pipeline
