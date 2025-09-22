@@ -1,6 +1,7 @@
 # Software Rasterizer
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d81ec894-9a02-4339-8f4b-fcfb6fc20eb3" alt="Demo project screen grab" />
+  
+  <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
 </p>
 
 A high-performance software 3D rendering engine written in C using SDL3. Implements a complete graphics pipeline entirely in software, featuring perspective projection, depth buffering, texture mapping, with programmable vertex and fragment shaders.
@@ -11,7 +12,7 @@ A high-performance software 3D rendering engine written in C using SDL3. Impleme
 - **Programmable Shaders**: Function pointer-based fragment shaders with custom parameters
 - **Texture Mapping**: UV-based texture sampling from embedded atlas
 - **Depth Buffering**: Z-buffer for proper 3D occlusion handling
-- **Fixed Timestep**: 20 TPS game loop with frame interpolation for smooth rendering
+- **Basic Diffuse Lighting**: Supports both point and directional lighting
 - **Cross-Platform**: Built with SDL3 for broad compatibility
 
 ## Quick Start
