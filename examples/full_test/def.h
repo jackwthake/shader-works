@@ -2,12 +2,12 @@
 #define __DEF_H__
 
 #include <SDL3/SDL.h>
-#include <cpu-render/renderer.h>
+#include <shader-works/renderer.h>
 
 #define WIN_WIDTH 400
 #define WIN_HEIGHT 250
 #define WIN_SCALE 4
-#define WIN_TITLE "CPU Renderer"
+#define WIN_TITLE "Shader Works - Full Test"
 
 #define ATLAS_WIDTH_PX 8
 #define ATLAS_HEIGHT_PX 8
@@ -32,11 +32,11 @@ typedef struct {
   SDL_Renderer *renderer;
   SDL_Texture* framebuffer_tex;
 
-  // Rendering buffers, used by cpu-render
+  // Rendering buffers, used by shader-works
   u32 framebuffer[WIN_WIDTH * WIN_HEIGHT];
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
 
-  renderer_t renderer_state; // from cpu-render/renderer.h
+  renderer_t renderer_state; // from shader-works/renderer.h
 
   // Performance counters
   u32 frame_count;

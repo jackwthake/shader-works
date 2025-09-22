@@ -1,7 +1,7 @@
 #ifndef FULL_TEST_SHADERS_H
 #define FULL_TEST_SHADERS_H
 
-#include <cpu-render/renderer.h>
+#include <shader-works/renderer.h>
 
 // Fragment Shader Functions
 u32 frag_cube_func(u32 input, fragment_context_t context, void *argv, usize argc);

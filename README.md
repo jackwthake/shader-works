@@ -1,4 +1,4 @@
-<h1 align="center">Software Rasterizer</h1>
+<h1 align="center">Shader Works</h1>
 <p align="center">
   <br>
   <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
@@ -21,8 +21,8 @@ A **pure software 3D rasterizer** written in C11 that implements a complete grap
 
 ## Quick Start
 ```c
-#include <cpu-render/renderer.h>
-#include <cpu-render/primitives.h>
+#include <shader-works/renderer.h>
+#include <shader-works/primitives.h>
 
 // Required: implement color conversion for your target pixel format
 uint32_t rgb_to_u32(uint8_t r, uint8_t g, uint8_t b) {
@@ -96,7 +96,7 @@ cmake --build . -j 8
 - **Shader System**: Extensible vertex and fragment shader architecture
 
 ### Technical Details
-- **API**: Clean C11 interface with modular design (`cpu_render_lib`)
+- **API**: Clean C11 interface with modular design (`shader-works-lib`)
 - **Dependencies**: SDL3 for platform abstraction (included as submodule)
 - **Memory Model**: Client-provided framebuffer and depth buffer for flexibility
 - **Threading**: Single-threaded design optimized for cache efficiency

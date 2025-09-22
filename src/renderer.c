@@ -1,4 +1,4 @@
-#include "../include/cpu-render/renderer.h"
+#include <shader-works/renderer.h>
 
 #include <math.h>
 #include <assert.h>
@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "../include/cpu-render/maths.h"
+#include <shader-works/maths.h>
 
 // Calculates the signed area of a triangle defined by three points.
 static inline f32 signed_triangle_area(const float2 a, const float2 b, const float2 c) {

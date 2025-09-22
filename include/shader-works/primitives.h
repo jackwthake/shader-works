@@ -1,8 +1,8 @@
-#ifndef CPU_RENDER_PRIMITIVES_H
-#define CPU_RENDER_PRIMITIVES_H
+#ifndef SHADER_WORKS_PRIMITIVES_H
+#define SHADER_WORKS_PRIMITIVES_H
 
-#include "maths.h"
-#include "shaders.h"
+#include <shader-works/maths.h>
+#include <shader-works/shaders.h>
 
 // Transform structure
 typedef struct {
@@ -44,4 +44,4 @@ int generate_billboard(model_t* model, float2 size, float3 position);
 // Model cleanup
 void delete_model(model_t* model);
 
-#endif // CPU_RENDER_PRIMITIVES_H
+#endif // SHADER_WORKS_PRIMITIVES_H

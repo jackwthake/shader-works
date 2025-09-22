@@ -1,8 +1,8 @@
-#ifndef CPU_RENDER_SHADERS_H
-#define CPU_RENDER_SHADERS_H
+#ifndef SHADER_WORKS_SHADERS_H
+#define SHADER_WORKS_SHADERS_H
 
 #include <stdbool.h>
-#include "maths.h"
+#include <shader-works/maths.h>
 
 typedef struct {
   float3 position, direction;
@@ -78,4 +78,4 @@ extern vertex_shader_t default_vertex_shader;
 extern fragment_shader_t default_frag_shader;
 extern fragment_shader_t default_lighting_frag_shader;
 
-#endif // CPU_RENDER_SHADERS_H
+#endif // SHADER_WORKS_SHADERS_H
