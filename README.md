@@ -1,7 +1,8 @@
-# Software Rasterizer
+<h1 align="center">Software Rasterizer</h1>
 <p align="center">
-  
+  <br>
   <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
+  <img src="https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a" alt="" />
 </p>
 
 A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
