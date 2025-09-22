@@ -16,7 +16,7 @@ A **pure software 3D rasterizer** written in C11 that implements a complete grap
 - **Texture Atlas Support**: UV-based sampling from embedded texture atlas
 - **Pixel Discard Transparency**: Fragment shaders can return `0x000000` to discard pixels for transparency effects
 - **Built-in Primitives**: Geometry generators for cubes, spheres, and other common shapes
-- **Cross-Platform**: SDL3 integration for broad compatibility
+- **Diffuse Lighting**: Supports multiple directional and point lights per scene
 
 ## Quick Start
 ```c
