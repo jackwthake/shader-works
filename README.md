@@ -70,8 +70,8 @@ int main() {
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/jackwthake/Software-Rasterizer.git
-cd Software-Rasterizer
+git clone --recursive https://github.com/jackwthake/shader-works
+cd shader-works
 
 # Or if already cloned, initialize submodules
 git submodule update --init --recursive
