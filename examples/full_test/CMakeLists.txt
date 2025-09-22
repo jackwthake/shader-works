@@ -1,5 +1,5 @@
-# Basic demo application
-add_executable(full_test main.c)
+# Full test application
+add_executable(full_test main.c shaders.c)
 
 # Link to the cpu_render library
 target_link_libraries(full_test PRIVATE cpu_render_lib)
