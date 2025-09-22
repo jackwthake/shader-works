@@ -4,33 +4,53 @@
   <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
 </p>
 
-A high-performance software 3D rendering engine written in C using SDL3. Implements a complete graphics pipeline entirely in software, featuring perspective projection, depth buffering, texture mapping, with programmable vertex and fragment shaders.
+A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
 
 ## Features
 
-- **Pure Software Rendering**: Complete 3D pipeline without GPU dependency
-- **Programmable Shaders**: Function pointer-based fragment shaders with custom parameters
-- **Texture Mapping**: UV-based texture sampling from embedded atlas
-- **Depth Buffering**: Z-buffer for proper 3D occlusion handling
-- **Basic Diffuse Lighting**: Supports both point and directional lighting
-- **Cross-Platform**: Built with SDL3 for broad compatibility
+- **Complete Software Pipeline**: Full 3D rendering implementation from vertex transformation to pixel output
+- **Function Pointer Shaders**: Extensible vertex and fragment shader system with rich context structures
+- **Barycentric Rasterization**: Triangle rasterization using barycentric coordinates with depth testing
+- **Transform-Based Camera**: Clean camera system using position + yaw/pitch rather than view matrices
+- **Texture Atlas Support**: UV-based sampling from embedded texture atlas
+- **Pixel Discard Transparency**: Fragment shaders can return `0x000000` to discard pixels for transparency effects
+- **Built-in Primitives**: Geometry generators for cubes, spheres, and other common shapes
+- **Cross-Platform**: SDL3 integration for broad compatibility
 
 ## Quick Start
 
+### Prerequisites
+
+- C11-compatible compiler
+- CMake 3.10+
+- Git (for submodules)
+
 ### Building
+
 ```bash
 # Clone with submodules
 git clone --recursive https://github.com/jackwthake/Software-Rasterizer.git
 cd Software-Rasterizer
 
-# Builds
+# Or if already cloned, initialize submodules
+git submodule update --init --recursive
+
+# Configure build (Release recommended for performance)
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RELEASE ..
+
+# Build
 cmake --build . -j 8
 
 # Run demo
 ./basic_demo
 ```
+
+### Build Configurations
+
+- **Release**: `cmake -DCMAKE_BUILD_TYPE=RELEASE ..` (optimized for performance)
+- **Debug**: `cmake -DCMAKE_BUILD_TYPE=DEBUG ..` (debugging symbols, no optimization)
+- **RelWithDebInfo**: `cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..` (uses `-O3 -march=native -g`)
 
 ## Architecture
 
