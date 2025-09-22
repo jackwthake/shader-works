@@ -11,16 +11,21 @@ typedef struct {
   float3 position;
 } transform_t;
 
-// Model structure
-// TODO: struct of arrays better than array of structs for cache efficiency
+// Cache-friendly vertex data - groups related data together
 typedef struct {
-  float3 *vertices;        // List of vertices
-  float2 *uvs;             // pointer to texture coordinates
-  float3 *face_normals;    // Normals for each triangle face
+  float3 position;
+  float2 uv;
+  float3 normal;  // Per-vertex normal (if needed)
+} vertex_data_t;
+
+// Model structure with cache-friendly vertex layout
+typedef struct {
+  // Cache-friendly: all vertex data together
+  vertex_data_t *vertex_data;  // Array of cache-friendly vertex structures
+  float3 *face_normals;        // Face normals (one per triangle)
 
   usize num_vertices;
-  usize num_uvs;
-  usize num_faces;         // Number of triangle faces (num_vertices/3)
+  usize num_faces;             // Number of triangle faces (num_vertices/3)
 
   float3 scale;
   transform_t transform;

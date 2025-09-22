@@ -2,7 +2,6 @@
 #define CPU_RENDER_RENDERER_H
 
 #include <stdbool.h>
-#include <SDL3/SDL.h>
 #include "maths.h"
 #include "shaders.h"
 #include "primitives.h"
@@ -19,15 +18,18 @@ typedef struct {
   float2 screen_dim, atlas_dim;
   f32 screen_height_world, projection_scale, frustum_bound;
   f32 max_depth;
+  f32 time;             // Time since renderer initialization
+  u64 start_time;       // Start time in milliseconds
 
   bool wireframe_mode; // If true, render in wireframe mode
 
   u32 *texture_atlas; // pointer to texture atlas data (static data)
 } renderer_t;
 
-// Utility functions for color conversion
-u32 rgb_to_u32(u8 r, u8 g, u8 b);
-void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
+// User-defined color conversion functions (must be implemented by client)
+// These allow the renderer to be pixel-format agnostic
+extern u32 rgb_to_u32(u8 r, u8 g, u8 b);
+extern void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
 
 // Core renderer functions
 void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth);

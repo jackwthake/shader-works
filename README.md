@@ -23,6 +23,15 @@ A **pure software 3D rasterizer** written in C11 that implements a complete grap
 #include <cpu-render/renderer.h>
 #include <cpu-render/primitives.h>
 
+// Required: implement color conversion for your target pixel format
+uint32_t rgb_to_u32(uint8_t r, uint8_t g, uint8_t b) {
+  return (r << 24) | (g << 16) | (b << 8) | 0xFF; // RGBA8888 example
+}
+
+void u32_to_rgb(uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
+  *r = (color >> 24) & 0xFF; *g = (color >> 16) & 0xFF; *b = (color >> 8) & 0xFF;
+}
+
 int main() {
   // Setup window and framebuffer...
 

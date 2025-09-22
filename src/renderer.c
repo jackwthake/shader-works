@@ -4,42 +4,16 @@
 #include <assert.h>
 #include <float.h> // For FLT_MAX
 #include <stdlib.h>
-#include <SDL3/SDL.h>
+#include <time.h>
 
 #include "../include/cpu-render/maths.h"
 
-// Converts RGB components (0-255) to packed 32-bit RGBA8888 format, portablely using SDL
-u32 rgb_to_u32(u8 r, u8 g, u8 b) {
-  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
-  return SDL_MapRGBA(format, NULL, r, g, b, 255);
-}
-
-// Converts packed 32-bit RGBA8888 format to RGB components (0-255), portablely using SDL
-void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b) {
-  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
-  SDL_GetRGB(color, format, NULL, r, g, b);
-}
-
-/**
-* Calculates the signed area of a triangle defined by three points.
-* The sign indicates the orientation of the triangle (positive for counter-clockwise, negative for clockwise).
-* @param a The first vertex of the triangle.
-* @param b The second vertex of the triangle.
-* @param c The third vertex of the triangle.
-* @return The signed area of the triangle.
-*/
+// Calculates the signed area of a triangle defined by three points.
 static inline f32 signed_triangle_area(const float2 a, const float2 b, const float2 c) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
-/**
-* Helper function to check if a point is inside a triangle using barycentric coordinates.
-* @param a The first vertex of the triangle.
-* @param b The second vertex of the triangle.
-* @param c The third vertex of the triangle.
-* @param p The point to check.
-* @return True if the point is inside the triangle, false otherwise.
-*/
+// Helper function to check if a point is inside a triangle using barycentric coordinates.
 static bool point_in_triangle(const float2 a, const float2 b, const float2 c, const float2 p, float3 *weights) {
   float area_abp = signed_triangle_area(a, b, p);
   float area_bcp = signed_triangle_area(b, c, p);
@@ -139,22 +113,27 @@ static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_
   assert(context != NULL);
   assert(out_a != NULL && out_b != NULL && out_c != NULL);
 
-  context->vertex_index = 0; // reset for each triangle
-  context->original_vertex = model->vertices[tri * 3 + 0];
-  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 0] : make_float2(0, 0);
+  // Cache-friendly: single memory fetch per vertex gets all data
+  vertex_data_t *v0 = &model->vertex_data[tri * 3 + 0];
+  vertex_data_t *v1 = &model->vertex_data[tri * 3 + 1];
+  vertex_data_t *v2 = &model->vertex_data[tri * 3 + 2];
+
+  context->vertex_index = 0;
+  context->original_vertex = v0->position;
+  context->original_uv = model->use_textures ? v0->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
   context->triangle_index = tri;
   *out_a = shader->func(*context, shader->argv, shader->argc);
 
-  context->vertex_index = 1; // update vertex info
-  context->original_vertex = model->vertices[tri * 3 + 1];
-  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 1] : make_float2(0, 0);
+  context->vertex_index = 1;
+  context->original_vertex = v1->position;
+  context->original_uv = model->use_textures ? v1->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
   *out_b = shader->func(*context, shader->argv, shader->argc);
 
-  context->vertex_index = 2; // update vertex info
-  context->original_vertex = model->vertices[tri * 3 + 2];
-  context->original_uv = model->use_textures ? model->uvs[tri * 3 + 2] : make_float2(0, 0);
+  context->vertex_index = 2;
+  context->original_vertex = v2->position;
+  context->original_uv = model->use_textures ? v2->uv : make_float2(0, 0);
   context->original_normal = model->use_textures ? &model->face_normals[tri] : NULL;
   *out_c = shader->func(*context, shader->argv, shader->argc);
 }
@@ -188,7 +167,7 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
   }
 
   uint8_t r, g, b;
-  SDL_GetRGB(color, SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888), NULL, &r, &g, &b);
+  u32_to_rgb(color, &r, &g, &b);
 
   // Interpolate between original color and fog color
   r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
@@ -223,6 +202,13 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
   state->screen_height_world = tanf(fov_over_2) * 2;
   state->projection_scale = (float)width / state->screen_height_world;
   state->max_depth = max_depth;
+
+  state->time = 0;
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  state->start_time = ts.tv_sec * 1000 + ts.tv_nsec / 1000000; // milliseconds
+  state->wireframe_mode = false;
+  state->texture_atlas = NULL;
   
   state->cam_right = make_float3(0, 0, 0);
   state->cam_up = make_float3(0, 0, 0);
@@ -245,7 +231,7 @@ void update_camera(renderer_t *state, transform_t *cam) {
 usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count) {
   assert(cam != NULL);
   assert(model != NULL);
-  assert(model->vertices != NULL);
+  assert(model->vertex_data != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
   assert(model->frag_shader != NULL);
 
@@ -257,10 +243,14 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   
   if (model->use_textures) {
     assert(state->texture_atlas != NULL);
-    assert(model->num_uvs == model->num_vertices); // Ensure we have UVs
+    assert(model->vertex_data != NULL); // Ensure we have vertex data with UVs
   }
 
   usize tris_rendered = 0;
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  u64 current_time = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+  state->time = (current_time - state->start_time) / 1000.0f;
 
   // Apply vertex shader to each vertex in model space
   vertex_context_t vertex_ctx = {
@@ -271,11 +261,11 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
     .projection_scale = state->projection_scale,
     .frustum_bound = state->frustum_bound,
     .screen_dim = state->screen_dim,
-    .time = SDL_GetTicks() / 1000.0f,
+    .time = state->time,
   };
 
   fragment_context_t frag_ctx = {0};
-  frag_ctx.time = SDL_GetTicks() / 1000.0f;
+  frag_ctx.time = state->time;
   frag_ctx.light = lights;
   frag_ctx.light_count = light_count;
 
@@ -337,10 +327,10 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
     float min_y = fmaxf(0.0f, floorf(fminf(a.y, fminf(b.y, c.y))));
     float max_y = fminf(state->screen_dim.y - 1, ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
 
-    // Get the UV coordinates for the current triangle's vertices
-    float2 uv_a = model->uvs[tri * 3 + 0];
-    float2 uv_b = model->uvs[tri * 3 + 1];
-    float2 uv_c = model->uvs[tri * 3 + 2];
+    // Get the UV coordinates for the current triangle's vertices (cache-friendly access)
+    float2 uv_a = model->vertex_data[tri * 3 + 0].uv;
+    float2 uv_b = model->vertex_data[tri * 3 + 1].uv;
+    float2 uv_c = model->vertex_data[tri * 3 + 2].uv;
 
     // Perspective-correct UVs: Pre-divide UVs by their respective 1/w (with epsilon to prevent divide by zero)
     float safe_a_z = (fabsf(a.z) < EPSILON) ? (a.z < 0 ? -EPSILON : EPSILON) : a.z;
@@ -418,12 +408,8 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
             // Screen position
             frag_ctx.screen_pos = make_float2((float)x, (float)y);
 
-            // UV coordinates (interpolated if available)
-            if (model->use_textures && model->uvs != NULL) {
-              float2 uv_a = model->uvs[tri * 3 + 0];
-              float2 uv_b = model->uvs[tri * 3 + 1];
-              float2 uv_c = model->uvs[tri * 3 + 2];
-
+            // UV coordinates (interpolated if available) - reuse already fetched UVs
+            if (model->use_textures && model->vertex_data != NULL) {
               frag_ctx.uv = make_float2(
                 weights.x * uv_a.x + weights.y * uv_b.x + weights.z * uv_c.x,
                 weights.x * uv_a.y + weights.y * uv_b.y + weights.z * uv_c.y

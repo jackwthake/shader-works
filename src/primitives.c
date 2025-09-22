@@ -5,8 +5,6 @@
 #include <math.h>
 #include <stdbool.h>
 
-#define PI 3.14159265f
-
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position) {
   if (!model || segment_size.x <= 0 || segment_size.y <= 0) return -1;
 
@@ -22,12 +20,10 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
   usize total_triangle_vertices = num_quads * 6;
   usize total_triangles = num_quads * 2; // Each quad has 2 triangles
 
-  model->vertices = malloc(total_triangle_vertices * sizeof(float3));
-  model->uvs = malloc(total_triangle_vertices * sizeof(float2));
+  model->vertex_data = malloc(total_triangle_vertices * sizeof(vertex_data_t));
   model->face_normals = malloc(total_triangles * sizeof(float3));
-  if (!model->vertices || !model->uvs || !model->face_normals) {
-    free(model->vertices);
-    free(model->uvs);
+  if (!model->vertex_data || !model->face_normals) {
+    free(model->vertex_data);
     free(model->face_normals);
     return -1;
   }
@@ -36,8 +32,8 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
   float3 *grid_verts = malloc(grid_vertices * sizeof(float3));
   float2 *grid_uvs = malloc(grid_vertices * sizeof(float2));
   if (!grid_verts || !grid_uvs) {
-    free(model->vertices);
-    free(model->uvs);
+    free(model->vertex_data);
+    free(model->face_normals);
     free(grid_verts);
     free(grid_uvs);
     return -1;
@@ -66,35 +62,28 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
       usize br = (z + 1) * w + (x + 1); // bottom-right
 
       // First triangle: TL -> BL -> TR (CCW)
-      model->vertices[vertex_idx] = grid_verts[tl];
-      model->uvs[vertex_idx] = grid_uvs[tl];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[tl], grid_uvs[tl], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
 
-      model->vertices[vertex_idx] = grid_verts[bl];
-      model->uvs[vertex_idx] = grid_uvs[bl];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[bl], grid_uvs[bl], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
 
-      model->vertices[vertex_idx] = grid_verts[tr];
-      model->uvs[vertex_idx] = grid_uvs[tr];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[tr], grid_uvs[tr], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
 
       // Second triangle: TR -> BL -> BR (CCW)
-      model->vertices[vertex_idx] = grid_verts[tr];
-      model->uvs[vertex_idx] = grid_uvs[tr];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[tr], grid_uvs[tr], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
 
-      model->vertices[vertex_idx] = grid_verts[bl];
-      model->uvs[vertex_idx] = grid_uvs[bl];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[bl], grid_uvs[bl], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
 
-      model->vertices[vertex_idx] = grid_verts[br];
-      model->uvs[vertex_idx] = grid_uvs[br];
+      model->vertex_data[vertex_idx] = (vertex_data_t){grid_verts[br], grid_uvs[br], {0.0f, -1.0f, 0.0f}};
       vertex_idx++;
     }
   }
 
   model->num_vertices = total_triangle_vertices;
-  model->num_uvs = total_triangle_vertices;
   model->num_faces = total_triangles;
   model->scale = (float3){1.0f, 1.0f, 1.0f};
 
@@ -115,14 +104,12 @@ int generate_cube(model_t* model, float3 position, float3 size) {
 
   const int CUBE_VERTS = 36;  // 6 faces * 2 triangles * 3 vertices
 
-  // Allocate memory for vertices, UVs, and face normals
-  model->vertices = malloc(CUBE_VERTS * sizeof(float3));
-  model->uvs = malloc(CUBE_VERTS * sizeof(float2));
+  // Allocate cache-friendly vertex data and face normals
+  model->vertex_data = malloc(CUBE_VERTS * sizeof(vertex_data_t));
   model->face_normals = malloc((CUBE_VERTS / 3) * sizeof(float3));
 
-  if (!model->vertices || !model->uvs || !model->face_normals) {
-    free(model->vertices);
-    free(model->uvs);
+  if (!model->vertex_data || !model->face_normals) {
+    free(model->vertex_data);
     free(model->face_normals);
     return -1;
   }
@@ -130,68 +117,56 @@ int generate_cube(model_t* model, float3 position, float3 size) {
   // Half extents for more intuitive vertex positioning
   float3 half = {size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
 
-  // Generate vertices for each face - maintain counter-clockwise winding order
+  // Generate cache-friendly vertex data for each face
   int v = 0;  // vertex index
 
   // Front face (-Z, closest to camera)
-  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
 
   // Back face (+Z, furthest from camera)
-  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
 
   // Left face (+X)
-  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
 
   // Right face (-X)
-  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
 
   // Top face (+Y)
-  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y, -half.z};
-  model->vertices[v++] = (float3){ half.x,  half.y,  half.z};
-  model->vertices[v++] = (float3){-half.x,  half.y,  half.z};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
 
   // Bottom face (-Y)
-  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y,  half.z};
-  model->vertices[v++] = (float3){ half.x, -half.y, -half.z};
-  model->vertices[v++] = (float3){-half.x, -half.y, -half.z};
-
-  // Generate UVs for each vertex
-  for (int i = 0; i < CUBE_VERTS; i += 6) {
-    // First triangle
-    model->uvs[i + 0] = (float2){0.0f, 0.0f};
-    model->uvs[i + 1] = (float2){1.0f, 0.0f};
-    model->uvs[i + 2] = (float2){1.0f, 1.0f};
-    // Second triangle
-    model->uvs[i + 3] = (float2){0.0f, 0.0f};
-    model->uvs[i + 4] = (float2){1.0f, 1.0f};
-    model->uvs[i + 5] = (float2){0.0f, 1.0f};
-  }
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
 
   // Generate face normals - one normal per triangle
   for (int i = 0; i < CUBE_VERTS / 3; i++) {
@@ -209,7 +184,6 @@ int generate_cube(model_t* model, float3 position, float3 size) {
 
   // Set up model parameters
   model->num_vertices = CUBE_VERTS;
-  model->num_uvs = CUBE_VERTS;
   model->num_faces = CUBE_VERTS / 3;
   model->scale = size;  // Store original size in scale
 
@@ -230,14 +204,12 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   int num_vertices = (rings + 1) * (segments + 1);
   int num_triangles = 2 * rings * segments;
 
-  // Allocate memory for vertices, UVs, and face normals
-  model->vertices = (float3*)malloc(num_triangles * 3 * sizeof(float3)); // 3 vertices per triangle
-  model->uvs = (float2*)malloc(num_triangles * 3 * sizeof(float2));      // 3 UVs per triangle
+  // Allocate cache-friendly vertex data and face normals
+  model->vertex_data = (vertex_data_t*)malloc(num_triangles * 3 * sizeof(vertex_data_t)); // 3 vertices per triangle
   model->face_normals = (float3*)malloc(num_triangles * sizeof(float3)); // 1 normal per triangle
 
-  if (!model->vertices || !model->uvs || !model->face_normals) {
-    if (model->vertices) free(model->vertices);
-    if (model->uvs) free(model->uvs);
+  if (!model->vertex_data || !model->face_normals) {
+    if (model->vertex_data) free(model->vertex_data);
     if (model->face_normals) free(model->face_normals);
     return -1;
   }
@@ -247,8 +219,7 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   float2* temp_uvs = (float2*)malloc(num_vertices * sizeof(float2));
 
   if (!temp_vertices || !temp_uvs) {
-    free(model->vertices);
-    free(model->uvs);
+    free(model->vertex_data);
     free(model->face_normals);
     if (temp_vertices) free(temp_vertices);
     if (temp_uvs) free(temp_uvs);
@@ -301,13 +272,14 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
       float3 v1 = temp_vertices[next];
       float3 v2 = temp_vertices[current + 1];
 
-      model->vertices[vertex_index]     = v0;
-      model->vertices[vertex_index + 1] = v1;
-      model->vertices[vertex_index + 2] = v2;
+      // Calculate normals for sphere (pointing outward)
+      float3 n0 = float3_normalize(v0);
+      float3 n1 = float3_normalize(v1);
+      float3 n2 = float3_normalize(v2);
 
-      model->uvs[vertex_index]     = temp_uvs[current];
-      model->uvs[vertex_index + 1] = temp_uvs[next];
-      model->uvs[vertex_index + 2] = temp_uvs[current + 1];
+      model->vertex_data[vertex_index]     = (vertex_data_t){v0, temp_uvs[current], n0};
+      model->vertex_data[vertex_index + 1] = (vertex_data_t){v1, temp_uvs[next], n1};
+      model->vertex_data[vertex_index + 2] = (vertex_data_t){v2, temp_uvs[current + 1], n2};
 
       float3 edge1 = float3_sub(v1, v0);
       float3 edge2 = float3_sub(v2, v0);
@@ -315,17 +287,14 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
       face_index++;
 
       // --- Second triangle of quad ---
-      float3 v3 = temp_vertices[next];
       float3 v4 = temp_vertices[next + 1];
-      float3 v5 = temp_vertices[current + 1];
 
-      model->vertices[vertex_index + 3] = v1;
-      model->vertices[vertex_index + 4] = v4;
-      model->vertices[vertex_index + 5] = v2;
+      // Calculate normals for sphere (pointing outward)
+      float3 n4 = float3_normalize(v4);
 
-      model->uvs[vertex_index + 3] = temp_uvs[next];
-      model->uvs[vertex_index + 4] = temp_uvs[next + 1];
-      model->uvs[vertex_index + 5] = temp_uvs[current + 1];
+      model->vertex_data[vertex_index + 3] = (vertex_data_t){v1, temp_uvs[next], n1};
+      model->vertex_data[vertex_index + 4] = (vertex_data_t){v4, temp_uvs[next + 1], n4};
+      model->vertex_data[vertex_index + 5] = (vertex_data_t){v2, temp_uvs[current + 1], n2};
 
       edge1 = float3_sub(v4, v1);
       edge2 = float3_sub(v2, v1);
@@ -340,7 +309,6 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   free(temp_uvs);
 
   model->num_vertices = num_triangles * 3;
-  model->num_uvs = num_triangles * 3;
   model->num_faces = num_triangles;
 
   model->transform.position = position;
@@ -356,14 +324,12 @@ int generate_billboard(model_t* model, float2 size, float3 position) {
 
   const int BILLBOARD_VERTS = 6;  // 2 triangles * 3 vertices each
 
-  // Allocate memory for vertices, UVs, and face normals
-  model->vertices = malloc(BILLBOARD_VERTS * sizeof(float3));
-  model->uvs = malloc(BILLBOARD_VERTS * sizeof(float2));
+  // Allocate cache-friendly vertex data and face normals
+  model->vertex_data = malloc(BILLBOARD_VERTS * sizeof(vertex_data_t));
   model->face_normals = malloc(2 * sizeof(float3));  // 2 triangles
 
-  if (!model->vertices || !model->uvs || !model->face_normals) {
-    free(model->vertices);
-    free(model->uvs);
+  if (!model->vertex_data || !model->face_normals) {
+    free(model->vertex_data);
     free(model->face_normals);
     return -1;
   }
@@ -372,34 +338,25 @@ int generate_billboard(model_t* model, float2 size, float3 position) {
   float half_width = size.x * 0.5f;
   float half_height = size.y * 0.5f;
 
-  // Generate quad vertices facing the camera (camera looks down -Z with -Y up)
+  // Generate cache-friendly vertex data facing the camera
+  float3 normal = {0.0f, 0.0f, -1.0f}; // Face normal toward camera
+
   // Triangle 1: counter-clockwise winding when viewed from camera position
-  model->vertices[0] = (float3){-half_width, -half_height, 0.0f};  // bottom-left
-  model->vertices[1] = (float3){ half_width, -half_height, 0.0f};  // bottom-right
-  model->vertices[2] = (float3){-half_width,  half_height, 0.0f};  // top-left
+  model->vertex_data[0] = (vertex_data_t){{-half_width, -half_height, 0.0f}, {0.0f, 1.0f}, normal};
+  model->vertex_data[1] = (vertex_data_t){{ half_width, -half_height, 0.0f}, {1.0f, 1.0f}, normal};
+  model->vertex_data[2] = (vertex_data_t){{-half_width,  half_height, 0.0f}, {0.0f, 0.0f}, normal};
 
   // Triangle 2: counter-clockwise winding when viewed from camera position
-  model->vertices[3] = (float3){ half_width, -half_height, 0.0f};  // bottom-right
-  model->vertices[4] = (float3){ half_width,  half_height, 0.0f};  // top-right
-  model->vertices[5] = (float3){-half_width,  half_height, 0.0f};  // top-left
-
-  // Generate UVs for texture mapping (matching new vertex order)
-  model->uvs[0] = (float2){0.0f, 1.0f};  // bottom-left
-  model->uvs[1] = (float2){1.0f, 1.0f};  // bottom-right
-  model->uvs[2] = (float2){0.0f, 0.0f};  // top-left
-
-  model->uvs[3] = (float2){1.0f, 1.0f};  // bottom-right
-  model->uvs[4] = (float2){1.0f, 0.0f};  // top-right
-  model->uvs[5] = (float2){0.0f, 0.0f};  // top-left
+  model->vertex_data[3] = (vertex_data_t){{ half_width, -half_height, 0.0f}, {1.0f, 1.0f}, normal};
+  model->vertex_data[4] = (vertex_data_t){{ half_width,  half_height, 0.0f}, {1.0f, 0.0f}, normal};
+  model->vertex_data[5] = (vertex_data_t){{-half_width,  half_height, 0.0f}, {0.0f, 0.0f}, normal};
 
   // Face normals point toward camera (camera looks down -Z, so billboard faces -Z)
-  float3 normal = {0.0f, 0.0f, -1.0f};
   model->face_normals[0] = normal;
   model->face_normals[1] = normal;
 
   // Set up model parameters
   model->num_vertices = BILLBOARD_VERTS;
-  model->num_uvs = BILLBOARD_VERTS;
   model->num_faces = 2;
   model->scale = (float3){1.0f, 1.0f, 1.0f};
 
@@ -414,14 +371,9 @@ int generate_billboard(model_t* model, float2 size, float3 position) {
 void delete_model(model_t* model) {
   if (!model) return;
 
-  if (model->vertices) {
-    free(model->vertices);
-    model->vertices = NULL;
-  }
-
-  if (model->uvs) {
-    free(model->uvs);
-    model->uvs = NULL;
+  if (model->vertex_data) {
+    free(model->vertex_data);
+    model->vertex_data = NULL;
   }
 
   if (model->face_normals) {
@@ -430,7 +382,6 @@ void delete_model(model_t* model) {
   }
 
   model->num_vertices = 0;
-  model->num_uvs = 0;
   model->num_faces = 0;
 
   model->frag_shader = NULL;

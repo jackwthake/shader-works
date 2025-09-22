@@ -7,6 +7,17 @@
 #include <cpu-render/maths.h>
 #include <cpu-render/primitives.h>
 
+// Color conversion functions using SDL (required by cpu-render)
+u32 rgb_to_u32(u8 r, u8 g, u8 b) {
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
+  return SDL_MapRGBA(format, NULL, r, g, b, 255);
+}
+
+void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b) {
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
+  SDL_GetRGB(color, format, NULL, r, g, b);
+}
+
 #define WIN_WIDTH 400
 #define WIN_HEIGHT 250
 #define WIN_SCALE 4

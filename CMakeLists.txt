@@ -8,8 +8,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS_RelWithDebInfo "-O3 -march=native -g")
 
-# This assumes the SDL source is available in lib/SDL
-add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
+# SDL is only needed for examples
+add_subdirectory(examples/lib/SDL EXCLUDE_FROM_ALL)
 
 # Create the cpu_render library
 add_library(cpu_render_lib STATIC
@@ -29,8 +29,7 @@ target_include_directories(cpu_render_lib PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Link SDL3 to the library
-target_link_libraries(cpu_render_lib PUBLIC SDL3::SDL3)
+# Core library only needs math library
 target_link_libraries(cpu_render_lib PUBLIC m)
 
 # Add examples subdirectory
