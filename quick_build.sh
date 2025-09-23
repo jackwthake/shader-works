@@ -12,15 +12,18 @@ cd "$PROJECT_ROOT"
 BUILD_TYPE="Release"
 USE_THREADS="ON"
 
-# Parse arguments
-case "${1,,}" in
+# Parse arguments (portable lowercase conversion)
+ARG1=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+ARG2=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+
+case "$ARG1" in
     "debug"|"d") BUILD_TYPE="Debug" ;;
     "release"|"r") BUILD_TYPE="Release" ;;
     "") ;; # Use default
     *) echo "Invalid build type: $1. Use 'debug' or 'release'"; exit 1 ;;
 esac
 
-case "${2,,}" in
+case "$ARG2" in
     "threads"|"t"|"on") USE_THREADS="ON" ;;
     "nothreads"|"nt"|"off") USE_THREADS="OFF" ;;
     "") ;; # Use default
