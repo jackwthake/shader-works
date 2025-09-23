@@ -12,6 +12,10 @@
 
 #include <shader-works/maths.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef SHADER_WORKS_USE_PTHREADS
 #include <pthread.h>
 #include <unistd.h> // For sysconf
@@ -521,9 +525,19 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   int total_triangles = model->num_vertices / 3;
 
 #ifdef SHADER_WORKS_USE_PTHREADS
-  // Get number of CPU cores
-  int num_threads = (int)sysconf(_SC_NPROCESSORS_ONLN);
-  if (num_threads <= 0) num_threads = 4; // Fallback
+  // Get number of CPU cores (cross-platform)
+  int num_threads = 4; // Default fallback
+
+#ifdef _WIN32
+  SYSTEM_INFO sysinfo;
+  GetSystemInfo(&sysinfo);
+  num_threads = (int)sysinfo.dwNumberOfProcessors;
+#elif defined(_SC_NPROCESSORS_ONLN)
+  // POSIX systems (Linux, macOS)
+  num_threads = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+
+  if (num_threads <= 0) num_threads = 4; // Safety fallback
 
   pthread_t* threads = malloc(num_threads * sizeof(pthread_t));
   worker_thread_data_t* thread_data = malloc(num_threads * sizeof(worker_thread_data_t));

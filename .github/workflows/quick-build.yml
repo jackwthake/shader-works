@@ -9,6 +9,7 @@ on:
 jobs:
   quick-build-test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         config: ['release threads', 'debug nothreads']
