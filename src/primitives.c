@@ -319,7 +319,7 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
   return 0;
 }
 
-int generate_billboard(model_t* model, float2 size, float3 position) {
+int generate_quad(model_t* model, float2 size, float3 position) {
   if (!model) return -1;
 
   const int BILLBOARD_VERTS = 6;  // 2 triangles * 3 vertices each

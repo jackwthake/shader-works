@@ -15,17 +15,17 @@ typedef struct {
 typedef struct {
   float3 position;
   float2 uv;
-  float3 normal;  // Per-vertex normal (if needed)
+  float3 normal;
 } vertex_data_t;
 
 // Model structure with cache-friendly vertex layout
 typedef struct {
   // Cache-friendly: all vertex data together
-  vertex_data_t *vertex_data;  // Array of cache-friendly vertex structures
-  float3 *face_normals;        // Face normals (one per triangle)
+  vertex_data_t *vertex_data;
+  float3 *face_normals;
 
   usize num_vertices;
-  usize num_faces;             // Number of triangle faces (num_vertices/3)
+  usize num_faces;
 
   float3 scale;
   transform_t transform;
@@ -36,10 +36,37 @@ typedef struct {
 } model_t;
 
 // Model generation functions
+
+// Generates a plane centered at position with given size and segment size
+// model: pointer to model structure to populate
+// size: dimensions of the plane (width, height)
+// segment_size: size of each segment (width, height)
+// position: center position of the plane (x, y, z)
+// Returns 0 on success, non-zero on failure
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position);
+
+// Generates a cube centered at position with given size
+// model: pointer to model structure to populate
+// position: center position of the cube (x, y, z)
+// size: dimensions of the cube (width, height, depth)
+// Returns 0 on success, non-zero on failure
 int generate_cube(model_t* model, float3 position, float3 size);
+
+// Generates a sphere centered at position with given radius, segments, and rings
+// model: pointer to model structure to populate
+// radius: radius of the sphere
+// segments: number of longitudinal segments
+// rings: number of latitudinal rings
+// position: center position of the sphere (x, y, z)
+// Returns 0 on success, non-zero on failure
 int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 position);
-int generate_billboard(model_t* model, float2 size, float3 position);
+
+// Generates a quad at position with given size
+// model: pointer to model structure to populate
+// size: dimensions of the quad (width, height)
+// position: center position of the quad (x, y, z)
+// Returns 0 on success, non-zero on failure
+int generate_quad(model_t* model, float2 size, float3 position);
 
 // Model cleanup
 void delete_model(model_t* model);

@@ -11,7 +11,8 @@
 
 #include <shader-works/primitives.h> // model_t
 
-typedef struct thread_context_t {
+// Triangle rendering context
+typedef struct triangle_context_t {
   struct renderer_t *state;
   model_t *model;
   transform_t *cam;
@@ -27,19 +28,19 @@ typedef struct thread_context_t {
 
   f32 frustum_bound;
   f32 max_depth;
-} thread_context_t;
+} triangle_context_t;
 
 // Renderer state structure
 typedef struct renderer_t {
-  u32 *framebuffer;
-  f32 *depthbuffer;
-  u32 *texture_atlas; // pointer to texture atlas data (static data)
+  u32 *framebuffer;     // framebuffer, client allocated
+  f32 *depthbuffer;     // depth buffer, client allocated
+  u32 *texture_atlas;   // pointer to texture atlas data (static data)
 
   f32 time;             // Time since renderer initialization
   u64 start_time;       // Start time in milliseconds
-  f32 max_depth;
+  f32 max_depth;        // Maximum depth value for depth buffering
 
-  u32 wireframe_mode; // If true, render in wireframe mode, packed as u32 for alignment
+  u32 wireframe_mode;   // If true, render in wireframe mode, packed as u32 for alignment
 
   float3 cam_right, cam_up, cam_forward;
   float2 screen_dim, atlas_dim;
@@ -52,12 +53,35 @@ extern u32 rgb_to_u32(u8 r, u8 g, u8 b);
 extern void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
 
 // Core renderer functions
+
+// Initialize the renderer state
+// framebuffer: pointer to pre-allocated framebuffer (u32 per pixel)
+// depthbuffer: pointer to pre-allocated depth buffer (f32 per pixel)
+// width, height: dimensions of the framebuffer
+// atlas_width, atlas_height: dimensions of the texture atlas
+// max_depth: maximum depth value for depth buffering
 void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth);
+
+// Update camera basis vectors based on transform
+// cam: pointer to camera transform
 void update_camera(renderer_t *state, transform_t *cam);
 
+// Render a model with given camera and lights
+// state: pointer to renderer state
+// cam: pointer to camera transform
+// model: pointer to model to render
+// lights: array of lights affecting the model
+// light_count: number of lights in the array
+// Returns the number of triangles rendered
 usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count);
 
 // Built-in effects
+
+// TODO: Implement post processing shaders and convert this to new format
+// Apply fog effect to the entire screen based on depth values
+// fog_start: distance at which fog starts
+// fog_end: distance at which fog fully obscures
+// fog_r, fog_g, fog_b: RGB color of the fog
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
 
 #endif // SHADER_WORKS_RENDERER_H

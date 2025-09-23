@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <shader-works/maths.h>
 
+// Light structure
 typedef struct {
   float3 position, direction;
   u32 color;
@@ -11,7 +12,7 @@ typedef struct {
   bool is_directional;
 } light_t;
 
-// Shader context structures
+// Fragment shader context structures
 typedef struct {
   float3 world_pos;     // Interpolated world position of this specific pixel
   float2 screen_pos;    // Pixel coordinates on screen
@@ -24,6 +25,7 @@ typedef struct {
   usize light_count;    // Number of lights
 } fragment_context_t;
 
+// Vertex shader context structure
 typedef struct {
   // Camera information
   float3 cam_position;      // Camera world position
@@ -58,14 +60,14 @@ typedef float3 (*vertex_shader_func)(vertex_context_t *context, void *args, usiz
 typedef struct {
   bool valid;
   usize argc;
-  void *argv;
+  void *argv; // user-defined arguments, user allocated
   fragment_shader_func func;
 } fragment_shader_t;
 
 typedef struct {
   bool valid;
   usize argc;
-  void *argv;
+  void *argv; // user-defined arguments, user allocated
   vertex_shader_func func;
 } vertex_shader_t;
 

@@ -128,22 +128,22 @@ static usize render_frame(game_state_t* state, transform_t* camera, model_t* cub
 // Cleanup and free SDL resources on exit
 static void system_cleanup(game_state_t* state) {
   assert(state != NULL);
-  
+
   if (state->framebuffer_tex) {
     SDL_DestroyTexture(state->framebuffer_tex);
     state->framebuffer_tex = NULL;
   }
-  
+
   if (state->renderer) {
     SDL_DestroyRenderer(state->renderer);
     state->renderer = NULL;
   }
-  
+
   if (state->window) {
     SDL_DestroyWindow(state->window);
     state->window = NULL;
   }
-  
+
   SDL_Quit();
 }
 
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
   sphere_model.use_textures = true;
 
   model_t billboard_model = {0};
-  generate_billboard(&billboard_model, make_float2(1.0f, 1.0f), make_float3(0.0f, 2.0f, -4.0f));
+  generate_quad(&billboard_model, make_float2(1.0f, 1.0f), make_float3(0.0f, 2.0f, -4.0f));
   billboard_model.frag_shader = &particle_frag;
   billboard_model.vertex_shader = &billboard_vs;
   billboard_model.use_textures = true;
@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 
   transform_t camera = {0};
   camera.position = make_float3(0.0f, 2.0f, 0.0f);  // Place camera at origin
-  
+
   update_camera(&state.renderer_state, &camera);
   state.running = true;
 
@@ -230,16 +230,16 @@ int main(int argc, char *argv[]) {
   // Fixed timestep loop variables
   f64 current_time = init_time;
   f64 accumulator = 0.0;
-  
+
   while (state.running) {
     f64 new_time = SDL_GetTicks() / 1000.0;
     f64 frame_time = new_time - current_time;
     current_time = new_time;
-    
+
     // Prevent spiral of death - cap frame time
     frame_time = fmin(frame_time, MAX_FRAME_TIME);
     accumulator += frame_time;
-    
+
     // Process input (this can happen at variable rate)
     system_poll_events(&state);
 
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
 
     SDL_Delay(1); // Small delay to prevent 100% CPU usage
   }
-  
+
   // Cleanup model resources
   delete_model(&cube_model);
   delete_model(&plane_model);

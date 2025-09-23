@@ -16,10 +16,10 @@
 #include <pthread.h>
 #include <unistd.h> // For sysconf
 
-bool render_triangle(thread_context_t *ctx);
+bool render_triangle(triangle_context_t *ctx);
 
 typedef struct {
-  thread_context_t base_ctx;
+  triangle_context_t base_ctx;
   int total_triangles;
   int* next_triangle;
   usize* triangles_rendered;
@@ -121,13 +121,13 @@ static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jh
   assert(ihat != NULL);
   assert(jhat != NULL);
   assert(khat != NULL);
-  
+
   // Apply yaw first, then pitch
   float cy = cosf(t->yaw);
   float sy = sinf(t->yaw);
   float cp = cosf(t->pitch);
   float sp = sinf(t->pitch);
-  
+
   // Combined rotation matrix (yaw * pitch)
   *ihat = make_float3(cy, sy * sp, sy * cp);
   *jhat = make_float3(0, cp, -sp);
@@ -140,13 +140,13 @@ static void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, fl
   assert(ihat != NULL);
   assert(jhat != NULL);
   assert(khat != NULL);
-  
+
   // For inverse, we transpose the rotation matrix (since rotation matrices are orthogonal)
   float cy = cosf(t->yaw);
   float sy = sinf(t->yaw);
   float cp = cosf(t->pitch);
   float sp = sinf(t->pitch);
-  
+
   // Transposed matrix
   *ihat = make_float3(cy, 0, -sy);
   *jhat = make_float3(sy * sp, cp, cy * sp);
@@ -156,10 +156,10 @@ static void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, fl
 // Transform a point from local space to world space using the transform's basis vectors and position
 static float3 transform_to_world(transform_t *t, float3 p) {
   assert(t != NULL);
-  
+
   float3 ihat, jhat, khat;
   transform_get_basis_vectors(t, &ihat, &jhat, &khat);
-  
+
   // Transform the point and then translate by position
   float3 rotated = transform_vector(ihat, jhat, khat, p);
   return float3_add(rotated, t->position);
@@ -168,10 +168,10 @@ static float3 transform_to_world(transform_t *t, float3 p) {
 // Transform a point from world space to local space using the inverse of the transform's basis vectors and position
 static float3 transform_to_local_point(transform_t *t, float3 p) {
   assert(t != NULL);
-  
+
   float3 ihat, jhat, khat;
   transform_get_inverse_basis_vectors(t, &ihat, &jhat, &khat);
-  
+
   // Translate first, then rotate
   float3 p_rel = float3_sub(p, t->position);
   return transform_vector(ihat, jhat, khat, p_rel);
@@ -280,7 +280,7 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
   state->start_time = ts.tv_sec * 1000 + ts.tv_nsec / 1000000; // milliseconds
   state->wireframe_mode = false;
   state->texture_atlas = NULL;
-  
+
   state->cam_right = make_float3(0, 0, 0);
   state->cam_up = make_float3(0, 0, 0);
   state->cam_forward = make_float3(0, 0, 0);
@@ -290,11 +290,11 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
 void update_camera(renderer_t *state, transform_t *cam) {
   assert(state != NULL);
   assert(cam != NULL);
-  
+
   transform_get_basis_vectors(cam, &state->cam_right, &state->cam_up, &state->cam_forward);
 }
 
-bool render_triangle(thread_context_t *ctx) {
+bool render_triangle(triangle_context_t *ctx) {
   // Call vertex shader to get transformed vertices
   float3 transformed_a, transformed_b, transformed_c;
   apply_vertex_shader(ctx->model, ctx->vertex_shader, &ctx->vertex_ctx, ctx->tri, &transformed_a, &transformed_b, &transformed_c);
@@ -318,15 +318,15 @@ bool render_triangle(thread_context_t *ctx) {
   float3 ihat, jhat, khat;
   transform_get_basis_vectors(&ctx->model->transform, &ihat, &jhat, &khat);
   float3 triangle_normal = transform_vector(ihat, jhat, khat, model_normal);
-  
+
   // Vector from camera to triangle center
   float3 triangle_center = float3_scale(float3_add(float3_add(world_a, world_b), world_c), 1.0f/3.0f);
   float3 view_direction = float3_normalize(float3_sub(triangle_center, ctx->cam->position));  // Point from camera to triangle
-  
+
   // Check if triangle is facing toward camera
   float dot_product = float3_dot(triangle_normal, view_direction);
   if (dot_product <= EPSILON) return false; // Triangle is facing away from camera
-  
+
   // Use pre-computed projection constants
   float pixels_per_world_unit_a = ctx->state->projection_scale / view_a.z;
   float pixels_per_world_unit_b = ctx->state->projection_scale / view_b.z;
@@ -344,7 +344,7 @@ bool render_triangle(thread_context_t *ctx) {
   float3 a = make_float3(screen_a.x, screen_a.y, view_a.z);
   float3 b = make_float3(screen_b.x, screen_b.y, view_b.z);
   float3 c = make_float3(screen_c.x, screen_c.y, view_c.z);
-  
+
   // Compute triangle bounding box (clamped to screen boundaries)
   float min_x = fmaxf(0.0f, floorf(fminf(a.x, fminf(b.x, c.x))));
   float max_x = fminf(ctx->state->screen_dim.x - 1, ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
@@ -381,7 +381,7 @@ bool render_triangle(thread_context_t *ctx) {
   // Rasterize only within the computed bounding box
   for (int y = (int)min_y; y <= (int)max_y; ++y) {
     int pixel_base = y * (int)ctx->state->screen_dim.x; // Precompute row offset
-    
+
     for (int x = (int)min_x; x <= (int)max_x; ++x) {
       // Use integer coordinates for pixel (with subpixel precision)
       int32_t p_x = x * 256; // Convert to same 8.24 format
@@ -489,7 +489,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 
   vertex_shader_t *vertex_shader = model->vertex_shader && model->vertex_shader->valid ? model->vertex_shader : &default_vertex_shader;
   assert(vertex_shader->func != NULL);
-  
+
   if (model->use_textures) {
     assert(state->texture_atlas != NULL);
     assert(model->vertex_data != NULL); // Ensure we have vertex data with UVs
@@ -533,7 +533,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   int next_triangle = 0;
 
   // Create base thread context
-  thread_context_t base_ctx = {
+  triangle_context_t base_ctx = {
     .state = state,
     .model = model,
     .cam = cam,
@@ -571,7 +571,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 #else
   // Single-threaded fallback
   for (int tri = 0; tri < total_triangles; ++tri) {
-    if (render_triangle(&(thread_context_t){
+    if (render_triangle(&(triangle_context_t){
       .state = state,
       .model = model,
       .cam = cam,
