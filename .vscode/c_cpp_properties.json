@@ -1,0 +1,70 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Linux Debug (Single-threaded)",
+      "includePath": [
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "/usr/include/**",
+        "/usr/local/include/**"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    },
+    {
+      "name": "Linux Debug (Threaded)",
+      "includePath": [
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "/usr/include/**",
+        "/usr/local/include/**"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE",
+        "SHADER_WORKS_USE_PTHREADS"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    },
+    {
+      "name": "Linux Release",
+      "includePath": [
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "/usr/include/**",
+        "/usr/local/include/**"
+      ],
+      "defines": [
+        "NDEBUG",
+        "UNICODE",
+        "_UNICODE",
+        "SHADER_WORKS_USE_PTHREADS"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    }
+  ]
+}
