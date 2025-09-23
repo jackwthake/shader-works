@@ -1,4 +1,4 @@
-name: Windows Build
+name: macOS Build
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows-build:
-    runs-on: windows-latest
+  macos-build:
+    runs-on: macos-latest
 
     strategy:
       fail-fast: false
@@ -23,43 +23,36 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-make
-          git
+    - name: Install dependencies
+      run: brew install cmake
 
-    - name: Configure and Build
-      shell: msys2 {0}
+    - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake -G "MinGW Makefiles" \
-              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
               -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} \
               ..
-        cmake --build . -j $(nproc)
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . -j $(sysctl -n hw.ncpu)
 
     - name: Test demo run
-      shell: msys2 {0}
       run: |
         cd build/bin
-        ./basic_demo.exe &
+        ./basic_demo &
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Windows demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "macOS demo test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: windows-${{ matrix.build_type }}-threads-${{ matrix.threading }}
+        name: macos-${{ matrix.build_type }}-threads-${{ matrix.threading }}
         path: |
-          build/bin/*.exe
-          build/lib/*.a
+          build/bin/
+          build/lib/
         retention-days: 5

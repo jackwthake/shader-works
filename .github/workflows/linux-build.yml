@@ -1,4 +1,4 @@
-name: Windows Build
+name: Linux Build
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows-build:
-    runs-on: windows-latest
+  linux-build:
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
@@ -23,43 +23,39 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-make
-          git
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
 
-    - name: Configure and Build
-      shell: msys2 {0}
+    - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake -G "MinGW Makefiles" \
-              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
               -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} \
+              -DSDL_UNIX_CONSOLE_BUILD=ON \
               ..
+
+    - name: Build
+      run: |
+        cd build
         cmake --build . -j $(nproc)
 
     - name: Test demo run
-      shell: msys2 {0}
       run: |
         cd build/bin
-        ./basic_demo.exe &
+        ./basic_demo &
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Windows demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "Linux demo test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: windows-${{ matrix.build_type }}-threads-${{ matrix.threading }}
+        name: linux-${{ matrix.build_type }}-threads-${{ matrix.threading }}
         path: |
-          build/bin/*.exe
-          build/lib/*.a
+          build/bin/
+          build/lib/
         retention-days: 5

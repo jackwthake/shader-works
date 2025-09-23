@@ -6,8 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jackwthake/shader-works/actions/workflows/quick-build.yml">
-    <img src="https://github.com/jackwthake/shader-works/actions/workflows/quick-build.yml/badge.svg" alt="Mac Linux">
+  <a href="https://github.com/jackwthake/shader-works/actions/workflows/linux-build.yml">
+    <img src="https://github.com/jackwthake/shader-works/actions/workflows/linux-build.yml/badge.svg" alt="Linux">
+  </a>
+  <a href="https://github.com/jackwthake/shader-works/actions/workflows/macos-build.yml">
+    <img src="https://github.com/jackwthake/shader-works/actions/workflows/macos-build.yml/badge.svg" alt="macOS">
   </a>
   <a href="https://github.com/jackwthake/shader-works/actions/workflows/windows-build.yml">
     <img src="https://github.com/jackwthake/shader-works/actions/workflows/windows-build.yml/badge.svg" alt="Windows">
