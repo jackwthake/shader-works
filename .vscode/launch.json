@@ -94,6 +94,72 @@
       "miDebuggerPath": "/usr/bin/gdb",
     },
     {
+      "name": "Debug: FPS Controller (Single-threaded)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/fps_demo",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Quick Build: Debug Single-threaded",
+      "miDebuggerPath": "/usr/bin/gdb",
+    },
+    {
+      "name": "Debug: FPS Controller (Threaded)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/fps_demo",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Quick Build: Debug Threaded",
+      "miDebuggerPath": "/usr/bin/gdb",
+    },
+    {
+      "name": "Run: FPS Controller (Release)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/fps_demo",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "Quick Build: Release Threaded",
+      "miDebuggerPath": "/usr/bin/gdb",
+    },
+    {
       "name": "Debug: Attach to Process",
       "type": "cppdbg",
       "request": "attach",

@@ -45,7 +45,7 @@ jobs:
               ..
         cmake --build . -j $(nproc)
 
-    - name: Test demo run
+    - name: Test demo runs
       shell: msys2 {0}
       run: |
         cd build/bin
@@ -53,7 +53,19 @@ jobs:
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Windows demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "Windows basic_demo test completed"
+
+        ./fps_demo.exe &
+        FPS_PID=$!
+        sleep 10
+        kill $FPS_PID 2>/dev/null || true
+        wait $FPS_PID 2>/dev/null || echo "Windows fps_demo test completed"
+
+        ./full_test.exe &
+        FULL_PID=$!
+        sleep 10
+        kill $FULL_PID 2>/dev/null || true
+        wait $FULL_PID 2>/dev/null || echo "Windows full_test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

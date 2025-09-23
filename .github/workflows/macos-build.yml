@@ -39,14 +39,26 @@ jobs:
         cd build
         cmake --build . -j $(sysctl -n hw.ncpu)
 
-    - name: Test demo run
+    - name: Test demo runs
       run: |
         cd build/bin
         ./basic_demo &
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "macOS demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "macOS basic_demo test completed"
+
+        ./fps_demo &
+        FPS_PID=$!
+        sleep 10
+        kill $FPS_PID 2>/dev/null || true
+        wait $FPS_PID 2>/dev/null || echo "macOS fps_demo test completed"
+
+        ./full_test &
+        FULL_PID=$!
+        sleep 10
+        kill $FULL_PID 2>/dev/null || true
+        wait $FULL_PID 2>/dev/null || echo "macOS full_test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

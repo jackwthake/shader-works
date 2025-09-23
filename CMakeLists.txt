@@ -66,3 +66,4 @@ target_link_libraries(shader-works-lib PUBLIC m)
 # Add examples subdirectory
 add_subdirectory(examples/basic_demo)
 add_subdirectory(examples/full_test)
+add_subdirectory(examples/fps_controller)
