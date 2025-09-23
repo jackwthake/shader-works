@@ -90,18 +90,18 @@ cd shader-works
 git submodule update --init --recursive
 
 # Quick single configuration builds
-./quick_build.sh release threads    # Multi-threaded release (best performance)
-./quick_build.sh debug nothreads   # Single-threaded debug (easier debugging)
-./quick_build.sh release          # Uses defaults: release with threading
+./quick_build.sh release threads           # Multi-threaded release (best performance)
+./quick_build.sh debug nothreads           # Single-threaded debug (easier debugging)
+./quick_build.sh release                   # Uses defaults: release with threading
 
 # Build all configurations at once
-./build_all.sh                    # Builds all 4 variants (debug/release × threaded/single)
+./build_all.sh                             # Builds all 4 variants (debug/release × threaded/single)
 
 # Run the demo
-./build/bin/basic_demo                        # After quick_build.sh
+./build/bin/basic_demo                     # After quick_build.sh
 # Or run specific configurations after build_all.sh:
-# ./build-release-threaded/bin/basic_demo     # Release multi-threaded
-# ./build-debug-single/bin/basic_demo         # Debug single-threaded
+# ./build-release-threaded/bin/basic_demo  # Release multi-threaded
+# ./build-debug-single/bin/basic_demo      # Debug single-threaded
 ```
 
 ## Manual CMake Build
@@ -167,8 +167,7 @@ void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
 ```
 Client must implement these for pixel format conversion. Allows renderer to be pixel-format agnostic.
 
-### Core Functions
-
+### Core Renderer Functions
 ```c
 void init_renderer(renderer_t *state, u32 win_width, u32 win_height,
                    u32 atlas_width, u32 atlas_height, u32 *framebuffer,
@@ -176,24 +175,27 @@ void init_renderer(renderer_t *state, u32 win_width, u32 win_height,
 ```
 Initialize renderer with client-provided buffers. Framebuffer and depthbuffer must be pre-allocated arrays of `win_width * win_height` elements.
 
+---
 ```c
 void update_camera(renderer_t *state, transform_t *cam);
 ```
 Update camera basis vectors based on transform (position + yaw/pitch). Call before rendering.
 
+---
 ```c
 usize render_model(renderer_t *state, transform_t *cam, model_t *model,
                    light_t *lights, usize light_count);
 ```
 Render model with threading support. Returns number of triangles rendered. Handles vertex transformation, rasterization, and shading.
 
+---
 ```c
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end,
                          u8 fog_r, u8 fog_g, u8 fog_b);
 ```
 Apply depth-based fog effect to entire framebuffer. Fog interpolates between `fog_start` and `fog_end` distances.
 
-
+---
 ## primitives.h
 
 ### Data Structures
@@ -211,6 +213,7 @@ typedef struct {
   fragment_shader_t *frag_shader;
 } model_t;
 ```
+
 
 ### Geometry Generation
 ```c
