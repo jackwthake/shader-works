@@ -52,7 +52,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} ..
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} ${{ matrix.os == 'ubuntu-latest' && '-DSDL_UNIX_CONSOLE_BUILD=ON' || '' }} ..
 
     - name: Configure CMake (Windows)
       if: matrix.os == 'windows-latest'

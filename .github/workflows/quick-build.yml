@@ -33,7 +33,12 @@ jobs:
       run: chmod +x quick_build.sh
 
     - name: Run quick build
-      run: ./quick_build.sh ${{ matrix.config }}
+      run: |
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          SDL_FLAGS="-DSDL_UNIX_CONSOLE_BUILD=ON" ./quick_build.sh ${{ matrix.config }}
+        else
+          ./quick_build.sh ${{ matrix.config }}
+        fi
 
     - name: Verify binary exists
       run: |

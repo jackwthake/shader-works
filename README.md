@@ -6,11 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/quick-build.yml">
-    <img src="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/quick-build.yml/badge.svg" alt="Mac Linux">
+  <a href="https://github.com/jackwthake/shader-works/actions/workflows/quick-build.yml">
+    <img src="https://github.com/jackwthake/shader-works/actions/workflows/quick-build.yml/badge.svg" alt="Mac Linux">
   </a>
-  <a href="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/windows-build.yml">
-    <img src="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/windows-build.yml/badge.svg" alt="Windows">
+  <a href="https://github.com/jackwthake/shader-works/actions/workflows/windows-build.yml">
+    <img src="https://github.com/jackwthake/shader-works/actions/workflows/windows-build.yml/badge.svg" alt="Windows">
   </a>
 </p>
 

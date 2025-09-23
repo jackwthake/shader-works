@@ -39,6 +39,7 @@ cd "$BUILD_DIR"
 # Configure and build
 cmake -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DSHADER_WORKS_USE_THREADS="$USE_THREADS" \
+      ${SDL_FLAGS} \
       ..
 
 cmake --build . -j$(nproc)
