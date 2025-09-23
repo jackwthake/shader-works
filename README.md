@@ -5,6 +5,15 @@
   <img src="https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a" alt="Demo prohect in wireframe mode" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/quick-build.yml">
+    <img src="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/quick-build.yml/badge.svg" alt="Mac Linux">
+  </a>
+  <a href="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/windows-build.yml">
+    <img src="https://github.com/jackwthake/Software-Rasterizer/actions/workflows/windows-build.yml/badge.svg" alt="Windows">
+  </a>
+</p>
+
 A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on portability and performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
 
 ## Table of Contents

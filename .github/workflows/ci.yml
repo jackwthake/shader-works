@@ -1,0 +1,123 @@
+name: Cross-Platform CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Release, Debug]
+        threading: [ON, OFF]
+        include:
+          - os: ubuntu-latest
+            platform_name: Linux
+          - os: windows-latest
+            platform_name: Windows
+          - os: macos-latest
+            platform_name: macOS
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup build tools (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+
+    - name: Setup build tools (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+
+    - name: Setup build tools (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make
+
+    - name: Configure CMake (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} ..
+
+    - name: Configure CMake (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
+      run: |
+        mkdir build
+        cd build
+        cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} ..
+
+    - name: Build (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd build
+        cmake --build . -j $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+    - name: Build (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
+      run: |
+        cd build
+        cmake --build . -j $(nproc)
+
+    - name: Test basic demo (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd build/bin
+        ./basic_demo &
+        DEMO_PID=$!
+        sleep 10
+        kill $DEMO_PID 2>/dev/null || true
+        wait $DEMO_PID 2>/dev/null || echo "Demo test completed"
+
+    - name: Test basic demo (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
+      run: |
+        cd build/bin
+        ./basic_demo.exe &
+        DEMO_PID=$!
+        sleep 10
+        kill $DEMO_PID 2>/dev/null || true
+        wait $DEMO_PID 2>/dev/null || echo "Demo test completed"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: shader-works-${{ matrix.platform_name }}-${{ matrix.build_type }}-threads-${{ matrix.threading }}
+        path: |
+          build/bin/
+          build/lib/
+        retention-days: 7
+
+  # Optional: Create release builds
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Display structure of downloaded files
+      run: ls -R
+
+    - name: Create release info
+      run: |
+        echo "Automated build from commit ${{ github.sha }}" > release_info.txt
+        echo "Built on $(date)" >> release_info.txt

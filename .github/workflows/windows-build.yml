@@ -1,0 +1,59 @@
+name: Windows MinGW Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  windows-mingw:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+        threading: [ON, OFF]
+
+    steps:
+    - name: Checkout with submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          git
+
+    - name: Build with CMake
+      shell: msys2 {0}
+      run: |
+        mkdir build
+        cd build
+        cmake -G "MinGW Makefiles" \
+              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+              -DSHADER_WORKS_USE_THREADS=${{ matrix.threading }} \
+              ..
+        cmake --build . -j $(nproc)
+
+    - name: Test build output
+      shell: msys2 {0}
+      run: |
+        ls -la build/bin/
+        file build/bin/basic_demo.exe
+
+    - name: Upload Windows binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: shader-works-windows-${{ matrix.build_type }}-threads-${{ matrix.threading }}
+        path: |
+          build/bin/*.exe
+          build/lib/*.a
+        retention-days: 5
