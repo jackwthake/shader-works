@@ -122,7 +122,16 @@ git submodule update --init --recursive
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DSHADER_WORKS_USE_THREADS=ON ..
 cmake --build . -j 8 && ./bin/basic_demo
+
+# Library-only build (no examples - useful for integration)
+cmake -DCMAKE_BUILD_TYPE=Release -DSHADER_WORKS_BUILD_EXAMPLES=OFF ..
+cmake --build . -j 8
 ```
+
+### Build Options
+- `SHADER_WORKS_USE_THREADS=ON/OFF` - Enable/disable multi-threaded rendering (default: ON)
+- `SHADER_WORKS_BUILD_EXAMPLES=ON/OFF` - Build example programs (default: ON)
+- `SHADER_WORKS_MULTI_CONFIG=ON/OFF` - Build multiple configurations (default: OFF)
 
 # Cross-Platform Builds
 
