@@ -230,7 +230,7 @@ static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_boun
 
 // Apply fog effect based on depth
 static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
-  f32 fog_factor = (depth - fog_start) / (fog_end - fog_start);
+  f32 fog_factor = (fabsf(depth) - fog_start) / (fog_end - fog_start);
 
   // Clamp fog factor
   if (fog_factor < 0.0f) fog_factor = 0.0f;
@@ -374,26 +374,16 @@ bool render_triangle(triangle_context_t *ctx) {
 
    ctx->frag_ctx.normal = triangle_normal;
 
-  // Convert screen coordinates to integers for faster triangle tests
-  int32_t a_x = (int32_t)(a.x * 256.0f); // Use 8.24 fixed point for subpixel precision
-  int32_t a_y = (int32_t)(a.y * 256.0f);
-  int32_t b_x = (int32_t)(b.x * 256.0f);
-  int32_t b_y = (int32_t)(b.y * 256.0f);
-  int32_t c_x = (int32_t)(c.x * 256.0f);
-  int32_t c_y = (int32_t)(c.y * 256.0f);
+  // Use floating point coordinates throughout
 
   // Rasterize only within the computed bounding box
   for (int y = (int)min_y; y <= (int)max_y; ++y) {
     int pixel_base = y * (int)ctx->state->screen_dim.x; // Precompute row offset
 
     for (int x = (int)min_x; x <= (int)max_x; ++x) {
-      // Use integer coordinates for pixel (with subpixel precision)
-      int32_t p_x = x * 256; // Convert to same 8.24 format
-      int32_t p_y = y * 256;
-
       float3 weights; // Barycentric coordinates
-      // Check if the current pixel is inside the triangle using integer math
-      if (point_in_triangle_int(a_x, a_y, b_x, b_y, c_x, c_y, p_x, p_y, &weights)) {
+      // Check if the current pixel is inside the triangle using floating point math
+      if (point_in_triangle(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y), make_float2(x + 0.5f, y + 0.5f), &weights)) {
         // Interpolate depth using barycentric coordinates (with safe Z values)
         float new_depth = -1.0f / (weights.x / safe_a_z + weights.y / safe_b_z + weights.z / safe_c_z);
 
@@ -447,7 +437,7 @@ bool render_triangle(triangle_context_t *ctx) {
           );
 
           // Screen position
-          ctx->frag_ctx.screen_pos = make_float2((float)x, (float)y);
+          ctx->frag_ctx.screen_pos = make_float2(x + 0.5f, y + 0.5f);
 
           // UV coordinates (interpolated if available) - reuse already fetched UVs
           if (ctx->model->use_textures && ctx->model->vertex_data != NULL) {
