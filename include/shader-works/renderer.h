@@ -84,4 +84,7 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 // fog_r, fog_g, fog_b: RGB color of the fog
 void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
 
+void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat);
+void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat);
+
 #endif // SHADER_WORKS_RENDERER_H

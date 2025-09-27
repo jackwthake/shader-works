@@ -120,7 +120,7 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
 }
 
 // Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
-static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -139,7 +139,7 @@ static void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jh
 }
 
 // Extracts the inverse basis vectors (right, up, forward) from a transform's yaw and pitch
-static void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
