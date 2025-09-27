@@ -217,7 +217,12 @@ static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_
 static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_bound, f32 max_depth) {
  // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
   if (a.z > 0 && b.z > 0 && c.z > 0) return true;
-  if (fmax(a.z, fmax(b.z, c.z)) > max_depth) return true; // Cull if too far away
+  // Cull triangles where the closest vertex is still too far away
+  float closest_distance = -fmax(a.z, fmax(b.z, c.z));
+  if (closest_distance > max_depth) {
+    // Uncomment for debugging: printf("Culling triangle at distance %.2f (max: %.2f)\n", closest_distance, max_depth);
+    return true;
+  }
 
   // Additional frustum culling - check if triangle is completely outside view frustum
   bool outside_left   = (a.x < a.z * frustum_bound && b.x < b.z * frustum_bound && c.x < c.z * frustum_bound);
