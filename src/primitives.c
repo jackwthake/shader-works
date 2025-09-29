@@ -96,6 +96,7 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
 
   free(grid_verts);
   free(grid_uvs);
+  model->disable_behind_camera_culling = false;
   return 0;
 }
 
@@ -359,6 +360,7 @@ int generate_quad(model_t* model, float2 size, float3 position) {
   model->num_vertices = BILLBOARD_VERTS;
   model->num_faces = 2;
   model->scale = (float3){1.0f, 1.0f, 1.0f};
+  model->disable_behind_camera_culling = false;
 
   // Initialize the transform
   model->transform.position = position;

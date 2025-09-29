@@ -214,9 +214,9 @@ static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_
 }
 
 // Basic frustum culling: returns true if triangle is completely outside the frustum
-static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_bound, f32 max_depth) {
+static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_bound, f32 max_depth, bool disable_behind_camera_culling) {
  // Basic frustum culling: skip triangle if all vertices are behind camera (z > 0 in view space)
-  if (a.z > 0 && b.z > 0 && c.z > 0) return true;
+  if (!disable_behind_camera_culling && a.z > 0 && b.z > 0 && c.z > 0) return true;
   // Cull triangles where the closest vertex is still too far away
   float closest_distance = -fmax(a.z, fmax(b.z, c.z));
   if (closest_distance > max_depth) {
@@ -317,7 +317,7 @@ bool render_triangle(triangle_context_t *ctx) {
   float3 view_b = transform_to_local_point(ctx->cam, world_b);
   float3 view_c = transform_to_local_point(ctx->cam, world_c);
 
-  if (frustum_cull_triangle(view_a, view_b, view_c, ctx->frustum_bound, ctx->max_depth))
+  if (frustum_cull_triangle(view_a, view_b, view_c, ctx->frustum_bound, ctx->max_depth, ctx->model->disable_behind_camera_culling))
     return false; // Triangle is outside the view frustum
 
   // Use pre-computed face normal for back-face culling
@@ -332,9 +332,11 @@ bool render_triangle(triangle_context_t *ctx) {
   float3 triangle_center = float3_scale(float3_add(float3_add(world_a, world_b), world_c), 1.0f/3.0f);
   float3 view_direction = float3_normalize(float3_sub(triangle_center, ctx->cam->position));  // Point from camera to triangle
 
-  // Check if triangle is facing toward camera
-  float dot_product = float3_dot(triangle_normal, view_direction);
-  if (dot_product <= EPSILON) return false; // Triangle is facing away from camera
+  // Check if triangle is facing toward camera (skip back-face culling for particles)
+  if (!ctx->model->disable_behind_camera_culling) {
+    float dot_product = float3_dot(triangle_normal, view_direction);
+    if (dot_product <= EPSILON) return false; // Triangle is facing away from camera
+  }
 
   // Use pre-computed projection constants
   float pixels_per_world_unit_a = ctx->state->projection_scale / view_a.z;

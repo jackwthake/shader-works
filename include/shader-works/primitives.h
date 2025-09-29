@@ -31,6 +31,7 @@ typedef struct {
   transform_t transform;
 
   bool use_textures;
+  bool disable_behind_camera_culling; // For particles that should render 360 degrees
   vertex_shader_t *vertex_shader;
   fragment_shader_t *frag_shader;
 } model_t;
