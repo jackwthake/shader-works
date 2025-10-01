@@ -49,23 +49,23 @@ jobs:
       shell: msys2 {0}
       run: |
         cd build/bin
-        ./basic_demo.exe &
+        ./01_spinning_cube.exe &
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Windows basic_demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "Windows 01_spinning_cube test completed"
 
-        ./fps_demo.exe &
+        ./03_fps_controller.exe &
         FPS_PID=$!
         sleep 10
         kill $FPS_PID 2>/dev/null || true
-        wait $FPS_PID 2>/dev/null || echo "Windows fps_demo test completed"
+        wait $FPS_PID 2>/dev/null || echo "Windows 03_fps_controller test completed"
 
-        ./full_test.exe &
+        ./02_textured_scene.exe &
         FULL_PID=$!
         sleep 10
         kill $FULL_PID 2>/dev/null || true
-        wait $FULL_PID 2>/dev/null || echo "Windows full_test completed"
+        wait $FULL_PID 2>/dev/null || echo "Windows 02_textured_scene completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

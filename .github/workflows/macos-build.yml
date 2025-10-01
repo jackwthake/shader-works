@@ -9,7 +9,7 @@ on:
 
 jobs:
   macos-build:
-    runs-on: macos-latest
+    runs-on: macos-14
 
     strategy:
       fail-fast: false
@@ -42,23 +42,23 @@ jobs:
     - name: Test demo runs
       run: |
         cd build/bin
-        ./basic_demo &
+        ./01_spinning_cube &
         DEMO_PID=$!
         sleep 10
         kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "macOS basic_demo test completed"
+        wait $DEMO_PID 2>/dev/null || echo "macOS 01_spinning_cube test completed"
 
-        ./fps_demo &
+        ./03_fps_controller &
         FPS_PID=$!
         sleep 10
         kill $FPS_PID 2>/dev/null || true
-        wait $FPS_PID 2>/dev/null || echo "macOS fps_demo test completed"
+        wait $FPS_PID 2>/dev/null || echo "macOS 03_fps_controller test completed"
 
-        ./full_test &
+        ./02_textured_scene &
         FULL_PID=$!
         sleep 10
         kill $FULL_PID 2>/dev/null || true
-        wait $FULL_PID 2>/dev/null || echo "macOS full_test completed"
+        wait $FULL_PID 2>/dev/null || echo "macOS 02_textured_scene completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

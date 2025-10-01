@@ -4,9 +4,9 @@
     {
       "name": "Linux Debug (Single-threaded)",
       "includePath": [
-        "${workspaceFolder}/include/**",
-        "${workspaceFolder}/src/**",
-        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "${workspaceFolder}/lib/include/**",
+        "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
       ],
@@ -25,9 +25,9 @@
     {
       "name": "Linux Debug (Threaded)",
       "includePath": [
-        "${workspaceFolder}/include/**",
-        "${workspaceFolder}/src/**",
-        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "${workspaceFolder}/lib/include/**",
+        "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
       ],
@@ -47,9 +47,9 @@
     {
       "name": "Linux Release",
       "includePath": [
-        "${workspaceFolder}/include/**",
-        "${workspaceFolder}/src/**",
-        "${workspaceFolder}/examples/lib/SDL/include/**",
+        "${workspaceFolder}/lib/include/**",
+        "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
       ],

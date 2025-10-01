@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for multiple configurations
+# Build script for all projects (examples and demos)
 # Usage: ./build_all.sh [clean]
 
 set -e  # Exit on any error
@@ -36,68 +36,51 @@ print_error() {
 # Clean build directories if requested
 if [[ "$1" == "clean" ]]; then
     print_header "Cleaning build directories"
-    rm -rf build-*
+    rm -rf build
+    rm -rf demos/microcraft/build
     print_status "All build directories cleaned"
 fi
 
-# Define build configurations
-declare -A configs=(
-    ["debug-threaded"]="Debug ON"
-    ["debug-single"]="Debug OFF"
-    ["release-threaded"]="Release ON"
-    ["release-single"]="Release OFF"
-)
+# Build main project (library, examples, and desktop demos)
+print_header "Building main project"
 
-print_header "Building multiple configurations"
+mkdir -p build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release .. > /dev/null
+cmake --build . -j$(nproc)
 
-# Build each configuration
-for config_name in "${!configs[@]}"; do
-    config_info=(${configs[$config_name]})
-    build_type=${config_info[0]}
-    use_threads=${config_info[1]}
+if [[ -f "lib/libshader-works.a" ]]; then
+    print_status "✓ Main project build successful"
+else
+    print_error "✗ Main project build failed"
+    exit 1
+fi
 
-    build_dir="build-${config_name}"
+cd ..
 
-    print_status "Building ${config_name} (${build_type}, threads=${use_threads})"
-
-    # Create and configure build directory
-    mkdir -p "$build_dir"
-    cd "$build_dir"
-
-    cmake -DCMAKE_BUILD_TYPE="$build_type" \
-          -DSHADER_WORKS_USE_THREADS="$use_threads" \
-          .. > /dev/null 2>&1
-
-    # Build with progress info
-    cmake --build . -j$(nproc) 2>&1 | grep -E "Built target|Linking|Building" || true
-
-    # Verify build success
-    if [[ -f "bin/basic_demo" && -f "lib/libshader-works-lib.a" ]]; then
-        print_status "✓ ${config_name} build successful"
-    else
-        print_error "✗ ${config_name} build failed"
-        exit 1
-    fi
-
-    cd ..
-done
+# Note: MicroCraft embedded (SAMD51) build must be done separately
+# Run: cd demos/microcraft/platforms/samd51 && mkdir build && cd build
+#      cmake -DCMAKE_TOOLCHAIN_FILE=../../arm-none-eabi-toolchain.cmake ..
+#      make
 
 print_header "Build Summary"
-echo -e "${GREEN}All configurations built successfully!${NC}"
+echo -e "${GREEN}All projects built successfully!${NC}"
 echo
-echo "Build directories:"
-for config_name in "${!configs[@]}"; do
-    build_dir="build-${config_name}"
-    if [[ -d "$build_dir" ]]; then
-        exe_size=$(du -h "$build_dir/bin/basic_demo" | cut -f1)
-        lib_size=$(du -h "$build_dir/lib/libshader-works-lib.a" | cut -f1)
-        echo "  $build_dir: executable=${exe_size}, library=${lib_size}"
-    fi
-done
+echo "Executables:"
+if [[ -d "build/bin" ]]; then
+    for exe in build/bin/*; do
+        if [[ -f "$exe" ]]; then
+            size=$(du -h "$exe" | cut -f1)
+            echo "  - $(basename "$exe"): ${size}"
+        fi
+    done
+fi
 
 echo
-echo "To test a specific configuration:"
-echo "  ./build-debug-threaded/bin/basic_demo"
-echo "  ./build-release-single/bin/basic_demo"
+echo "Run examples and demos:"
+echo "  ./build/bin/01_spinning_cube"
+echo "  ./build/bin/02_textured_scene"
+echo "  ./build/bin/03_fps_controller"
+echo "  ./build/bin/microcraft"
 echo
 echo "To clean all builds: ./build_all.sh clean"

@@ -27,16 +27,21 @@ target_link_libraries(${PROG_NAME}.elf PRIVATE
     nosys
 )
 
-# Post-build commands to generate .bin, .hex, and .uf2 files
+# Set output directory for this executable to the unified bin directory
+set_target_properties(${PROG_NAME}.elf PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${UNIFIED_BIN_DIR}
+)
+
+# Post-build commands to generate .bin, .hex, and .uf2 files in the bin directory
 add_custom_command(TARGET ${PROG_NAME}.elf POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROG_NAME}.elf> ${CMAKE_BINARY_DIR}/${PROG_NAME}.bin
-    COMMAND ${CMAKE_OBJCOPY} -O ihex -R .eeprom $<TARGET_FILE:${PROG_NAME}.elf> ${CMAKE_BINARY_DIR}/${PROG_NAME}.hex
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${PROG_NAME}.elf> ${UNIFIED_BIN_DIR}/${PROG_NAME}.bin
+    COMMAND ${CMAKE_OBJCOPY} -O ihex -R .eeprom $<TARGET_FILE:${PROG_NAME}.elf> ${UNIFIED_BIN_DIR}/${PROG_NAME}.hex
     COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../tools/uf2/utils/uf2conv.py
-            ${CMAKE_BINARY_DIR}/${PROG_NAME}.bin
+            ${UNIFIED_BIN_DIR}/${PROG_NAME}.bin
             --base 0x4000
             --family 0x55114460
-            --output ${CMAKE_BINARY_DIR}/${PROG_NAME}.uf2
-    COMMENT "Generating ${PROG_NAME}.bin, ${PROG_NAME}.hex, and ${PROG_NAME}.uf2"
+            --output ${UNIFIED_BIN_DIR}/${PROG_NAME}.uf2
+    COMMENT "Generating ${PROG_NAME}.bin, ${PROG_NAME}.hex, and ${PROG_NAME}.uf2 in bin/"
 )
 
 # Print size information
