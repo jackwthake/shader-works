@@ -1,0 +1,12 @@
+main
+bin/
+src/resources.inl
+
+# CMake build artifacts
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
