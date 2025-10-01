@@ -17,7 +17,7 @@ set(MCU_PART "SAMD51J19A")
 # Directories
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third-party)
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set(PLATFORM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../platforms/SAMD51)
+set(PLATFORM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../platforms/samd51)
 set(LINKER_SCRIPT ${PLATFORM_DIR}/variant/linker_scripts/gcc/flash_with_bootloader.ld)
 
 # Compiler definitions
