@@ -1,0 +1,15 @@
+[submodule "third-party/CMSIS"]
+	path = third-party/CMSIS
+	url = https://github.com/ARM-software/CMSIS_5.git
+[submodule "third-party/CMSIS-Atmel"]
+	path = third-party/CMSIS-Atmel
+	url = https://github.com/arduino/ArduinoModule-CMSIS-Atmel.git
+[submodule "third-party/SdFat"]
+	path = third-party/SdFat
+	url = https://github.com/adafruit/SdFat.git
+[submodule "third-party/samd-core"]
+	path = third-party/samd-core
+	url = https://github.com/adafruit/ArduinoCore-samd.git
+[submodule "tools/uf2"]
+	path = tools/uf2
+	url = https://github.com/microsoft/uf2.git
