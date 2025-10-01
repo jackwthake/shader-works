@@ -1,6 +1,6 @@
 #include "device.h"
 
-#include <arduino.h>
+#include <Arduino.h>
 #include <variant.h>
 
 
