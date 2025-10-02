@@ -1,4 +1,27 @@
-
 [submodule "third-party/SDL"]
 	path = third-party/SDL
 	url = https://github.com/libsdl-org/SDL.git
+
+[submodule "demos/tundra/third-party/cJSON"]
+	path = demos/tundra/third-party/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+
+[submodule "demos/microcraft/third-party/CMSIS"]
+	path = demos/microcraft/third-party/CMSIS
+	url = https://github.com/ARM-software/CMSIS_5.git
+
+[submodule "demos/microcraft/third-party/CMSIS-Atmel"]
+	path = demos/microcraft/third-party/CMSIS-Atmel
+	url = https://github.com/arduino/ArduinoModule-CMSIS-Atmel.git
+
+[submodule "demos/microcraft/third-party/SdFat"]
+	path = demos/microcraft/third-party/SdFat
+	url = https://github.com/adafruit/SdFat.git
+
+[submodule "demos/microcraft/third-party/samd-core"]
+	path = demos/microcraft/third-party/samd-core
+	url = https://github.com/adafruit/ArduinoCore-samd.git
+
+[submodule "demos/microcraft/tools/uf2"]
+	path = demos/microcraft/tools/uf2
+	url = https://github.com/microsoft/uf2.git

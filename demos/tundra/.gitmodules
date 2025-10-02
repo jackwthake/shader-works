@@ -1,9 +1,0 @@
-[submodule "lib/SDL"]
-	path = lib/SDL
-	url = https://github.com/libsdl-org/SDL.git
-[submodule "lib/shader-works"]
-	path = lib/shader-works
-	url = https://github.com/jackwthake/shader-works.git
-[submodule "lib/cJSON"]
-	path = lib/cJSON
-	url = https://github.com/DaveGamble/cJSON.git

@@ -113,4 +113,5 @@ endif()
 # Add desktop demos
 if(SHADER_WORKS_BUILD_DEMOS)
     add_subdirectory(demos/microcraft)
+    add_subdirectory(demos/tundra)
 endif()
