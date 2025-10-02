@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Set the toolchain file before project()
-set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/arm-none-eabi-toolchain.cmake)
+set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../../arm-none-eabi-toolchain.cmake)
 
 project(microcraft C CXX ASM)
 
@@ -15,9 +15,10 @@ set(PROG_NAME "microcraft")
 set(MCU_PART "SAMD51J19A")
 
 # Directories
-set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third-party)
-set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set(PLATFORM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/platforms/samd51)
+set(MICROCRAFT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(LIB_DIR ${MICROCRAFT_ROOT}/third-party)
+set(SRC_DIR ${MICROCRAFT_ROOT}/src)
+set(PLATFORM_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(LINKER_SCRIPT ${PLATFORM_DIR}/variant/linker_scripts/gcc/flash_with_bootloader.ld)
 
 # Set unified output directory in build/bin
@@ -98,16 +99,16 @@ set(CORE_INCLUDES
 )
 
 # Create core library
-add_subdirectory(third-party)
+add_subdirectory(${MICROCRAFT_ROOT}/third-party ${CMAKE_BINARY_DIR}/third-party)
 
 # Create main executable
-add_subdirectory(src)
+add_subdirectory(${SRC_DIR} ${CMAKE_BINARY_DIR}/src)
 
 # Custom target for uploading via UF2 bootloader
 # The Adafruit PyGamer M4 shows up as a USB drive when in bootloader mode
 # Double-tap the reset button to enter bootloader mode
 add_custom_target(upload
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/uf2/utils/uf2conv.py
+    COMMAND python3 ${MICROCRAFT_ROOT}/tools/uf2/utils/uf2conv.py
             ${UNIFIED_BIN_DIR}/${PROG_NAME}.bin
             --base 0x4000
             --family 0x55114460
@@ -127,7 +128,7 @@ add_custom_target(upload-uf2
 
 # Custom target for resource baking
 add_custom_target(bake
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/bake.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND python3 ${MICROCRAFT_ROOT}/tools/bake.py
+    WORKING_DIRECTORY ${MICROCRAFT_ROOT}
     COMMENT "Baking resources from res/ directory"
 )

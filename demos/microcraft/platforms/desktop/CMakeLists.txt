@@ -1,11 +1,12 @@
 # MicroCraft - Desktop Demo
 
 add_executable(microcraft
-    main.c
+    main.cpp
 )
 
 target_link_libraries(microcraft PRIVATE
     shader-works
+    demos-common
     SDL3::SDL3
 )
 
