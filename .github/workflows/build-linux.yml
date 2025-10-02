@@ -1,0 +1,83 @@
+name: Linux
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          pkg-config \
+          libx11-dev \
+          libxext-dev \
+          libxi-dev \
+          libxrandr-dev \
+          libxss-dev \
+          libgl1-mesa-dev \
+          libgles2-mesa-dev \
+          libegl1-mesa-dev \
+          libdrm-dev \
+          libxkbcommon-dev \
+          libdecor-0-dev \
+          libasound2-dev \
+          libpulse-dev \
+          libjack-jackd2-dev \
+          libpipewire-0.3-dev \
+          libwayland-dev \
+          wayland-protocols \
+          libxss-dev \
+          libibus-1.0-dev
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=gcc \
+          -DSDL_SHARED=ON \
+          -DSDL_STATIC=OFF \
+          -DSDL_WAYLAND=ON \
+          -DSDL_X11=ON \
+          -DSHADER_WORKS_USE_THREADS=ON \
+          -DSHADER_WORKS_BUILD_EXAMPLES=OFF
+
+    - name: Build
+      run: cmake --build build --parallel
+
+    - name: Test Run Program
+      run: |
+        export DISPLAY=:99
+        sudo apt-get install -y xvfb
+        Xvfb :99 -screen 0 1024x768x24 &
+        sleep 2
+
+        # Run the program for 10 seconds and capture output
+        timeout 10s ./build/tundra > program_output.log 2>&1 || echo "Program completed or timed out"
+
+        echo "=== Program Output ==="
+        cat program_output.log || echo "No output captured"
+        echo "======================"
+
+    - name: Upload Linux Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: tundra-linux-x86_64
+        path: |
+          build/tundra
+          build/lib*.so*
+          program_output.log
