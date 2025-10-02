@@ -1,11 +1,5 @@
 <h1 align="center">Shader Works</h1>
 <p align="center">
-  <br>
-  <img src="https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587" alt="Demo project screen grab" />
-  <img src="https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a" alt="Demo prohect in wireframe mode" />
-</p>
-
-<p align="center">
   <a href="https://github.com/jackwthake/shader-works/actions/workflows/linux-build.yml">
     <img src="https://github.com/jackwthake/shader-works/actions/workflows/linux-build.yml/badge.svg" alt="Linux">
   </a>
@@ -16,6 +10,11 @@
     <img src="https://github.com/jackwthake/shader-works/actions/workflows/windows-build.yml/badge.svg" alt="Windows">
   </a>
 </p>
+
+  | | |
+|:-------------------------:|:-------------------------:
+| ![02_textured_scene grab](https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587) | ![02_textured_scene wireframe]("https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a")
+| ![snowy scene](./demos/tundra/screenshots/day-night.gif) |![static scene](./demos/microcraft/screenshots/screenshot.png)
 
 A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on portability and performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
 

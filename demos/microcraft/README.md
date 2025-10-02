@@ -1,5 +1,7 @@
 # Microcraft
 
+<img src="./screenshots/screenshot.png" alt="Demo project screen grab" />
+
 ## Hardware Requirements
 
 ### Adafruit PyGamer M4 Express

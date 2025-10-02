@@ -70,7 +70,7 @@ private:
   model_t cube = {};  // Zero-initialize
 
   light_t sun = {
-    .direction = {1, -1, 1},
+    .direction = {1, -1, -1},
     .color = 0xFFFFFFFF,  // White color (RGBA)
     .is_directional = true
   };

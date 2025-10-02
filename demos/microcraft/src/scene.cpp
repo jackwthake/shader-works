@@ -63,20 +63,53 @@ static inline float2 get_tile_uv(int tile_id, int corner) {
   return TILE_UVS[tile_id][corner];
 }
 
-// Checks if block needs rendering (occlusion culling)
-static bool is_block_visible(size_t x, size_t z, size_t y) {
-  // If block is on the edge of the map, it's visible
+// Checks if block needs rendering (occlusion culling + view frustum culling)
+static bool is_block_visible(size_t x, size_t z, size_t y, transform_t& camera) {
+  // First check if any face is exposed (basic occlusion)
+  bool has_exposed_face = false;
+
   if (x == 0 || x == Scene::MAP_WIDTH-1 || z == 0 || z == Scene::MAP_DEPTH-1 || y == 0 || y == Scene::MAP_HEIGHT-1) {
-    return true;
+    has_exposed_face = true;
+  } else {
+    has_exposed_face = (Scene::map[x-1][z][y] == block_type_t::AIR ||
+                        Scene::map[x+1][z][y] == block_type_t::AIR ||
+                        Scene::map[x][z-1][y] == block_type_t::AIR ||
+                        Scene::map[x][z+1][y] == block_type_t::AIR ||
+                        Scene::map[x][z][y-1] == block_type_t::AIR ||
+                        Scene::map[x][z][y+1] == block_type_t::AIR);
   }
 
-  // Check if all 6 adjacent blocks are solid (occluding this block)
-  return (Scene::map[x-1][z][y] == block_type_t::AIR ||
-          Scene::map[x+1][z][y] == block_type_t::AIR ||
-          Scene::map[x][z-1][y] == block_type_t::AIR ||
-          Scene::map[x][z+1][y] == block_type_t::AIR ||
-          Scene::map[x][z][y-1] == block_type_t::AIR ||
-          Scene::map[x][z][y+1] == block_type_t::AIR);
+  if (!has_exposed_face) return false;
+
+  // View frustum culling using two rays from camera tracing screen edges
+  float3 block_pos = {(float)x, (float)y, (float)z};
+  float3 to_block = {
+    block_pos.x - camera.position.x,
+    block_pos.y - camera.position.y,
+    block_pos.z - camera.position.z
+  };
+
+  float3 right, up, forward;
+  transform_get_basis_vectors(&camera, &right, &up, &forward);
+
+  // Check if block is in front of camera
+  float forward_dot = float3_dot(forward, to_block);
+  if (forward_dot >= 0.0f) return false;
+
+  // Define FOV half-angle (matching the projection matrix FOV)
+  const float fov_half_angle = 0.785398f;  // 45 degrees in radians (90° total FOV)
+
+  // Calculate the horizontal frustum planes using right vector
+  // Left and right edge rays are: forward +/- tan(fov_half_angle) * right
+  float tan_fov = tanf(fov_half_angle);
+
+  // Project block onto right axis to check if it's within horizontal frustum
+  float right_dot = float3_dot(right, to_block);
+
+  // Block must be within the cone defined by: |right_dot| <= forward_dot * tan(fov)
+  if (fabsf(right_dot) < forward_dot * tan_fov) return false;
+
+  return true;
 }
 
 // Generate UV coordinates for a full cube (6 faces, each with 2 triangles)
@@ -180,7 +213,7 @@ void Scene::init() {
   // Initialize the cube mesh
   generate_cube(&cube, {0.f, 0.f, 0.f}, {1.f, 1.f, 1.f});
   cube.vertex_shader = nullptr;
-  cube.frag_shader = nullptr;
+  cube.frag_shader = &default_lighting_frag_shader;
   cube.use_textures = true;
 
   fprintf(stderr, "Cube initialized: vertices=%zu, vertex_data=%p\n", cube.num_vertices, cube.vertex_data);
@@ -215,14 +248,7 @@ void Scene::update(float delta_time) {
 
 // Render the scene to the display buffer
 void Scene::render(renderer_t &state, uint32_t *buffer, float *depth_buffer) {
-  // Debug check
-  static int frame = 0;
-  if (frame == 0) {
-    fprintf(stderr, "First render: this=%p, cube.num_vertices=%zu, cube.vertex_data=%p, &(this->cube)=%p\n",
-            this, cube.num_vertices, cube.vertex_data, &(this->cube));
-    fflush(stderr);
-  }
-  frame++;
+  static unsigned frames = 0; // for debug
 
   // Simple frustum culling: only render blocks near the player
   const float render_distance = 16.0f;
@@ -241,13 +267,15 @@ void Scene::render(renderer_t &state, uint32_t *buffer, float *depth_buffer) {
     cube.vertex_data[i].uv = cube_uvs_grass[i];
   }
 
-  int blocks_rendered = 0;
+  size_t blocks_rendered = 0, tris_rendered = 0, blocks_attempted = 0;
   for (int x = min_x; x <= max_x; ++x) {
     for (int z = min_z; z <= max_z; ++z) {
       float height = terrain_height(x, z, MAP_HEIGHT);
 
       for (size_t y = 0; y <= height; ++y) {
-        if (is_block_visible(x, z, y)) {
+        blocks_attempted++;
+
+        if (is_block_visible(x, z, y, player_cam)) {
           block_type_t block = Scene::map[x][z][y];
 
           cube.transform.position = { (float)x, (float)y, (float)z };
@@ -286,10 +314,15 @@ void Scene::render(renderer_t &state, uint32_t *buffer, float *depth_buffer) {
             cube.vertex_data[i].uv = uvs[i];
           }
 
-          render_model(&state, &player_cam, &cube, &sun, 1);
+          tris_rendered += render_model(&state, &player_cam, &cube, &sun, 1) % 36;
+          ++blocks_rendered;
         }
       }
     }
+  }
+
+  if (++frames % 60) {
+    printf("%u blocks sent to renderer, %u triangles actually rendered of %u total\n", blocks_rendered, tris_rendered, blocks_attempted);
   }
 
   apply_fog_to_screen(&state, 5, 15, 50, 50, 175);
