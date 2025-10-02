@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 project(shader-works C CXX)
 
 # Set policies for compatibility
+if(POLICY CMP0000)
+    cmake_policy(SET CMP0000 NEW)
+endif()
 if(POLICY CMP0054)
     cmake_policy(SET CMP0054 NEW)
 endif()

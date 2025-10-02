@@ -43,27 +43,24 @@ def add_file(file_path, outfile):
 
   print (file_path)
   with Image.open(file_path) as img:
-    # Convert to RGB if not already
-    img = img.convert('RGB')
-    
-    # Convert to 565 format
-    pixels_565 = []
+    # Convert to RGBA if not already
+    img = img.convert('RGBA')
+
+    # Convert to RGBA8888 format (32-bit)
+    pixels_rgba = []
     for y in range(img.height):
       for x in range(img.width):
-        r, g, b = img.getpixel((x, y))
-        # Convert 8-bit RGB to 565 format
-        r565 = (r >> 3) & 0x1F
-        g565 = (g >> 2) & 0x3F  
-        b565 = (b >> 3) & 0x1F
-        pixel_565 = (r565 << 11) | (g565 << 5) | b565
-        pixels_565.append(pixel_565)
-    
-    # Format as uint16_t array
-    pixels_str = ', '.join([f'0x{p:04X}' for p in pixels_565])
-    content = '(const uint16_t[]) { ' + pixels_str + ' }'
-    num_pixels = len(pixels_565)
-    
-    generate_file_obj(outfile, file_path, content, num_pixels * 2)  # 2 bytes per uint16_t
+        r, g, b, a = img.getpixel((x, y))
+        # Pack RGBA into 32-bit integer: RGBA8888 format
+        pixel_rgba = (r << 24) | (g << 16) | (b << 8) | a
+        pixels_rgba.append(pixel_rgba)
+
+    # Format as uint32_t array
+    pixels_str = ', '.join([f'0x{p:08X}' for p in pixels_rgba])
+    content = '(uint32_t[]) { ' + pixels_str + ' }'
+    num_pixels = len(pixels_rgba)
+
+    generate_file_obj(outfile, file_path, content, num_pixels * 4)  # 4 bytes per uint32_t
     
 
 print("Resource Directory:", RES_DIR)
@@ -77,10 +74,10 @@ output.write('#pragma once\n\n')
 output.write('#include <stdint.h>\n\n')
 output.write('struct FileEntry {\n'
               '\t\tconst char* name;\n'
-              '\t\tconst uint16_t *data;\n'
+              '\t\tuint32_t *data;\n'
               '\t\tunsigned int size;\n'
               '};\n\n'
-              'const FileEntry files[] __attribute__((section(".rodata"))) = {\n'
+              'FileEntry files[] __attribute__((section(".rodata"))) = {\n'
              )
 
 # Walk through the RES_DIR and add each file to the output
