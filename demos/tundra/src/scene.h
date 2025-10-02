@@ -5,8 +5,8 @@
 #include <shader-works/primitives.h>
 #include <shader-works/maths.h>
 
-#include "util/chunk_map.h"
-#include "util/config.h"
+#include "common/chunk_map.h"
+#include "common/config.h"
 
 typedef struct {
   float move_speed;
@@ -26,14 +26,8 @@ typedef struct scene_t {
   light_t sun;
 } scene_t;
 
-// Implementation found in proc_gen.c
 extern float map_range(float value, float old_min, float old_max, float new_min, float new_max);
 
-extern float lerp(float a, float b, float t);
-extern float hash2(int x, int y, int seed);
-
-extern float noise2D(float x, float y, int seed);
-extern float ridgeNoise(float x, float y, int seed);
 extern float terrainHeight(float x, float y, int seed);
 extern float get_interpolated_terrain_height(float x, float z);
 

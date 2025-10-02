@@ -9,6 +9,8 @@
 #include <shader-works/renderer.h>
 #include <shader-works/maths.h>
 
+#include "common/noise.h"
+
 extern fragment_shader_t ground_shadow_frag;
 extern fragment_shader_t tree_frag;
 
@@ -33,8 +35,15 @@ static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
   generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(1.0f, 1.0f), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
 
-  chunk->num_trees = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0, 7);
-  chunk->trees = calloc(chunk->num_trees, sizeof(model_t));
+  float num_trees_float = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0.0f, 7.0f);
+  chunk->num_trees = (usize)(num_trees_float < 0.0f ? 0 : num_trees_float);
+  chunk->trees = chunk->num_trees > 0 ? calloc(chunk->num_trees, sizeof(model_t)) : NULL;
+
+  if (chunk->trees == NULL && chunk->num_trees > 0) {
+    fprintf(stderr, "Failed to allocate memory for %zu trees\n", chunk->num_trees);
+    chunk->num_trees = 0;
+    return;
+  }
 
   for (usize i = 0; i < chunk->num_trees; ++i) {
     float tree_x = map_range(hash2(chunk_x * 100 + i, chunk_z * 100 + i * 3, g_world_config.seed), -1.0f, 1.0f, world_x + 2, world_x + g_world_config.chunk_size - 2);

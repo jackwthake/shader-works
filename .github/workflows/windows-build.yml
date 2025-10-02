@@ -49,23 +49,17 @@ jobs:
       shell: msys2 {0}
       run: |
         cd build/bin
-        ./01_spinning_cube.exe &
-        DEMO_PID=$!
+        ./tundra.exe &
+        TUNDRA_PID=$!
         sleep 10
-        kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Windows 01_spinning_cube test completed"
+        kill $TUNDRA_PID 2>/dev/null || true
+        wait $TUNDRA_PID 2>/dev/null || echo "Windows tundra test completed"
 
-        ./03_fps_controller.exe &
-        FPS_PID=$!
+        ./microcraft.exe &
+        MICROCRAFT_PID=$!
         sleep 10
-        kill $FPS_PID 2>/dev/null || true
-        wait $FPS_PID 2>/dev/null || echo "Windows 03_fps_controller test completed"
-
-        ./02_textured_scene.exe &
-        FULL_PID=$!
-        sleep 10
-        kill $FULL_PID 2>/dev/null || true
-        wait $FULL_PID 2>/dev/null || echo "Windows 02_textured_scene completed"
+        kill $MICROCRAFT_PID 2>/dev/null || true
+        wait $MICROCRAFT_PID 2>/dev/null || echo "Windows microcraft test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

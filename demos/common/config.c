@@ -10,7 +10,7 @@ cJSON *g_config = NULL;
 world_config_t g_world_config = {0};
 
 // Default values
-#define DEFAULT_TITLE "Tundra"
+#define DEFAULT_TITLE "Demo"
 #define DEFAULT_WIDTH 200
 #define DEFAULT_HEIGHT 125
 #define DEFAULT_SCALE 8
@@ -94,28 +94,26 @@ int load_world_config(void) {
 
   if (!g_config) {
     printf("Config not loaded, using default world settings\n");
-    goto calculate_derived;
+  } else {
+    // Extract world settings
+    cJSON *world = cJSON_GetObjectItem(g_config, "world");
+    if (world) {
+      cJSON *seed = cJSON_GetObjectItem(world, "seed");
+      cJSON *chunk_size = cJSON_GetObjectItem(world, "chunk_size");
+      cJSON *ground_segments = cJSON_GetObjectItem(world, "ground_segments_per_chunk");
+      cJSON *load_radius = cJSON_GetObjectItem(world, "chunk_load_radius");
+
+      if (cJSON_IsNumber(seed)) g_world_config.seed = seed->valueint;
+      if (cJSON_IsNumber(chunk_size)) g_world_config.chunk_size = chunk_size->valueint;
+      if (cJSON_IsNumber(ground_segments)) g_world_config.ground_segments_per_chunk = ground_segments->valueint;
+      if (cJSON_IsNumber(load_radius)) g_world_config.chunk_load_radius = load_radius->valueint;
+
+      printf("Loaded world config: seed=%d, chunk_size=%d, segments=%d, load_radius=%d\n",
+              g_world_config.seed, g_world_config.chunk_size,
+              g_world_config.ground_segments_per_chunk, g_world_config.chunk_load_radius);
+    }
   }
 
-  // Extract world settings
-  cJSON *world = cJSON_GetObjectItem(g_config, "world");
-  if (world) {
-    cJSON *seed = cJSON_GetObjectItem(world, "seed");
-    cJSON *chunk_size = cJSON_GetObjectItem(world, "chunk_size");
-    cJSON *ground_segments = cJSON_GetObjectItem(world, "ground_segments_per_chunk");
-    cJSON *load_radius = cJSON_GetObjectItem(world, "chunk_load_radius");
-
-    if (cJSON_IsNumber(seed)) g_world_config.seed = seed->valueint;
-    if (cJSON_IsNumber(chunk_size)) g_world_config.chunk_size = chunk_size->valueint;
-    if (cJSON_IsNumber(ground_segments)) g_world_config.ground_segments_per_chunk = ground_segments->valueint;
-    if (cJSON_IsNumber(load_radius)) g_world_config.chunk_load_radius = load_radius->valueint;
-
-    printf("Loaded world config: seed=%d, chunk_size=%d, segments=%d, load_radius=%d\n",
-           g_world_config.seed, g_world_config.chunk_size,
-           g_world_config.ground_segments_per_chunk, g_world_config.chunk_load_radius);
-  }
-
-calculate_derived:
   // Calculate derived values
   g_world_config.half_chunk_size = g_world_config.chunk_size / 2;
   g_world_config.ground_segment_size = (float)g_world_config.chunk_size / (float)g_world_config.ground_segments_per_chunk;

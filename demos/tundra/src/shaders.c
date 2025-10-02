@@ -7,7 +7,8 @@
 #include <stdio.h>
 #include "scene.h"
 
-#include "util/chunk_map.h"
+#include "common/chunk_map.h"
+#include "common/noise.h"
 
 u32 rgb_to_u32(u8 r, u8 g, u8 b) {
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
@@ -25,7 +26,7 @@ static float rand_float(void) {
 
 u32 tree_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {
   (void)input; (void)args; (void)argc;
-  
+
   // white/black noise pattern based on world position
   float check_size = 0.02f;
   float x = floorf(ctx->world_pos.x / check_size);
@@ -384,5 +385,3 @@ usize render_quads(renderer_t *renderer, transform_t *camera, light_t *lights, u
 
   return total_triangles;
 }
-
-

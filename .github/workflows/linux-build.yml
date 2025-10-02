@@ -47,23 +47,17 @@ jobs:
     - name: Test demo runs
       run: |
         cd build/bin
-        ./01_spinning_cube &
-        DEMO_PID=$!
+        ./tundra &
+        TUNDRA_PID=$!
         sleep 10
-        kill $DEMO_PID 2>/dev/null || true
-        wait $DEMO_PID 2>/dev/null || echo "Linux 01_spinning_cube test completed"
+        kill $TUNDRA_PID 2>/dev/null || true
+        wait $TUNDRA_PID 2>/dev/null || echo "Linux tundra test completed"
 
-        ./03_fps_controller &
-        FPS_PID=$!
+        ./microcraft &
+        MICROCRAFT_PID=$!
         sleep 10
-        kill $FPS_PID 2>/dev/null || true
-        wait $FPS_PID 2>/dev/null || echo "Linux 03_fps_controller test completed"
-
-        ./02_textured_scene &
-        FULL_PID=$!
-        sleep 10
-        kill $FULL_PID 2>/dev/null || true
-        wait $FULL_PID 2>/dev/null || echo "Linux 02_textured_scene completed"
+        kill $MICROCRAFT_PID 2>/dev/null || true
+        wait $MICROCRAFT_PID 2>/dev/null || echo "Linux microcraft test completed"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

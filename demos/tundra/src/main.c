@@ -8,7 +8,8 @@
 
 #include <SDL3/SDL.h>
 
-#include "util/config.h"
+#include "common/config.h"
+#include "common/noise.h"
 #include "util/state.h"
 #include "scene.h"
 
@@ -108,7 +109,7 @@ static void apply_fps_movement(struct context_t *ctx, float dt) {
   const bool *keys = ctx->keys;
   float3 movement = {0}, right, up, forward;
   float speed = ctx->scene.controller.move_speed * dt;
-  
+
   // movement
   transform_get_basis_vectors(&ctx->scene.camera_pos, &right, &up, &forward);
 
@@ -116,7 +117,7 @@ static void apply_fps_movement(struct context_t *ctx, float dt) {
   if (keys[SDL_SCANCODE_S]) movement = float3_add(movement, float3_scale(forward, speed));
   if (keys[SDL_SCANCODE_A]) movement = float3_add(movement, float3_scale(right, speed));
   if (keys[SDL_SCANCODE_D]) movement = float3_add(movement, float3_scale(right, -speed));
-  
+
   // apply movement
   ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, movement);
   float new_ground_height = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
@@ -124,10 +125,10 @@ static void apply_fps_movement(struct context_t *ctx, float dt) {
   // mouse input
   float mx, my;
   SDL_GetRelativeMouseState(&mx, &my);
-  
+
   ctx->scene.camera_pos.yaw += mx * ctx->scene.controller.mouse_sensitivity;
   ctx->scene.camera_pos.pitch -= my * ctx->scene.controller.mouse_sensitivity;
-  
+
   if (ctx->scene.camera_pos.pitch < ctx->scene.controller.min_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.min_pitch;
   if (ctx->scene.camera_pos.pitch > ctx->scene.controller.max_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.max_pitch;
 
@@ -142,7 +143,11 @@ static void on_generate(void *args, size_t size) {
   if (!ctx) return;
 
   ctx->scene = (scene_t) {
-    .camera_pos = { 0 },
+    .camera_pos = {
+      .pitch = -0.3f,  // Look down slightly to see the terrain
+      .yaw = 0.0f,
+      .position = {0, 0, 0}
+    },
     .chunk_map = { 0 },
     .controller = (fps_controller_t) {
       .move_speed = 15.0f,
@@ -190,7 +195,7 @@ static void on_normal_tick(void *args, size_t size, float dt) {
   if (!args) return;
 
   struct context_t *ctx = (struct context_t*)args;
-  
+
   // apply movement
   apply_fps_movement(ctx, dt);
   ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;
@@ -262,7 +267,7 @@ static int on_overhead_render(void *args, size_t size) {
   if (!args) return 0;
 
   struct context_t *ctx = (struct context_t*)args;
-  
+
   model_t cube = { 0 };
   float3 pos = make_float3(ctx->scene.camera_pos.position.x, ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset, ctx->scene.camera_pos.position.z);
   generate_cube(&cube, pos, (float3){ 2, 1, 2 });
@@ -354,15 +359,15 @@ int main(int argc, char const *argv[]) {
 
     accumulator += frame_time;
     state_context.total_time += frame_time;
-    
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_EVENT_QUIT) running = false;
       if (event.type == SDL_EVENT_KEY_DOWN) {
         if (event.key.key == SDLK_ESCAPE) {
           running = false;
-        } 
-        
+        }
+
         if (event.key.key == SDLK_1 && fsm_get_state(&sm) != NORMAL)
           fsm_change_state(&sm, NORMAL);
         else if (event.key.key == SDLK_2)
@@ -389,14 +394,14 @@ int main(int argc, char const *argv[]) {
       depth_buffer[i] = FLT_MAX;
     }
 
-    fsm_render_state(&sm);
+    int triangles_rendered = fsm_render_state(&sm);
 
     SDL_UpdateTexture(sdl_framebuff, NULL, framebuffer, config_width * sizeof(u32));
     SDL_RenderTexture(sdl_renderer, sdl_framebuff, NULL, NULL);
     SDL_RenderPresent(sdl_renderer);
-    
+
     stats.fps_counter++;
-    // stats.triangle_counter += triangles_rendered;
+    stats.triangle_counter += triangles_rendered;
     uint64_t counter_time = SDL_GetPerformanceCounter();
     if ((float)(counter_time - stats.last_counter_time) / (float)SDL_GetPerformanceFrequency() >= 1.0f) {
       uint64_t avg_triangles_per_frame = stats.fps_counter > 0 ? stats.triangle_counter / stats.fps_counter : 0;

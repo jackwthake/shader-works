@@ -6,73 +6,11 @@
 
 #include "scene.h"
 
-// Smooth step function for better interpolation
-static inline float smoothstep(float t) {
-  return t * t * (3.0f - 2.0f * t);
-}
+#include "common/noise.h"
 
 // Map a value from one range to another
 inline float map_range(float value, float old_min, float old_max, float new_min, float new_max) {
   return new_min + (value - old_min) * (new_max - new_min) / (old_max - old_min);
-}
-
-// Simple 1D interpolation
-inline float lerp(float a, float b, float t) {
-  return a + t * (b - a);
-}
-
-// Hash function to get pseudo-random gradients with seed
-inline float hash2(int x, int y, int seed) {
-  int n = x + y * 57 + seed * 2654435761;
-  n = (n << 13) ^ n;
-  return (1.0f - (float)((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
-}
-
-// Simple 2D Perlin-like noise (using a hash for gradients) with seed
-float noise2D(float x, float y, int seed) {
-  // Grid coordinates - use floor for proper handling of negative coordinates
-  int xi = (int)floorf(x);
-  int yi = (int)floorf(y);
-
-  // Fractional parts
-  float xf = x - (float)xi;
-  float yf = y - (float)yi;
-  
-  // Hash function to get pseudo-random gradients at grid points
-  // (This is simplified - you'd want better hashing in practice)
-  float a = hash2(xi, yi, seed);
-  float b = hash2(xi + 1, yi, seed);
-  float c = hash2(xi, yi + 1, seed);
-  float d = hash2(xi + 1, yi + 1, seed);
-  
-  // Interpolate
-  float i1 = lerp(a, b, smoothstep(xf));
-  float i2 = lerp(c, d, smoothstep(xf));
-  return lerp(i1, i2, smoothstep(yf));
-}
-
-// Fractal Brownian Motion (fBm) for generating terrain with seed
-static float fbm(float x, float y, int octaves, int seed) {
-  float value = 0.0f;
-  float amplitude = 1.0f;
-  float frequency = 1.0f;
-  float maxValue = 0.0f;  // For normalizing
-  
-  for (int i = 0; i < octaves; i++) {
-    value += noise2D(x * frequency, y * frequency, seed + i) * amplitude;
-    maxValue += amplitude;
-    
-    amplitude *= 0.5f;  // Each octave has half the amplitude
-    frequency *= 2.0f;  // Each octave has double the frequency
-  }
-  
-  return value / maxValue;  // Normalize to [-1, 1]
-}
-
-// Ridge noise function to create sharp features with seed
-float ridgeNoise(float x, float y, int seed) {
-  float n = fbm(x, y, 4, seed);
-  return 1.0f - fabsf(n);  // Creates ridges by inverting absolute value
 }
 
 // Terrain height function combining multiple noise layers for gradual hills and mountains
@@ -114,30 +52,30 @@ float terrainHeight(float x, float y, int seed) {
 
 float get_interpolated_terrain_height(float x, float z) {
   float grid_size = 1.0f; // Sample every 1 unit
-  
+
   // Find which grid cell we're in
   float grid_x = x / grid_size;
   float grid_z = z / grid_size;
-  
+
   // Get integer grid coordinates
   int gx = (int)floorf(grid_x);
   int gz = (int)floorf(grid_z);
-  
+
   // Get fractional parts for interpolation
   float fx = grid_x - (float)gx;
   float fz = grid_z - (float)gz;
-  
+
   // Sample terrain height at the four corners of the grid cell
   float corner_x0 = (float)gx * grid_size;
   float corner_x1 = (float)(gx + 1) * grid_size;
   float corner_z0 = (float)gz * grid_size;
   float corner_z1 = (float)(gz + 1) * grid_size;
-  
+
   float h00 = terrainHeight(corner_x0, corner_z0, g_world_config.seed);
   float h10 = terrainHeight(corner_x1, corner_z0, g_world_config.seed);
   float h01 = terrainHeight(corner_x0, corner_z1, g_world_config.seed);
   float h11 = terrainHeight(corner_x1, corner_z1, g_world_config.seed);
-  
+
   // Bilinear interpolation
   float h0 = lerp(h00, h10, fx);
   float h1 = lerp(h01, h11, fx);
@@ -150,57 +88,57 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
 
   // Skip degenerate cylinders where both radii are too small
   if (bottom_radius < 0.0001f && top_radius < 0.0001f) return 0;
-  
+
   // Calculate vertices and faces
   usize side_vertices = segments * 6;         // 2 triangles per segment = 6 vertices
   usize bottom_cap_vertices = (segments - 2) * 3;
   usize top_cap_vertices = (segments - 2) * 3;
   usize new_vertices = side_vertices + bottom_cap_vertices + top_cap_vertices;
   usize new_faces = segments * 2 + (segments - 2) + (segments - 2);
-  
+
   usize old_vertices = model->num_vertices;
   usize old_faces = model->num_faces;
-  
+
   // Reallocate arrays for append
   vertex_data_t* tmp_v = realloc(model->vertex_data, (old_vertices + new_vertices) * sizeof(vertex_data_t));
   float3* tmp_f = realloc(model->face_normals, (old_faces + new_faces) * sizeof(float3));
-  
+
   if (!tmp_v || !tmp_f) {
     free(tmp_v);
     free(tmp_f);
     return -1;
   }
-  
+
   model->vertex_data = tmp_v;
   model->face_normals = tmp_f;
-  
+
   float3 axis = float3_normalize(float3_sub(top_center, bottom_center));
-  
+
   usize vertex_idx = old_vertices;
   usize face_idx = old_faces;
-  
+
   // -------- Side faces --------
   for (usize i = 0; i < segments; i++) {
     // Bottom angles
     float angle1b = (2.0f * PI * i) / segments + bottom_angle_offset;
     float angle2b = (2.0f * PI * (i + 1)) / segments + bottom_angle_offset;
-    
+
     float cos1b = cosf(angle1b), sin1b = sinf(angle1b);
     float cos2b = cosf(angle2b), sin2b = sinf(angle2b);
-    
+
     // Top angles
     float angle1t = (2.0f * PI * i) / segments + top_angle_offset;
     float angle2t = (2.0f * PI * (i + 1)) / segments + top_angle_offset;
-    
+
     float cos1t = cosf(angle1t), sin1t = sinf(angle1t);
     float cos2t = cosf(angle2t), sin2t = sinf(angle2t);
-    
+
     // Tangent basis
     float3 right = float3_normalize(float3_cross(axis, make_float3(0, 1, 0)));
     if (float3_magnitude(right) < 0.1f)
     right = float3_normalize(float3_cross(axis, make_float3(1, 0, 0)));
     float3 forward = float3_normalize(float3_cross(axis, right));
-    
+
     // Bottom vertices
     float3 bottom1 = float3_add(bottom_center,
       float3_add(float3_scale(right, cos1b * bottom_radius),
@@ -208,7 +146,7 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
       float3 bottom2 = float3_add(bottom_center,
       float3_add(float3_scale(right, cos2b * bottom_radius),
       float3_scale(forward, sin2b * bottom_radius)));
-        
+
     // Top vertices
     float3 top1 = float3_add(top_center,
                   float3_add(float3_scale(right, cos1t * top_radius),
@@ -216,26 +154,26 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
     float3 top2 = float3_add(top_center,
                   float3_add(float3_scale(right, cos2t * top_radius),
                   float3_scale(forward, sin2t * top_radius)));
-      
+
     // Side normal
     float3 edge1 = float3_sub(top1, bottom1);
     float3 edge2 = float3_sub(bottom2, bottom1);
     float3 normal = float3_normalize(float3_cross(edge1, edge2));
-    
+
     // First triangle
     model->vertex_data[vertex_idx++] = (vertex_data_t){ bottom1, make_float2((float)i / segments, 0.0f), normal };
     model->vertex_data[vertex_idx++] = (vertex_data_t){ bottom2, make_float2((float)(i + 1) / segments, 0.0f), normal };
     model->vertex_data[vertex_idx++] = (vertex_data_t){ top1,    make_float2((float)i / segments, 1.0f), normal };
-    
+
     // Second triangle
     model->vertex_data[vertex_idx++] = (vertex_data_t){ bottom2, make_float2((float)(i + 1) / segments, 0.0f), normal };
     model->vertex_data[vertex_idx++] = (vertex_data_t){ top2,    make_float2((float)(i + 1) / segments, 1.0f), normal };
     model->vertex_data[vertex_idx++] = (vertex_data_t){ top1,    make_float2((float)i / segments, 1.0f), normal };
-    
+
     model->face_normals[face_idx++] = normal;
     model->face_normals[face_idx++] = normal;
   }
-  
+
   // -------- Bottom cap --------
   if (bottom_radius > 0.0001f) {
     float3 bottom_normal = float3_scale(axis, -1.0f);
@@ -243,16 +181,16 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
       float angle0 = 0 + bottom_angle_offset;
       float angle1 = (2.0f * PI * i) / segments + bottom_angle_offset;
       float angle2 = (2.0f * PI * (i + 1)) / segments + bottom_angle_offset;
-      
+
       float cos0 = cosf(angle0), sin0 = sinf(angle0);
       float cos1 = cosf(angle1), sin1 = sinf(angle1);
       float cos2 = cosf(angle2), sin2 = sinf(angle2);
-      
+
       float3 right = float3_normalize(float3_cross(axis, make_float3(0, 1, 0)));
       if (float3_magnitude(right) < 0.1f)
       right = float3_normalize(float3_cross(axis, make_float3(1, 0, 0)));
       float3 forward = float3_normalize(float3_cross(axis, right));
-      
+
       float3 v0 = float3_add(bottom_center,
                   float3_add(float3_scale(right, cos0 * bottom_radius),
                   float3_scale(forward, sin0 * bottom_radius)));
@@ -262,15 +200,15 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
       float3 v2 = float3_add(bottom_center,
           float3_add(float3_scale(right, cos2 * bottom_radius),
           float3_scale(forward, sin2 * bottom_radius)));
-          
+
           model->vertex_data[vertex_idx++] = (vertex_data_t){ v0, make_float2(0.5f + cos0 * 0.5f, 0.5f + sin0 * 0.5f), bottom_normal };
           model->vertex_data[vertex_idx++] = (vertex_data_t){ v1, make_float2(0.5f + cos1 * 0.5f, 0.5f + sin1 * 0.5f), bottom_normal };
           model->vertex_data[vertex_idx++] = (vertex_data_t){ v2, make_float2(0.5f + cos2 * 0.5f, 0.5f + sin2 * 0.5f), bottom_normal };
-          
+
           model->face_normals[face_idx++] = bottom_normal;
     }
   }
-      
+
   // -------- Top cap --------
   if (top_radius > 0.0001f) {
     float3 top_normal = axis;
@@ -278,16 +216,16 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
       float angle0 = 0 + top_angle_offset;
       float angle1 = (2.0f * PI * i) / segments + top_angle_offset;
       float angle2 = (2.0f * PI * (i + 1)) / segments + top_angle_offset;
-      
+
       float cos0 = cosf(angle0), sin0 = sinf(angle0);
       float cos1 = cosf(angle1), sin1 = sinf(angle1);
       float cos2 = cosf(angle2), sin2 = sinf(angle2);
-      
+
       float3 right = float3_normalize(float3_cross(axis, make_float3(0, 1, 0)));
       if (float3_magnitude(right) < 0.1f)
       right = float3_normalize(float3_cross(axis, make_float3(1, 0, 0)));
       float3 forward = float3_normalize(float3_cross(axis, right));
-      
+
       float3 v0 = float3_add(top_center,
                   float3_add(float3_scale(right, cos0 * top_radius),
                   float3_scale(forward, sin0 * top_radius)));
@@ -297,19 +235,19 @@ int generate_tree_cylinder(model_t* model, float bottom_radius, float top_radius
       float3 v2 = float3_add(top_center,
                   float3_add(float3_scale(right, cos2 * top_radius),
                   float3_scale(forward, sin2 * top_radius)));
-          
+
       // Reverse winding
       model->vertex_data[vertex_idx++] = (vertex_data_t){ v0, make_float2(0.5f + cos0 * 0.5f, 0.5f + sin0 * 0.5f), top_normal };
       model->vertex_data[vertex_idx++] = (vertex_data_t){ v2, make_float2(0.5f + cos2 * 0.5f, 0.5f + sin2 * 0.5f), top_normal };
       model->vertex_data[vertex_idx++] = (vertex_data_t){ v1, make_float2(0.5f + cos1 * 0.5f, 0.5f + sin1 * 0.5f), top_normal };
-      
+
       model->face_normals[face_idx++] = top_normal;
     }
   }
-      
+
   model->num_vertices = old_vertices + new_vertices;
   model->num_faces = old_faces + new_faces;
-  
+
   return 0;
 }
 
@@ -341,7 +279,7 @@ int generate_tree(model_t *model, float base_radius, float base_angle, float3 ba
   }
 
   float top_radius = base_radius * taper_factor;
-  
+
   top_center = make_float3(
     base_position.x + sinf(growth_angle) * segment_height * angle_offset,
     base_position.y + segment_height * upward_factor,

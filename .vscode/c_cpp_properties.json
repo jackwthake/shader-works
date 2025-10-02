@@ -6,6 +6,8 @@
       "includePath": [
         "${workspaceFolder}/lib/include/**",
         "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/demos/**",
+        "${workspaceFolder}/demos/tundra/third-party/cJSON/**",
         "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
@@ -27,6 +29,8 @@
       "includePath": [
         "${workspaceFolder}/lib/include/**",
         "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/demos/**",
+        "${workspaceFolder}/demos/tundra/third-party/cJSON/**",
         "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
@@ -49,6 +53,8 @@
       "includePath": [
         "${workspaceFolder}/lib/include/**",
         "${workspaceFolder}/lib/src/**",
+        "${workspaceFolder}/demos/**",
+        "${workspaceFolder}/demos/tundra/third-party/cJSON/**",
         "${workspaceFolder}/third-party/SDL/include/**",
         "/usr/include/**",
         "/usr/local/include/**"
@@ -65,6 +71,63 @@
       "intelliSenseMode": "linux-gcc-x64",
       "configurationProvider": "ms-vscode.cmake-tools",
       "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    },
+    {
+      "name": "SAMD51 Embedded",
+      "includePath": [
+        "${workspaceFolder}/demos/microcraft/third-party/samd-core/cores/arduino",
+        "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Adafruit_TinyUSB_Arduino/src",
+        "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Adafruit_ZeroDMA",
+        "${workspaceFolder}/demos/microcraft/third-party/CMSIS/CMSIS/Core/Include",
+        "${workspaceFolder}/demos/microcraft/third-party/CMSIS/CMSIS/DSP/Include",
+        "${workspaceFolder}/demos/microcraft/third-party/CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL",
+        "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Wire",
+        "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/SPI",
+        "${workspaceFolder}/demos/microcraft/platforms/samd51",
+        "${workspaceFolder}/demos/microcraft/platforms/samd51/variant",
+        "${workspaceFolder}/demos/microcraft/src",
+        "${workspaceFolder}/demos",
+        "${workspaceFolder}/lib/include"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/demos/microcraft/third-party/samd-core/cores/arduino",
+          "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Adafruit_TinyUSB_Arduino/src",
+          "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Adafruit_ZeroDMA",
+          "${workspaceFolder}/demos/microcraft/third-party/CMSIS/CMSIS/Core/Include",
+          "${workspaceFolder}/demos/microcraft/third-party/CMSIS/CMSIS/DSP/Include",
+          "${workspaceFolder}/demos/microcraft/third-party/CMSIS-Atmel/CMSIS-Atmel/CMSIS/Device/ATMEL",
+          "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/Wire",
+          "${workspaceFolder}/demos/microcraft/third-party/samd-core/libraries/SPI",
+          "${workspaceFolder}/demos/microcraft/platforms/samd51",
+          "${workspaceFolder}/demos/microcraft/platforms/samd51/variant",
+          "${workspaceFolder}/demos/microcraft/src",
+          "${workspaceFolder}/demos",
+          "${workspaceFolder}/lib/include"
+        ],
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "defines": [
+        "F_CPU=200000000L",
+        "ARDUINO=10607",
+        "ARDUINO_PYGAMER_M4",
+        "ARDUINO_ARCH_SAMD",
+        "ARDUINO_SAMD_ADAFRUIT",
+        "__SAMD51J19A__",
+        "CRYSTALLESS",
+        "ADAFRUIT_PYGAMER_M4_EXPRESS",
+        "__SAMD51__",
+        "__FPU_PRESENT",
+        "ARM_MATH_CM4",
+        "USB_VID=0x239A",
+        "USB_PID=0x803D",
+        "USBCON",
+        "USB_CONFIG_POWER=100"
+      ],
+      "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++11",
+      "intelliSenseMode": "gcc-arm"
     }
   ]
 }

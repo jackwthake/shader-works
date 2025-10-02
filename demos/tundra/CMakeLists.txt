@@ -20,6 +20,7 @@ if(TUNDRA_SOURCES)
     target_link_libraries(tundra
         SDL3::SDL3
         shader-works
+        demos-common
         cjson
     )
 
