@@ -14,10 +14,6 @@
 	path = demos/microcraft/third-party/CMSIS-Atmel
 	url = https://github.com/arduino/ArduinoModule-CMSIS-Atmel.git
 
-[submodule "demos/microcraft/third-party/SdFat"]
-	path = demos/microcraft/third-party/SdFat
-	url = https://github.com/adafruit/SdFat.git
-
 [submodule "demos/microcraft/third-party/samd-core"]
 	path = demos/microcraft/third-party/samd-core
 	url = https://github.com/adafruit/ArduinoCore-samd.git
