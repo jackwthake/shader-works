@@ -1,7 +1,7 @@
 # MicroCraft - Desktop Demo
 
 add_executable(microcraft
-    main.cpp
+    main.c
 )
 
 target_link_libraries(microcraft PRIVATE

@@ -6,6 +6,16 @@ if(NOT TARGET cjson)
     set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
     set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Only build static lib")
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Don't build shared lib")
+
+    # Apply patch to fix cJSON CMake compatibility
+    execute_process(
+        COMMAND patch -p0 -N -i ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cjson-cmake-fix.patch
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cJSON
+        RESULT_VARIABLE PATCH_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+
     add_subdirectory(third-party/cJSON)
 endif()
 
