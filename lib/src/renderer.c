@@ -483,7 +483,6 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
   assert(model != NULL);
   assert(model->vertex_data != NULL);
   assert(model->num_vertices % 3 == 0); // Ensure we have complete triangles
-  assert(model->frag_shader != NULL);
 
   fragment_shader_t *frag_shader = model->frag_shader && model->frag_shader->valid ? model->frag_shader : &default_frag_shader;
   assert(frag_shader->func != NULL);
