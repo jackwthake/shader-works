@@ -258,7 +258,7 @@ typedef struct {
 static falling_particle_t particles[MAX_PARTICLES];
 static bool particles_initialized = false;
 static particle_system_t particle_system = {
-  .max_particles = 300,
+  .max_particles = MAX_PARTICLES,
   .min_distance = -8.0f,
   .max_distance = 50.0f,
   .update_distance = 45.0f,
@@ -372,7 +372,7 @@ void update_quads(float3 player_pos, transform_t *camera_transform) {
   }
 }
 
-usize render_quads(renderer_t *renderer, transform_t *camera, light_t *lights, usize num_lights) {
+usize render_quads(renderer_t *restrict renderer, transform_t *restrict camera, light_t *restrict lights, usize num_lights) {
   particle_system_t *ps = &particle_system;
   usize total_triangles = 0;
 

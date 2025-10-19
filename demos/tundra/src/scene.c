@@ -103,7 +103,7 @@ static usize render_chunk(renderer_t *state, chunk_t *chunk, transform_t *camera
 void init_scene(scene_t *scene, usize max_loaded_chunks) {
   (void)max_loaded_chunks;
   if (!scene) return;
-  
+
   scene->controller = (fps_controller_t){
     .move_speed = 8.0f,
     .mouse_sensitivity = 0.0015f,
@@ -113,47 +113,47 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
     .camera_height_offset = 6.0f,
     .last_frame_time = SDL_GetPerformanceCounter()
   };
-  
+
   scene->camera_pos = (transform_t){ 0 };
-  
+
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);
 }
 
 bool cull_chunk(chunk_t *chunk, void *param, usize num_params) {
   (void)num_params;
   if (!chunk || !param) return true;
-  
+
   transform_t *player = (transform_t*)param;
-  
+
   // Calculate player's chunk coordinates (handle negative coordinates properly)
   int player_chunk_x = (int)floorf(player->position.x / g_world_config.chunk_size);
   int player_chunk_z = (int)floorf(player->position.z / g_world_config.chunk_size);
-  
+
   // Check if chunk is within the 2x3 grid pattern
   int dx = chunk->x - player_chunk_x;
   int dz = chunk->z - player_chunk_z;
-  
+
   float3 right, up, fwd;
   transform_get_inverse_basis_vectors(player, &right, &up, &fwd);
-  
+
   // Check if chunk matches the xxx/xPx pattern
   float chunk_offsets[][2] = {
     {0, 0}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}
   };
-  
+
   int num_chunks = sizeof(chunk_offsets) / sizeof(chunk_offsets[0]);
-  
+
   for (int i = 0; i < num_chunks; i++) {
     float rel_x = chunk_offsets[i][0];
     float rel_z = chunk_offsets[i][1];
     int world_dx = (int)roundf(rel_x * right.x + rel_z * fwd.x);
     int world_dz = (int)roundf(rel_x * right.z + rel_z * fwd.z);
-    
+
     if (dx == world_dx && dz == world_dz) {
       return false; // chunk is within the pattern
     }
   }
-  
+
   return true; // cull chunk outside the 2x3 grid
 }
 
@@ -181,16 +181,17 @@ typedef struct {
   chunk_t *chunk;
   float distance;
 } chunk_distance_t;
+
 static int compare_chunks_by_distance(const void *a, const void *b) {
   const chunk_distance_t *chunk_a = (const chunk_distance_t*)a;
   const chunk_distance_t *chunk_b = (const chunk_distance_t*)b;
-  
+
   if (chunk_a->distance < chunk_b->distance) return -1;
   if (chunk_a->distance > chunk_b->distance) return 1;
   return 0;
 }
 
-usize render_loaded_chunks(renderer_t *state, scene_t *scene, light_t *lights, const usize num_lights) {
+usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, light_t *restrict lights, const usize num_lights) {
   set_shadow_scene(scene);
 
   chunk_t **chunks = calloc(g_world_config.max_chunks, sizeof(chunk_t*));
@@ -213,9 +214,9 @@ usize render_loaded_chunks(renderer_t *state, scene_t *scene, light_t *lights, c
         chunks[i]->x * g_world_config.chunk_size + g_world_config.half_chunk_size,
         chunks[i]->z * g_world_config.chunk_size + g_world_config.half_chunk_size
       );
-      
+
       float distance = float2_magnitude(float2_sub(camera_pos, chunk_center));
-      
+
       sorted_chunks[i].chunk = chunks[i];
       sorted_chunks[i].distance = distance;
     }

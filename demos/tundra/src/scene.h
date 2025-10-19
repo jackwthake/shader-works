@@ -34,11 +34,11 @@ extern float get_interpolated_terrain_height(float x, float z);
 // Implementation found in scene.c
 void init_scene(scene_t *scene, usize max_loaded_chunks);
 void update_loaded_chunks(scene_t *scene);
-usize render_loaded_chunks(renderer_t *state, scene_t *scene, light_t *lights, const usize num_lights);
+usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, light_t *restrict lights, const usize num_lights);
 
 // Implementation found in shaders.c
 void update_quads(float3 player_pos, transform_t *camera_transform);
-usize render_quads(renderer_t *renderer, transform_t *camera, light_t *lights, usize num_lights);
+usize render_quads(renderer_t *restrict renderer, transform_t *restrict camera, light_t *restrict lights, usize num_lights);
 
 
 #endif // SCENE_H
