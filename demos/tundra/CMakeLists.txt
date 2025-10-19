@@ -6,6 +6,17 @@ if(NOT TARGET cjson)
     set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
     set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Only build static lib")
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Don't build shared lib")
+    set(ENABLE_CUSTOM_COMPILER_FLAGS OFF CACHE BOOL "Disable custom compiler flags that may cause issues on Windows")
+
+    # Windows-specific configuration
+    if(WIN32)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
+        if(MINGW)
+            # Disable problematic flags for MinGW
+            string(REPLACE "-O3" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+            string(REPLACE "-c" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+        endif()
+    endif()
 
     # Apply patch to fix cJSON CMake compatibility
     execute_process(
