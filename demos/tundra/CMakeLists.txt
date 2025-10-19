@@ -16,6 +16,15 @@ if(NOT TARGET cjson)
         ERROR_QUIET
     )
 
+    if(WIN32)
+        message(STATUS "Disabling /WX (treat warnings as errors) for cJSON on Windows")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4996 /D_CRT_SECURE_NO_WARNINGS") # optional silencing
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /WX-")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /WX-")
+        set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} /WX-")
+        set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /WX-")
+    endif()
+
     add_subdirectory(third-party/cJSON)
 endif()
 
