@@ -2,7 +2,7 @@
 
 | | |
 |:-------------------------:|:-------------------------:
-| ![day-night cycle](./screenshots/day-night.gif) | ![snowy trees](./screenshots/snowy-trees.gif)
+| ![gameplay](./screenshots/gameplay.gif) | ![day night cycle](./screenshots/day-night.gif)
 | ![static scene](./screenshots/static-1.png) |![static scene](./screenshots/static-2.png)
 
 **An infinite explorable world rendered entirely in software.**
