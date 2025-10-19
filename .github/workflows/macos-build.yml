@@ -24,9 +24,7 @@ jobs:
         submodules: recursive
 
     - name: Install dependencies
-      run: |
-        brew install cmake
-        pip3 install pillow
+      run: brew install cmake pillow
 
     - name: Configure CMake
       run: |
