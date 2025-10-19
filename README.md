@@ -11,16 +11,21 @@
   </a>
 </p>
 
-  | | |
-|:-------------------------:|:-------------------------:
-| ![02_textured_scene grab](https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587) | ![02_textured_scene wireframe]("https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a")
-| ![snowy scene](./demos/tundra/screenshots/day-night.gif) |![static scene](./demos/microcraft/screenshots/screenshot.png)
+<p align="center">
+  <img src="./demos/tundra/screenshots/gameplay.gif" width="400"/>
+  <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
+</p>
+<p align="center">
+  <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
+  <img src="./examples/screenshots/02_textured_scene_wireframe.gif" width="400"/>
+</p>
 
 A **portable software 3D renderer** written in pure C with zero external dependencies. Renders 2000-3000 triangles at 30-40 FPS on a 2019 MacBook Air without a GPU. Runs on everything from desktop computers to ARM Cortex-M4 microcontrollers.
 
 ## Table of Contents
 - [Why This Matters](#why-this-matters)
 - [Key Features](#key-features)
+- [Technical Highlights](#technical-highlights)
 - [Quick Start](#quick-start)
 - [Demos](#demos)
 - [Building](#building)
@@ -42,6 +47,18 @@ A **portable software 3D renderer** written in pure C with zero external depende
 - **Modern Graphics** — Perspective-correct texturing, multi-light support, depth testing, transparency, wireframe mode
 - **Multi-threaded** — Optional POSIX threads for parallel rasterization (configurable at build time)
 - **Built-in Geometry** — Generators for cubes, spheres, planes, and quads
+
+# Technical Highlights
+
+**Barycentric Rasterization** — Implements scanline-free triangle filling using barycentric coordinates for pixel-perfect coverage testing and smooth attribute interpolation.
+
+**Perspective-Correct Texturing** — Proper depth-aware UV interpolation using 1/w correction prevents texture warping on perspective-projected surfaces.
+
+**Pthread Parallelization** — Work-stealing multi-threaded architecture using atomic operations distributes triangle rasterization across CPU cores for near-linear performance scaling.
+
+**Compiler Optimization Support** — Strategic use of the `restrict` keyword on hot-path function parameters enables advanced compiler optimizations by guaranteeing pointer aliasing constraints, allowing better instruction scheduling and vectorization.
+
+**Embedded Systems Port** — Identical rendering code runs on SAMD51 ARM Cortex-M4 (200MHz, 192KB RAM) by abstracting platform-specific layers (framebuffer, display drivers) while maintaining zero external dependencies.
 
 # Quick Start
 ```c
@@ -93,17 +110,17 @@ int main() {
 # Demos
 
 ## Tundra
-![Tundra day-night cycle](./demos/tundra/screenshots/day-night.gif)
+![Tundra gameplay](./demos/tundra/screenshots/gameplay.gif)
 
 An explorable infinite world featuring:
 - **Infinite procedural terrain** using Perlin noise
 - **Dynamic day/night cycle** with atmospheric color transitions
 - **Real-time snow particles** with physics simulation
-- **Chunk-based streaming** for seamless exploration
+- **Chunk-based streaming** and an **FSM-driven architecture** for seamless exploration and state management
 
 Demonstrates the renderer's capability to handle complex scenes with thousands of triangles, dynamic lighting, and environmental effects.
 
-**Tech:** Uses cJSON for configuration. See [demos/tundra/](demos/tundra/)
+**Tech:** Uses cJSON for configuration. See [demos/tundra/](demos/tundra/) for details.
 
 ## Microcraft
 ![Microcraft running on hardware](./demos/microcraft/screenshots/screenshot.png)

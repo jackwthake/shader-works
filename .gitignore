@@ -24,3 +24,4 @@ Makefile
 # OS files
 .DS_Store
 Thumbs.db
+demos/microcraft/src/resources.inl

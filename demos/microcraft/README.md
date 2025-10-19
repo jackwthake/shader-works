@@ -1,6 +1,9 @@
 # Microcraft
 
-<img src="./screenshots/screenshot.png" alt="3D rendering on a microcontroller" />
+<p align="center">
+  <img src="./screenshots/screenshot.png" width="400" alt="3D rendering output"/>
+  <img src="./screenshots/embedded.jpeg" width="400" alt="Running on hardware"/>
+</p>
 
 **The same software renderer from the main project, running on a microcontroller.**
 

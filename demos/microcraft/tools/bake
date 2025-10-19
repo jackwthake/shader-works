@@ -77,7 +77,7 @@ output.write('struct FileEntry {\n'
               '\t\tuint32_t *data;\n'
               '\t\tunsigned int size;\n'
               '};\n\n'
-              'FileEntry files[] __attribute__((section(".rodata"))) = {\n'
+              'FileEntry files[] = {\n'
              )
 
 # Walk through the RES_DIR and add each file to the output
