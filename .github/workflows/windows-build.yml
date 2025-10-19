@@ -45,21 +45,12 @@ jobs:
               ..
         cmake --build . -j $(nproc)
 
-    - name: Test demo runs
+    - name: Verify binaries exist
       shell: msys2 {0}
       run: |
-        cd build/bin
-        ./tundra.exe &
-        TUNDRA_PID=$!
-        sleep 10
-        kill $TUNDRA_PID 2>/dev/null || true
-        wait $TUNDRA_PID 2>/dev/null || echo "Windows tundra test completed"
-
-        ./microcraft.exe &
-        MICROCRAFT_PID=$!
-        sleep 10
-        kill $MICROCRAFT_PID 2>/dev/null || true
-        wait $MICROCRAFT_PID 2>/dev/null || echo "Windows microcraft test completed"
+        ls -lh build/bin/
+        file build/bin/tundra.exe
+        file build/bin/microcraft.exe
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

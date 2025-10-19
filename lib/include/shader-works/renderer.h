@@ -6,6 +6,11 @@
 #include <shader-works/shaders.h>
 #include <shader-works/primitives.h>
 
+// Handle restrict keyword for C++ compatibility
+#ifdef __cplusplus
+#define restrict
+#endif
+
 // Rendering constants
 #define fov_over_2 (1.0472f / 2.0f) // 60 degrees in radians / 2
 
@@ -64,7 +69,7 @@ void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_w
 
 // Update camera basis vectors based on transform
 // cam: pointer to camera transform
-void update_camera(renderer_t *state, transform_t *cam);
+void update_camera(renderer_t *restrict state, transform_t *restrict cam);
 
 // Render a model with given camera and lights
 // state: pointer to renderer state
@@ -82,9 +87,9 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 // fog_start: distance at which fog starts
 // fog_end: distance at which fog fully obscures
 // fog_r, fog_g, fog_b: RGB color of the fog
-void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
+void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
 
-void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat);
-void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat);
+void transform_get_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat);
+void transform_get_inverse_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat);
 
 #endif // SHADER_WORKS_RENDERER_H

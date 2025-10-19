@@ -40,7 +40,7 @@ endif()
 # Set proper compiler flags for build types (GCC/Clang)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-    set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O3 -mtune=native -march=native -DNDEBUG")
     set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g")
 
     # Add -march=native only on x86/x64 platforms for better performance

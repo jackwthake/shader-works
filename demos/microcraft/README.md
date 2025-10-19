@@ -1,63 +1,44 @@
 # Microcraft
 
-<img src="./screenshots/screenshot.png" alt="Demo project screen grab" />
+<img src="./screenshots/screenshot.png" alt="3D rendering on a microcontroller" />
 
-## Hardware Requirements
+**The same software renderer from the main project, running on a microcontroller.**
 
-### Adafruit PyGamer M4 Express
-* **Board**: [Adafruit PyGamer M4 Express](https://www.adafruit.com/product/4242)
-* **MCU**: SAMD51J19A ARM Cortex-M4F @ 200MHz with FPU
-* **RAM**: 192KB SRAM
-* **Flash**: 512KB onboard flash (8MB QSPI flash also available)
-* **Display**: 160x128 ST7735R TFT LCD with 16-bit color (65K colors)
-* **Input**:
-  - 8 tactile buttons (D-pad, A, B, Start, Select)
-  - Analog thumbstick (2-axis)
-  - 3-axis accelerometer (LIS3DH)
-* **Audio**: Built-in mono speaker and audio jack
-* **Connectivity**: USB Type-C (for programming and power)
-* **Power**:
-  - USB powered or
-  - JST connector for 3.7V LiPo battery
-* **Features**:
-  - NeoPixel LEDs (5x)
-  - Light sensor
-  - UF2 bootloader for drag-and-drop programming
+This demo proves the portability claim — the exact same rendering code that runs on desktop also runs on a 200MHz ARM Cortex-M4 with just 192KB of RAM.
 
-### Desktop
-* **OS**: Linux, Windows, or macOS
-* **CPU**: Any modern x86-64 processor (multi-core recommended)
-* **RAM**: 512MB minimum, 2GB+ recommended
-* **GPU**: OpenGL-capable graphics card (for SDL3 rendering)
-* **Display**: Any resolution
-* **Build Tools**:
-  - C++11 compatible compiler (GCC, Clang, or MSVC)
-  - SDL3 library
-  - CMake 3.15+
+## What Makes This Interesting
 
-***
+**No GPU Required** — 3D rendering with texturing, depth buffering, and perspective correction on bare metal hardware with no graphics acceleration.
 
-## Build Instructions
+**Real Hardware Constraints** — 160x128 pixel display, 192KB RAM, 200MHz CPU. Achieves playable framerates through optimized rasterization and careful memory management.
 
-### Setup and Build
+**Identical Codebase** — Uses the same `shader-works` library as desktop demos. Only difference is the platform layer (display driver, input handling).
+
+## Hardware Target
+
+**Adafruit PyGamer M4 Express** ([Product Page](https://www.adafruit.com/product/4242))
+- SAMD51J19A ARM Cortex-M4F @ 200MHz with hardware FPU
+- 192KB SRAM, 512KB Flash
+- 160x128 ST7735R TFT display (65K colors)
+- Joystick + buttons for input
+
+## Building and Uploading
 
 ```bash
-git clone --recursive https://github.com/jackwthake/shader-works.git
-cd shader-works/demos/Microcraft
+# From shader-works root
+cd demos/microcraft
 
-# Generate src/resources.inl (run any time files in res/ are updated)
+# Embed texture assets
 python3 tools/bake.py
 
-# Build with CMake (recommended)
+# Build firmware
 mkdir build && cd build
-cmake ..
-cmake --build . -j4
+cmake .. && cmake --build . -j4
 
-# Upload to PyGamer M4
-# Double-tap reset button to enter bootloader mode, then:
+# Upload to device
+# 1. Double-tap reset button on PyGamer (should see "PYGAMER" drive)
+# 2. Run upload target
 cmake --build . --target upload
 ```
 
-## License
-
-This project is open source and available under the MIT License.
+The device should reboot and start rendering immediately.

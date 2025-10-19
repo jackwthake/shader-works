@@ -16,31 +16,32 @@
 | ![02_textured_scene grab](https://github.com/user-attachments/assets/c049c8c7-0cde-44aa-a394-ef0f2d131587) | ![02_textured_scene wireframe]("https://github.com/user-attachments/assets/282f91c4-77fa-4049-93c9-1343df47e52a")
 | ![snowy scene](./demos/tundra/screenshots/day-night.gif) |![static scene](./demos/microcraft/screenshots/screenshot.png)
 
-A **pure software 3D rasterizer** written in C11 that implements a complete graphics pipeline without GPU dependency. This project focuses on portability and performance-oriented software rendering with a clean, modular API designed for learning and understanding 3D graphics fundamentals.
+A **portable software 3D renderer** written in pure C with zero external dependencies. Renders 2000-3000 triangles at 30-40 FPS on a 2019 MacBook Air without a GPU. Runs on everything from desktop computers to ARM Cortex-M4 microcontrollers.
 
 ## Table of Contents
-- [Features](#features)
+- [Why This Matters](#why-this-matters)
+- [Key Features](#key-features)
 - [Quick Start](#quick-start)
+- [Demos](#demos)
 - [Building](#building)
-- [Cross-Platform Builds](#cross-platform-builds)
-- [Architecture](#architecture)
 - [API Reference](#api-reference)
 
-# Features
+# Why This Matters
 
-- **Complete Software Pipeline**: Full 3D rendering implementation from vertex transformation to pixel output
-- **As Portable As It Gets**: Just bring your own frame buffer, depth buffer, and color conversion functions
-- **Programmable Shaders**: Function pointer-based vertex and fragment shaders with rich context structures and user-defined parameters
-- **Barycentric Rasterization**: Triangle rasterization using barycentric coordinates with depth testing
-- **Transform-Based Camera**: Clean camera system using position + yaw/pitch rather than view matrices
-- **Texture Atlas Support**: UV-based sampling from embedded texture atlas
-- **Pixel Discard Transparency**: Fragment shaders can return `rgb_to_u32(255, 0, 255)` to discard pixels for transparency effects
-- **Wireframe Rendering**: Built-in wireframe mode with edge detection using barycentric coordinates
-- **Perspective-Correct Texturing**: Proper UV interpolation with 1/w correction for realistic texture mapping
-- **Built-in Primitives**: Geometry generators for cubes, spheres, and other common shapes
-- **Diffuse Lighting**: Supports multiple directional and point lights per scene
-- **Multi-threaded Rendering**: Optional POSIX threads support for parallel triangle rasterization
-- **Configurable Threading**: Build with or without pthread dependency via CMake options
+**Portability** — Zero dependencies in the core library. No OpenGL, Vulkan, DirectX, or GPU required. Runs identically on Linux, macOS, Windows, and ARM microcontrollers.
+
+**Performance** — Achieves 30-40 FPS rendering 2000-3000 triangles on a 2019 MacBook Air using multi-threaded CPU rasterization. Optimized barycentric coordinate triangle filling with perspective-correct texture mapping.
+
+**Real Applications** — Not just a toy. Powers [Tundra](#tundra), a demo with infinite procedural terrain, dynamic weather, and day/night cycles. [Microcraft](#microcraft) demonstrates the same renderer running on a SAMD51 microcontroller with a 160x128 display.
+
+# Key Features
+
+- **100% Software Rendering** — Complete 3D graphics pipeline from vertex transformation to pixel output with no GPU dependency
+- **Fully Portable** — Bring your own framebuffer and pixel format. Library handles the rest
+- **Programmable Shaders** — Custom vertex and fragment shaders via function pointers with rich context access
+- **Modern Graphics** — Perspective-correct texturing, multi-light support, depth testing, transparency, wireframe mode
+- **Multi-threaded** — Optional POSIX threads for parallel rasterization (configurable at build time)
+- **Built-in Geometry** — Generators for cubes, spheres, planes, and quads
 
 # Quick Start
 ```c
@@ -89,6 +90,30 @@ int main() {
 }
 ```
 
+# Demos
+
+## Tundra
+![Tundra day-night cycle](./demos/tundra/screenshots/day-night.gif)
+
+An explorable infinite world featuring:
+- **Infinite procedural terrain** using Perlin noise
+- **Dynamic day/night cycle** with atmospheric color transitions
+- **Real-time snow particles** with physics simulation
+- **Chunk-based streaming** for seamless exploration
+
+Demonstrates the renderer's capability to handle complex scenes with thousands of triangles, dynamic lighting, and environmental effects.
+
+**Tech:** Uses cJSON for configuration. See [demos/tundra/](demos/tundra/)
+
+## Microcraft
+![Microcraft running on hardware](./demos/microcraft/screenshots/screenshot.png)
+
+The same 3D renderer **running on a SAMD51 ARM Cortex-M4 microcontroller** (200MHz, 192KB RAM) with a 160x128 LCD display.
+
+Proves true portability — identical rendering code runs on both desktop and embedded hardware with zero GPU dependency. Features voxel-style world rendering at playable framerates on resource-constrained hardware.
+
+**Tech:** Custom SAMD51 drivers, UF2 bootloader deployment. See [demos/microcraft/](demos/microcraft/)
+
 # Building
 
 ## Quick Build (Recommended)
@@ -132,49 +157,8 @@ cmake --build . -j 8
 - `SHADER_WORKS_BUILD_EXAMPLES=ON/OFF` - Build example programs (default: ON)
 - `SHADER_WORKS_MULTI_CONFIG=ON/OFF` - Build multiple configurations (default: OFF)
 
-# Cross-Platform Builds
-
-## Windows (MinGW-w64)
-```bash
-# Install via MSYS2
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
-
-./quick_build.sh release threads
-./build/bin/basic_demo.exe
-```
-
-## macOS
-```bash
-brew install cmake  # Xcode Command Line Tools assumed
-
-./quick_build.sh release threads
-```
-
-## Other Linux Distros
-```bash
-# Ubuntu/Debian: sudo apt install build-essential cmake
-# Fedora/RHEL: sudo dnf install gcc cmake
-# Arch Linux: sudo pacman -S base-devel cmake
-
-./quick_build.sh release threads
-```
-
-# Architecture
-
-## Core Components
-- **Renderer**: Complete 3D pipeline with vertex transformation, rasterization, and shading
-- **Math Library**: Vector/matrix operations optimized for 3D graphics
-- **Primitives**: Built-in generators for planes, cubes, and spheres
-- **Shader System**: Programmable vertex and fragment shaders with context-rich function pointers
-
-## Technical Details
-- **API**: Clean C11 interface with modular design (`cpu-render-lib`)
-- **Dependencies**: Core library requires only libc and libm; optional pthread support; SDL3 for demo projects (included as submodule)
-- **Memory Model**: Client-provided framebuffer and depth buffer for flexibility
-- **Threading**: Optional POSIX threads implementation with triangle-level parallelization; single-threaded fallback optimized for cache efficiency
-- **Precision**: 32-bit floating point with 8.24 fixed-point coordinates for subpixel accuracy
-- **Safety**: Automatic bounds checking prevents buffer overruns and segfaults
-- **Performance**: Optimized rasterization loop with perspective-correct interpolation and configurable multi-threading
+### Platform Support
+Works on Linux, macOS, Windows (MinGW/MSVC), and ARM microcontrollers. Build requirements: C11 compiler, CMake 3.15+. Demos require SDL3 (included as submodule).
 
 # API Reference
 

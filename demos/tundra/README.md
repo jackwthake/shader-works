@@ -1,33 +1,51 @@
-<div align="center">
-  <h1>Tundra</h1>
-  <img src="https://github.com/jackwthake/tundra/actions/workflows/build-macos.yml/badge.svg" alt="macOS Build Status">
-  <img src="https://github.com/jackwthake/tundra/actions/workflows/build-linux.yml/badge.svg" alt="Linux Build Status">
-</div>
+# Tundra
 
 | | |
 |:-------------------------:|:-------------------------:
 | ![day-night cycle](./screenshots/day-night.gif) | ![snowy trees](./screenshots/snowy-trees.gif)
 | ![static scene](./screenshots/static-1.png) |![static scene](./screenshots/static-2.png)
 
-## Keybindings
-| Key | Function |
-|:-------------------------:|:-------------------------:
-| W | Move Forward |
-| A | Move Left |
-| S | Move Back |
-| D | Move Right |
-| 1 | Normal FPS style view (Default) |
-| 2 | Birds-eye view |
-| ESC | Exit |
+**An infinite explorable world rendered entirely in software.**
 
+Built with the `shader-works` renderer to demonstrate real-world performance and capability. Features procedural terrain generation, real-time weather, and atmospheric effects — all running at 30-40 FPS on modest hardware.
+
+## What It Demonstrates
+
+**Complex Scene Management** — Handles 2000-3000 triangles per frame with chunk-based streaming and frustum culling.
+
+**Dynamic Lighting** — Day/night cycle affects sun color, fog color, and ambient lighting in real-time.
+
+**Environmental Effects** — Particle-based snow system with physics simulation and wind.
+
+**Procedural Generation** — Infinite terrain using Perlin noise. Generates rolling hills, frozen lakes, gravel shores, and tree placement on the fly.
 
 ## Features
 
-- **Infinite Procedural World**: Endless terrain generation using Perlin noise and procedural algorithms
-- **Dynamic Day/Night Cycle**: 2-minute cycles with smooth color transitions affecting sun and fog colors
-- **Real-time Weather Effects**: Falling snow particle system with realistic physics and wind simulation
-- **Procedural Terrain**: Rolling hills, frozen lakes with ice textures, and gravel shores
-- **Atmospheric Rendering**: Distance fog that changes color with time of day
-- **Tree Generation**: Procedurally placed vegetation with shadow casting
-- **Multiple Camera Modes**: First-person exploration, overhead map view, and wireframe debugging
-- **Chunk-based Loading**: Efficient memory management with dynamic world streamin
+- Infinite procedural terrain generation
+- 2-minute day/night cycle with atmospheric color transitions
+- Real-time snow particle system
+- Dynamic fog rendering
+- Chunk-based world streaming
+- First-person and overhead camera modes
+- Wireframe debug view
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| W/A/S/D | Move |
+| 1 | First-person view (default) |
+| 2 | Birds-eye view |
+| ESC | Exit |
+
+## Building
+
+```bash
+# From shader-works root
+./quick_build.sh release threads
+
+# Run demo
+./build/bin/tundra
+```
+
+Built with SDL3 for windowing and cJSON for configuration. Both included as submodules.

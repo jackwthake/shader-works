@@ -53,12 +53,12 @@ static inline f32 signed_triangle_area(const float2 a, const float2 b, const flo
 }
 
 // Integer version of signed triangle area calculation (much faster)
-static inline int32_t signed_triangle_area_int(int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t cx, int32_t cy) {
+static inline i32 signed_triangle_area_int(i32 ax, i32 ay, i32 bx, i32 by, i32 cx, i32 cy) {
   return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 }
 
 // Helper function to check if a point is inside a triangle using barycentric coordinates.
-static bool point_in_triangle(const float2 a, const float2 b, const float2 c, const float2 p, float3 *weights) {
+static bool point_in_triangle(const float2 a, const float2 b, const float2 c, const float2 p, float3 *restrict weights) {
   float area_abp = signed_triangle_area(a, b, p);
   float area_bcp = signed_triangle_area(b, c, p);
   float area_cap = signed_triangle_area(c, a, p);
@@ -80,7 +80,7 @@ static bool point_in_triangle(const float2 a, const float2 b, const float2 c, co
 }
 
 // Integer version of point_in_triangle for faster rasterization
-static bool point_in_triangle_int(int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t cx, int32_t cy, int32_t px, int32_t py, float3 *weights) {
+static bool point_in_triangle_int(int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t cx, int32_t cy, int32_t px, int32_t py, float3 *restrict weights) {
   int32_t area_abp = signed_triangle_area_int(ax, ay, bx, by, px, py);
   int32_t area_bcp = signed_triangle_area_int(bx, by, cx, cy, px, py);
   int32_t area_cap = signed_triangle_area_int(cx, cy, ax, ay, px, py);
@@ -120,7 +120,7 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
 }
 
 // Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
-void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -139,7 +139,7 @@ void transform_get_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, flo
 }
 
 // Extracts the inverse basis vectors (right, up, forward) from a transform's yaw and pitch
-void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *jhat, float3 *khat) {
+void transform_get_inverse_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
@@ -158,7 +158,7 @@ void transform_get_inverse_basis_vectors(transform_t *t, float3 *ihat, float3 *j
 }
 
 // Transform a point from local space to world space using the transform's basis vectors and position
-static float3 transform_to_world(transform_t *t, float3 p) {
+static float3 transform_to_world(transform_t *restrict t, float3 p) {
   assert(t != NULL);
 
   float3 ihat, jhat, khat;
@@ -170,7 +170,7 @@ static float3 transform_to_world(transform_t *t, float3 p) {
 }
 
 // Transform a point from world space to local space using the inverse of the transform's basis vectors and position
-static float3 transform_to_local_point(transform_t *t, float3 p) {
+static float3 transform_to_local_point(transform_t *restrict t, float3 p) {
   assert(t != NULL);
 
   float3 ihat, jhat, khat;
@@ -182,7 +182,7 @@ static float3 transform_to_local_point(transform_t *t, float3 p) {
 }
 
 // Apply the vertex shader to a triangle's vertices
-static void apply_vertex_shader(model_t *model, vertex_shader_t *shader, vertex_context_t *context, usize tri, float3 *out_a, float3 *out_b, float3 *out_c) {
+static void apply_vertex_shader(model_t *restrict model, vertex_shader_t *restrict shader, vertex_context_t *restrict context, usize tri, float3 *restrict out_a, float3 *restrict out_b, float3 *restrict out_c) {
   assert(model != NULL);
   assert(shader != NULL && shader->valid);
   assert(context != NULL);
@@ -256,7 +256,7 @@ static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r,
   return rgb_to_u32(r, g, b);
 }
 
-void apply_fog_to_screen(renderer_t *state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
+void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   assert(state != NULL);
 
   int total_pixels = (int)(state->screen_dim.x * state->screen_dim.y);
@@ -296,14 +296,14 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
 }
 
 // Update camera basis vectors based on its current transform
-void update_camera(renderer_t *state, transform_t *cam) {
+void update_camera(renderer_t *restrict state, transform_t *restrict cam) {
   assert(state != NULL);
   assert(cam != NULL);
 
   transform_get_basis_vectors(cam, &state->cam_right, &state->cam_up, &state->cam_forward);
 }
 
-bool render_triangle(triangle_context_t *ctx) {
+bool render_triangle(triangle_context_t *restrict ctx) {
   // Call vertex shader to get transformed vertices
   float3 transformed_a, transformed_b, transformed_c;
   apply_vertex_shader(ctx->model, ctx->vertex_shader, &ctx->vertex_ctx, ctx->tri, &transformed_a, &transformed_b, &transformed_c);
@@ -379,9 +379,7 @@ bool render_triangle(triangle_context_t *ctx) {
   // Precompute color for this triangle (use different colors for debugging)
   uint32_t flat_color = rgb_to_u32(255, 10, 255); // Magenta for all triangles
 
-   ctx->frag_ctx.normal = triangle_normal;
-
-  // Use floating point coordinates throughout
+  ctx->frag_ctx.normal = triangle_normal;
 
   // Rasterize only within the computed bounding box
   for (int y = (int)min_y; y <= (int)max_y; ++y) {
@@ -478,7 +476,7 @@ bool render_triangle(triangle_context_t *ctx) {
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,
 * back-face culling, and rasterizes triangles with depth testing.
 */
-usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count) {
+usize render_model(renderer_t *restrict state, transform_t *restrict cam, model_t *restrict model, light_t *restrict lights, usize light_count) {
   assert(cam != NULL);
   assert(model != NULL);
   assert(model->vertex_data != NULL);
