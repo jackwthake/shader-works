@@ -24,6 +24,7 @@ A **portable software 3D renderer** written in pure C with zero external depende
 
 ## Table of Contents
 - [Why This Matters](#why-this-matters)
+- [Performance](#performance)
 - [Key Features](#key-features)
 - [Technical Highlights](#technical-highlights)
 - [Quick Start](#quick-start)
@@ -38,6 +39,21 @@ A **portable software 3D renderer** written in pure C with zero external depende
 **Performance** — Achieves 30-40 FPS rendering 2000-3000 triangles on a 2019 MacBook Air using multi-threaded CPU rasterization. Optimized barycentric coordinate triangle filling with perspective-correct texture mapping.
 
 **Real Applications** — Not just a toy. Powers [Tundra](#tundra), a demo with infinite procedural terrain, dynamic weather, and day/night cycles. [Microcraft](#microcraft) demonstrates the same renderer running on a SAMD51 microcontroller with a 160x128 display.
+
+# Performance
+
+Benchmarked on Intel Core i5-8210Y (4 cores @ 3.6GHz) at 800×600 resolution with threading enabled:
+
+![Performance Graph](./examples/screenshots/04_performance.png)
+
+| Scene Complexity | Triangles | FPS  | Triangles/sec |
+|-----------------|-----------|------|---------------|
+| Low             | 32        | 77   | 672           |
+| Medium          | 512       | 66   | 9,395         |
+| High            | 2,048     | 61   | 34,846        |
+| Very High       | 8,192     | 53   | 121,342       |
+
+**Note:** These measurements represent pure rendering performance without overhead from windowing systems (SDL), game logic, input handling, or vertical sync. Real-world applications will see lower FPS due to these additional costs. See `examples/04_benchmark` for details.
 
 # Key Features
 

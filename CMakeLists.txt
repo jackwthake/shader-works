@@ -128,7 +128,7 @@ target_include_directories(shader-works PRIVATE
 # Configure threading support
 if(SHADER_WORKS_USE_THREADS)
     find_package(Threads REQUIRED)
-    target_compile_definitions(shader-works PRIVATE SHADER_WORKS_USE_PTHREADS)
+    target_compile_definitions(shader-works PUBLIC SHADER_WORKS_USE_PTHREADS)
     target_link_libraries(shader-works PUBLIC Threads::Threads)
     message(STATUS "Threading support: ENABLED")
 else()
@@ -145,6 +145,7 @@ if(SHADER_WORKS_BUILD_EXAMPLES)
     add_subdirectory(examples/01_spinning_cube)
     add_subdirectory(examples/02_textured_scene)
     add_subdirectory(examples/03_fps_controller)
+    add_subdirectory(examples/04_benchmark)
 endif()
 
 # Add desktop demos
