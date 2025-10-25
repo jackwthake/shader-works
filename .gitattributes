@@ -1,0 +1,10 @@
+# Mark third-party code as vendored (exclude from stats)
+third-party/** linguist-vendored
+
+# Mark build artifacts as generated (exclude from stats)
+**/build/** linguist-generated
+**/CMakeFiles/** linguist-generated
+
+# Ensure C++ is detected
+*.cpp linguist-detectable
+*.hpp linguist-detectable

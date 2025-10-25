@@ -1,22 +1,20 @@
 # Tundra demo - integrated into shader-works build system
 # This CMakeLists.txt is designed to work as part of the shader-works project
 
-# Add cJSON library (only if not already added)
+# Add cJSON as a simple static library (vendor the sources directly, skip their CMake nonsense)
 if(NOT TARGET cjson)
-    set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
-    set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Only build static lib")
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Don't build shared lib")
-
-    # Apply patch to fix cJSON CMake compatibility
-    execute_process(
-        COMMAND patch -p0 -N -i ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cjson-cmake-fix.patch
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cJSON
-        RESULT_VARIABLE PATCH_RESULT
-        OUTPUT_QUIET
-        ERROR_QUIET
+    add_library(cjson STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cJSON/cJSON.c
     )
-
-    add_subdirectory(third-party/cJSON)
+    target_include_directories(cjson PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/cJSON
+    )
+    # Disable warnings for third-party code
+    if(MSVC)
+        target_compile_options(cjson PRIVATE /W0)
+    else()
+        target_compile_options(cjson PRIVATE -w)
+    endif()
 endif()
 
 # Find source files in src directory
