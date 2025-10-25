@@ -149,31 +149,11 @@ Proves true portability — identical rendering code runs on both desktop and em
 
 # Building
 
-## Quick Build (Recommended)
-```bash
-# Clone with submodules
-git clone --recursive https://github.com/jackwthake/shader-works
-cd shader-works
+### Build Options
+- `SHADER_WORKS_USE_THREADS=ON/OFF` - Enable/disable multi-threaded rendering (default: ON)
+- `SHADER_WORKS_BUILD_EXAMPLES=ON/OFF` - Build example programs (default: ON)
+- `SHADER_WORKS_MULTI_CONFIG=ON/OFF` - Build multiple configurations (default: OFF)
 
-# Or if already cloned, initialize submodules
-git submodule update --init --recursive
-
-# Quick single configuration builds
-./quick_build.sh release threads           # Multi-threaded release (best performance)
-./quick_build.sh debug nothreads           # Single-threaded debug (easier debugging)
-./quick_build.sh release                   # Uses defaults: release with threading
-
-# Build all configurations at once
-./build_all.sh                             # Builds all 4 variants (debug/release × threaded/single)
-
-# Run the demo
-./build/bin/basic_demo                     # After quick_build.sh
-# Or run specific configurations after build_all.sh:
-# ./build-release-threaded/bin/basic_demo  # Release multi-threaded
-# ./build-debug-single/bin/basic_demo      # Debug single-threaded
-```
-
-## Manual CMake Build
 ```bash
 # Configure with threading options
 mkdir build && cd build
@@ -184,11 +164,6 @@ cmake --build . -j 8 && ./bin/basic_demo
 cmake -DCMAKE_BUILD_TYPE=Release -DSHADER_WORKS_BUILD_EXAMPLES=OFF ..
 cmake --build . -j 8
 ```
-
-### Build Options
-- `SHADER_WORKS_USE_THREADS=ON/OFF` - Enable/disable multi-threaded rendering (default: ON)
-- `SHADER_WORKS_BUILD_EXAMPLES=ON/OFF` - Build example programs (default: ON)
-- `SHADER_WORKS_MULTI_CONFIG=ON/OFF` - Build multiple configurations (default: OFF)
 
 ### Platform Support
 Works on Linux, macOS, Windows (MinGW/MSVC), and ARM microcontrollers. Build requirements: C11 compiler, CMake 3.15+. Demos require SDL3 (included as submodule).
