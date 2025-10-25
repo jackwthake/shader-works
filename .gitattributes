@@ -5,6 +5,6 @@ third-party/** linguist-vendored
 **/build/** linguist-generated
 **/CMakeFiles/** linguist-generated
 
-# Ensure C++ is detected
-*.cpp linguist-detectable
-*.hpp linguist-detectable
+# Explicitly mark C++ files for language stats
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
