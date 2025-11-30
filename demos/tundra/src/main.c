@@ -14,7 +14,7 @@
 #include "scene.h"
 
 // Default values
-#define MAX_DEPTH 40
+#define MAX_DEPTH (g_world_config.chunk_size * g_world_config.chunk_load_radius) - 1
 
 typedef enum {
   GENERATE,
@@ -43,8 +43,6 @@ struct context_t {
   state_machine_t *sm;
 };
 
-static const float TICK_RATE = 20.0f; // 20 TPS
-static const float TICK_INTERVAL = 1.0f / TICK_RATE;
 
 // Day/night cycle color keyframes: Dawn -> Noon -> Dusk -> Midnight
 static const u8 sun_colors[][3] = {
@@ -96,13 +94,14 @@ static void get_cycle_color(float time_elapsed, const u8 colors[][3], u8 *r, u8 
 }
 
 static u32 get_sun_color(float time_elapsed) {
-  u8 r, g, b;
-  get_cycle_color(time_elapsed, sun_colors, &r, &g, &b);
-  return rgb_to_u32(r, g, b);
+  // u8 r, g, b;
+  // get_cycle_color(time_elapsed, sun_colors, &r, &g, &b);
+  return rgb_to_u32(105.f, 125.f, 200.f);
 }
 
 static void get_fog_color(float time_elapsed, u8 *r, u8 *g, u8 *b) {
-  get_cycle_color(time_elapsed, fog_colors, r, g, b);
+  // get_cycle_color(time_elapsed, fog_colors, r, g, b);
+  *r = 162; *g = 208.f; *b = 227.f;
 }
 
 static void apply_fps_movement(struct context_t *ctx, float dt) {
@@ -120,6 +119,7 @@ static void apply_fps_movement(struct context_t *ctx, float dt) {
 
   // apply movement
   ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, movement);
+  ctx->scene.controller.distance_walked = sqrtf((movement.x * movement.x) + (movement.z * movement.z));
   float new_ground_height = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
 
   // mouse input
@@ -150,14 +150,15 @@ static void on_generate(void *args, size_t size) {
     },
     .chunk_map = { 0 },
     .controller = (fps_controller_t) {
-      .move_speed = 15.0f,
+      .move_speed = 10.0f,
       .mouse_sensitivity = 0.002f,
       .min_pitch = -PI / 2 + EPSILON,
       .max_pitch = PI / 2  - EPSILON,
-      .camera_height_offset = 3.0f,
-      .delta_time = TICK_INTERVAL,
+      .camera_height_offset = 2.0f,
+      .delta_time = 1.0f / g_world_config.tick_rate,
       .last_frame_time = 0.0f,
-      .ground_height = 0.0f
+      .ground_height = 0.0f,
+      .distance_walked = 0.0f
     }
   };
 
@@ -198,10 +199,13 @@ static void on_normal_tick(void *args, size_t size, float dt) {
 
   // apply movement
   apply_fps_movement(ctx, dt);
-  ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;
+
+  // bob camera
+  float camera_bob_offset = sinf(ctx->scene.controller.distance_walked / ctx->scene.controller.move_speed) * 0.5;
+  ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset + camera_bob_offset;
 
   // update snow particles
-  update_quads(ctx->scene.camera_pos.position, &ctx->scene.camera_pos);
+  // update_quads(ctx->scene.camera_pos.position, &ctx->scene.camera_pos);
 
   // update loaded chunks
   update_loaded_chunks(&ctx->scene);
@@ -220,7 +224,7 @@ static int on_normal_render(void *args, size_t size) {
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
-  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth / 2.f, ctx->renderer.max_depth - 1.0f, fog_r, fog_g, fog_b);
+  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * 0.65f, ctx->renderer.max_depth, fog_r, fog_g, fog_b);
 
   return triangles_rendered;
 }
@@ -323,6 +327,8 @@ int main(int argc, char const *argv[]) {
 
   performance_counter stats;
   init_performance_counter(&stats);
+
+  float TICK_INTERVAL = 1.0f / g_world_config.tick_rate;
 
   // Initialize state machine
   state_machine_t sm = {0};

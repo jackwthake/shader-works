@@ -32,7 +32,7 @@ static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
   float corner_x = world_x;
   float corner_z = world_z;
 
-  generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(1.0f, 1.0f), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
+  generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(g_world_config.ground_segments_per_chunk, g_world_config.ground_segments_per_chunk), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
 
   float num_trees_float = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0.0f, 7.0f);
@@ -110,8 +110,9 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
     .min_pitch = -PI/3,
     .max_pitch = PI/3,
     .ground_height = 2.0f,
-    .camera_height_offset = 6.0f,
-    .last_frame_time = SDL_GetPerformanceCounter()
+    .camera_height_offset = 3.0f,
+    .last_frame_time = SDL_GetPerformanceCounter(),
+    .distance_walked = 0.f
   };
 
   scene->camera_pos = (transform_t){ 0 };
@@ -129,32 +130,15 @@ bool cull_chunk(chunk_t *chunk, void *param, usize num_params) {
   int player_chunk_x = (int)floorf(player->position.x / g_world_config.chunk_size);
   int player_chunk_z = (int)floorf(player->position.z / g_world_config.chunk_size);
 
-  // Check if chunk is within the 2x3 grid pattern
   int dx = chunk->x - player_chunk_x;
   int dz = chunk->z - player_chunk_z;
 
-  float3 right, up, fwd;
-  transform_get_inverse_basis_vectors(player, &right, &up, &fwd);
+  float dist = sqrtf((dx * dx) + (dz * dz));
 
-  // Check if chunk matches the xxx/xPx pattern
-  float chunk_offsets[][2] = {
-    {0, 0}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}
-  };
+  if (dist <= g_world_config.chunk_load_radius)
+    return false;
 
-  int num_chunks = sizeof(chunk_offsets) / sizeof(chunk_offsets[0]);
-
-  for (int i = 0; i < num_chunks; i++) {
-    float rel_x = chunk_offsets[i][0];
-    float rel_z = chunk_offsets[i][1];
-    int world_dx = (int)roundf(rel_x * right.x + rel_z * fwd.x);
-    int world_dz = (int)roundf(rel_x * right.z + rel_z * fwd.z);
-
-    if (dx == world_dx && dz == world_dz) {
-      return false; // chunk is within the pattern
-    }
-  }
-
-  return true; // cull chunk outside the 2x3 grid
+  return true;
 }
 
 void update_loaded_chunks(scene_t *scene) {
@@ -244,7 +228,7 @@ usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, 
       // If dot < 0, chunk is behind the camera (except in overhead mode)
       // Add chunk_size buffer to account for chunk size and avoid culling visible chunks
       float dot = is_overhead ? 1.0f : float3_dot(to_chunk, forward);
-      if (dot < -(g_world_config.chunk_size * 2)) {
+      if (dot > (g_world_config.chunk_size * 2)) {
         // Chunk is fully behind the player, skip rendering
         continue;
       }

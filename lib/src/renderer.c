@@ -219,7 +219,7 @@ static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_boun
   if (!disable_behind_camera_culling && a.z > 0 && b.z > 0 && c.z > 0) return true;
   // Cull triangles where the closest vertex is still too far away
   float closest_distance = -fmax(a.z, fmax(b.z, c.z));
-  if (closest_distance > max_depth) {
+  if (closest_distance < -EPSILON) {
     // Uncomment for debugging: printf("Culling triangle at distance %.2f (max: %.2f)\n", closest_distance, max_depth);
     return true;
   }
@@ -335,7 +335,7 @@ bool render_triangle(triangle_context_t *restrict ctx) {
   // Check if triangle is facing toward camera (skip back-face culling for particles)
   if (!ctx->model->disable_behind_camera_culling) {
     float dot_product = float3_dot(triangle_normal, view_direction);
-    if (dot_product <= EPSILON) return false; // Triangle is facing away from camera
+    if (dot_product < EPSILON) return false; // Triangle is facing away from camera
   }
 
   // Use pre-computed projection constants

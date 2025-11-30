@@ -10,6 +10,7 @@ extern cJSON *g_config;
 // World configuration (loaded from config.json)
 typedef struct {
   int seed;
+  float tick_rate;
   int chunk_size;
   int half_chunk_size;
   int ground_segments_per_chunk;

@@ -16,6 +16,7 @@ typedef struct {
   float camera_height_offset;
   float delta_time;
   uint64_t last_frame_time;
+  float distance_walked;
 } fps_controller_t;
 
 typedef struct scene_t {

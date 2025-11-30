@@ -51,7 +51,7 @@ float terrainHeight(float x, float y, int seed) {
 }
 
 float get_interpolated_terrain_height(float x, float z) {
-  float grid_size = 1.0f; // Sample every 1 unit
+  float grid_size = EPSILON;
 
   // Find which grid cell we're in
   float grid_x = x / grid_size;

@@ -260,18 +260,18 @@ static bool particles_initialized = false;
 static particle_system_t particle_system = {
   .max_particles = MAX_PARTICLES,
   .min_distance = -8.0f,
-  .max_distance = 50.0f,
-  .update_distance = 45.0f,
+  .max_distance = 30.0f,
+  .update_distance = 64.0f,
   .spawn_height_min_offset = 25.0f,
-  .spawn_height_max_offset = 40.0f,
-  .fall_speed_min = 13.0f,
-  .fall_speed_max = 20.0f,
-  .sway_speed_min = 0.5f,
+  .spawn_height_max_offset = 30.0f,
+  .fall_speed_min = 2.0f,
+  .fall_speed_max = 12.0f,
+  .sway_speed_min = 1.5f,
   .sway_speed_max = 5.5f,
-  .sway_amplitude = 0.75f,
-  .quad_size = 0.2f,
-  .spawn_interval = 0.05f,
-  .frame_time = 0.016f
+  .sway_amplitude = 1.0f,
+  .quad_size = 0.1f,
+  .spawn_interval = 0.5f,
+  .frame_time = 1.f / 50.f
 };
 
 static void init_particles(particle_system_t *ps) {
@@ -336,14 +336,14 @@ void update_quads(float3 player_pos, transform_t *camera_transform) {
   for (int i = 0; i < ps->max_particles; i++) {
     if (!particles[i].active) continue;
 
-    if (!is_particle_in_range(particles[i].model.transform.position, player_pos, ps->max_distance)) {
-      particles[i].active = false;
-      continue;
-    }
+    // if (!is_particle_in_range(particles[i].model.transform.position, player_pos, ps->max_distance)) {
+    //   particles[i].active = false;
+    //   continue;
+    // }
 
-    if (!is_particle_in_range(particles[i].model.transform.position, player_pos, ps->update_distance)) {
-      continue;
-    }
+    // if (!is_particle_in_range(particles[i].model.transform.position, player_pos, ps->update_distance)) {
+    //   continue;
+    // }
 
     particles[i].sway_time += particles[i].sway_speed * ps->frame_time;
     float sway_offset = sinf(particles[i].sway_time) * ps->sway_amplitude * ps->frame_time;

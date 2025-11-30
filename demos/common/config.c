@@ -19,7 +19,8 @@ world_config_t g_world_config = {0};
 #define DEFAULT_WORLD_SEED 2
 #define DEFAULT_CHUNK_SIZE 32
 #define DEFAULT_GROUND_SEGMENTS_PER_CHUNK 4
-#define DEFAULT_CHUNK_LOAD_RADIUS 1
+#define DEFAULT_CHUNK_LOAD_RADIUS 2
+#define DEFAULT_TICK_RATE 25.f;
 
 int load_config(unsigned int *width, unsigned int *height, unsigned int *scale, char *title, size_t title_size) {
   FILE *config_file = fopen("config.json", "r");
@@ -91,6 +92,7 @@ int load_world_config(void) {
   g_world_config.chunk_size = DEFAULT_CHUNK_SIZE;
   g_world_config.ground_segments_per_chunk = DEFAULT_GROUND_SEGMENTS_PER_CHUNK;
   g_world_config.chunk_load_radius = DEFAULT_CHUNK_LOAD_RADIUS;
+  g_world_config.tick_rate = DEFAULT_TICK_RATE;
 
   if (!g_config) {
     printf("Config not loaded, using default world settings\n");
@@ -102,14 +104,16 @@ int load_world_config(void) {
       cJSON *chunk_size = cJSON_GetObjectItem(world, "chunk_size");
       cJSON *ground_segments = cJSON_GetObjectItem(world, "ground_segments_per_chunk");
       cJSON *load_radius = cJSON_GetObjectItem(world, "chunk_load_radius");
+      cJSON *tick_rate = cJSON_GetObjectItem(world, "target_tick_rate");
 
       if (cJSON_IsNumber(seed)) g_world_config.seed = seed->valueint;
       if (cJSON_IsNumber(chunk_size)) g_world_config.chunk_size = chunk_size->valueint;
       if (cJSON_IsNumber(ground_segments)) g_world_config.ground_segments_per_chunk = ground_segments->valueint;
       if (cJSON_IsNumber(load_radius)) g_world_config.chunk_load_radius = load_radius->valueint;
+      if (cJSON_IsNumber(tick_rate)) g_world_config.tick_rate = (float)tick_rate->valuedouble;
 
-      printf("Loaded world config: seed=%d, chunk_size=%d, segments=%d, load_radius=%d\n",
-              g_world_config.seed, g_world_config.chunk_size,
+      printf("Loaded world config: seed=%d, tick_rate=%f, chunk_size=%d, segments=%d, load_radius=%d\n",
+              g_world_config.seed, g_world_config.tick_rate, g_world_config.chunk_size,
               g_world_config.ground_segments_per_chunk, g_world_config.chunk_load_radius);
     }
   }

@@ -7,8 +7,9 @@
   },
   "world": {
     "seed": 69,
+    "target_tick_rate": 25,
     "chunk_size": 32,
     "ground_segments_per_chunk": 4,
-    "chunk_load_radius": 1
+    "chunk_load_radius": 2
   }
 }
