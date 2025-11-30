@@ -10,6 +10,7 @@ typedef struct {
   model_t ground_plane;
   model_t *trees;
   usize num_trees;
+  int lod;
 } chunk_t;
 
 typedef struct chunk_map_node_t {
@@ -27,6 +28,7 @@ typedef struct {
 typedef bool (*query_func)(chunk_t *chunk, void *param, usize num_params);
 
 void init_chunk_map(chunk_map_t *map, usize num_buckets);
+void free_chunk_node(chunk_map_node_t *node);
 void free_chunk_map(chunk_map_t *map);
 
 void insert_chunk(chunk_map_t *map, chunk_t *chunk);

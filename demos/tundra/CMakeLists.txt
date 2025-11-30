@@ -45,6 +45,7 @@ if(TUNDRA_SOURCES)
         -Wpedantic
         -Wstrict-prototypes
         -Wshadow
+        -O3
     )
 
     # Copy config.json to build directory

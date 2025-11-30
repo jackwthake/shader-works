@@ -140,6 +140,9 @@ static void apply_ski_movement(struct context_t *ctx, float dt) {
   // friction
   if (keys[SDL_SCANCODE_S]) {
     ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.70f);
+
+    if (float3_magnitude(ctx->scene.controller.velocity) <= 0.5)
+      ctx->scene.controller.velocity = (float3){0};
   } else {
     ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.98f);
   }
@@ -247,7 +250,7 @@ static int on_normal_render(void *args, size_t size) {
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
-  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * 0.65f, ctx->renderer.max_depth, fog_r, fog_g, fog_b);
+  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * ctx->scene.fog_start, ctx->renderer.max_depth, fog_r, fog_g, fog_b);
 
   return triangles_rendered;
 }
@@ -271,19 +274,6 @@ static void on_overhead_tick(void *args, size_t size, float dt) {
 
   struct context_t *ctx = (struct context_t*)args;
 
-  float3 world_forward = make_float3(0, 0, -1); // Forward is negative Z (up on screen)
-  float3 world_right = make_float3(1, 0, 0);    // Right is positive X
-  float3 movement = {0};
-  float speed = ctx->scene.controller.move_speed * dt;
-  const bool *keys = ctx->keys;
-
-
-  if (keys[SDL_SCANCODE_W]) movement = float3_add(movement, float3_scale(world_forward, speed));
-  if (keys[SDL_SCANCODE_S]) movement = float3_add(movement, float3_scale(world_forward, -speed));
-  if (keys[SDL_SCANCODE_A]) movement = float3_add(movement, float3_scale(world_right, speed));
-  if (keys[SDL_SCANCODE_D]) movement = float3_add(movement, float3_scale(world_right, -speed));
-
-  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, movement);
   update_loaded_chunks(&ctx->scene);
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }

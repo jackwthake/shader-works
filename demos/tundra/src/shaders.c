@@ -125,8 +125,8 @@ u32 ground_shadow_func(u32 input, fragment_context_t *ctx, void *args, usize arg
   // Shore gravel texture
   else if (terrain_height <= 0.3f) {
     // Pixelated gravel coordinates
-    float gravel_x = floorf(ctx->world_pos.x / 0.15f);
-    float gravel_z = floorf(ctx->world_pos.z / 0.15f);
+    float gravel_x = floorf(ctx->world_pos.x / 0.25f);
+    float gravel_z = floorf(ctx->world_pos.z / 0.25f);
 
     // Gravel base color and texture
     float gravel_base = noise2D(gravel_x, gravel_z, g_world_config.seed + 500);
@@ -152,7 +152,7 @@ u32 ground_shadow_func(u32 input, fragment_context_t *ctx, void *args, usize arg
   }
   else {
     // Generate normal ground color for higher terrain
-    float check_size = 0.05f;
+    float check_size = 0.5f;
     float x = floorf(ctx->world_pos.x / check_size);
     float z = floorf(ctx->world_pos.z / check_size);
 

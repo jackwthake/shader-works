@@ -1,15 +1,14 @@
 {
   "window": {
     "title": "Tundra",
-    "width": 200,
-    "height": 125,
+    "width": 192,
+    "height": 144,
     "scale": 8
   },
   "world": {
     "seed": 69,
-    "target_tick_rate": 25,
-    "chunk_size": 48,
-    "ground_segments_per_chunk": 4,
+    "target_tick_rate": 15,
+    "chunk_size": 64,
     "chunk_load_radius": 4
   }
 }

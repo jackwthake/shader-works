@@ -18,20 +18,57 @@ extern void set_shadow_scene(scene_t *scene);
 
 extern void generate_ground_plane(model_t *, float2, float2, float3);  // in proc_gen.c
 
-static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
+static int get_lod_from_dist(int dist_sq) {
+  float chunk_size_sq = g_world_config.chunk_size * g_world_config.chunk_size;
+  if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 2;
+  else if (dist_sq <= (2 * 2) * chunk_size_sq) return 3;
+  else if (dist_sq <= (3 * 3) * chunk_size_sq) return 8;
+  else if (dist_sq <= (4 * 4) * chunk_size_sq) return 20;
+  else if (dist_sq <= (5 * 5) * chunk_size_sq) return 15;
+
+  return 20;
+}
+
+static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z, float player_x, float player_z) {
   if (chunk == NULL) return;
 
   chunk->x = chunk_x;
   chunk->z = chunk_z;
   chunk->ground_plane = (model_t){0};
 
-  float world_x = chunk_x * g_world_config.chunk_size;
-  float world_z = chunk_z * g_world_config.chunk_size;
+  float world_x = chunk_x * g_world_config.chunk_size + g_world_config.half_chunk_size;
+  float world_z = chunk_z * g_world_config.chunk_size + g_world_config.half_chunk_size;
   float corner_x = world_x;
   float corner_z = world_z;
 
-  generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(g_world_config.ground_segments_per_chunk, g_world_config.ground_segments_per_chunk), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
+  int dx = player_x - world_x;
+  int dz = player_z - world_z;
+
+  int dist_sq = (dx * dx) + (dz * dz);
+
+  chunk->lod = get_lod_from_dist(dist_sq);
+
+  generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(chunk->lod, chunk->lod), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
+}
+
+static void validate_lod_level(scene_t *scene, chunk_map_node_t *node) {
+  chunk_t chunk = node->chunk;
+  float chunk_world_x = (float)(chunk.x * g_world_config.chunk_size) + g_world_config.half_chunk_size;
+  float chunk_world_z = (float)(chunk.z * g_world_config.chunk_size) + g_world_config.half_chunk_size;
+  float dx = scene->camera_pos.position.x - chunk_world_x;
+  float dz = scene->camera_pos.position.z - chunk_world_z;
+
+  float dist_sq = (dx * dx) + (dz * dz);
+  if (get_lod_from_dist(dist_sq) != chunk.lod) {
+    int chunk_x = chunk.x, chunk_z = chunk.z;
+    remove_chunk(&scene->chunk_map, chunk_x, chunk_z);
+
+    chunk = (chunk_t){0};
+
+    generate_chunk(&chunk, chunk_x, chunk_z, scene->camera_pos.position.x, scene->camera_pos.position.z);
+    insert_chunk(&scene->chunk_map, &chunk);
+  }
 }
 
 static usize render_chunk(renderer_t *state, chunk_t *chunk, transform_t *camera, light_t *lights, const usize num_lights, scene_t *scene) {
@@ -60,6 +97,7 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
   };
 
   scene->camera_pos = (transform_t){ 0 };
+  scene->fog_start = 0.65;
 
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);
 }
@@ -98,8 +136,10 @@ void update_loaded_chunks(scene_t *scene) {
 
       if (!is_chunk_loaded(&scene->chunk_map, chunk_x, chunk_z)) {
         chunk_t new_chunk = {0};
-        generate_chunk(&new_chunk, chunk_x, chunk_z);
+        generate_chunk(&new_chunk, chunk_x, chunk_z, scene->camera_pos.position.x, scene->camera_pos.position.z);
         insert_chunk(&scene->chunk_map, &new_chunk);
+      } else {
+        validate_lod_level(scene, chunk_lookup(&scene->chunk_map, chunk_x, chunk_z));
       }
     }
   }

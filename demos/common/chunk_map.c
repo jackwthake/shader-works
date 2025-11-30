@@ -6,7 +6,7 @@ static inline usize get_chunk_hash(int x, int z, usize table_size) {
   return ((x * 73856093) ^ (z * 19349663)) % table_size;
 }
 
-static void free_chunk_node(chunk_map_node_t *node) {
+void free_chunk_node(chunk_map_node_t *node) {
   if (!node) return;
 
   delete_model(&node->chunk.ground_plane);
@@ -86,7 +86,7 @@ void remove_chunk(chunk_map_t *map, int x, int z) {
       --map->num_loaded_chunks;
       return;
     }
-    
+
     prev = head;
     head = head->next;
   }
@@ -130,7 +130,7 @@ chunk_map_node_t *chunk_lookup(chunk_map_t *map, int x, int z) {
   while (head) {
     if (head->chunk.x == x && head->chunk.z == z)
       return head;
-    
+
     head = head->next;
   }
 
