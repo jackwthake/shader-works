@@ -31,9 +31,9 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
     final_b = surface_b;
   } else {
     // Start with ambient light (small amount of original color)
-    final_r = surface_r * 0.1f;
-    final_g = surface_g * 0.1f;
-    final_b = surface_b * 0.1f;
+    final_r = surface_r * 0.45;
+    final_g = surface_g * 0.45f;
+    final_b = surface_b * 0.45f;
 
     for (int i = 0; i < context->light_count; i++) {
       float light_contribution;

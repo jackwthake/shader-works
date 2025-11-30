@@ -18,33 +18,14 @@ float terrainHeight(float x, float y, int seed) {
   // Define minimum height for frozen lakes
   const float lake_level = 0.0f;
 
-  // Large-scale gentle rolling terrain (very low frequency for gradual hills)
-  float large_hills = fbm(x * 0.003f, y * 0.003f, 4, g_world_config.seed + seed) * 40.0f;
+  float mountain_mask = noise2D(x * 0.0125, y * 0.0125, seed);
+  float base = 5.f + fbm(x * 0.0001f, y * 0.0001f, 4, seed);
 
-  // Medium-scale terrain features
-  float medium_hills = fbm(x * 0.008f, y * 0.008f, 5, g_world_config.seed + seed + 1) * 12.0f;
+  float ridge = ridgeNoise(x * 0.01, y * 0.01, seed);
 
-  // Small-scale detail
-  float detail = fbm(x * 0.02f, y * 0.02f, 6, g_world_config.seed + seed + 2) * 4.0f;
+  ridge = powf(ridge, 2.5f) * 45.f;
 
-  // Domain warping for more interesting mountain shapes
-  float warp_x = fbm(x * 0.005f, y * 0.005f, 3, g_world_config.seed + seed + 3) * 20.0f;
-  float warp_y = fbm(x * 0.005f, y * 0.005f, 3, g_world_config.seed + seed + 4) * 20.0f;
-
-  // Mountain peaks using warped coordinates
-  float mountains = ridgeNoise((x + warp_x) * 0.004f, (y + warp_y) * 0.004f, g_world_config.seed + seed + 5);
-  mountains = powf(mountains, 1.5f) * 100.0f; // More dramatic peaks
-
-  // Blend everything together with smooth transitions
-  float base_terrain = large_hills + medium_hills * 0.7f + detail * 0.3f;
-
-  // Shift terrain down to ensure some areas go below 0.0f for lakes
-  base_terrain -= 8.0f; // This ensures low areas become lakes
-
-  // Use the mountain noise as a mask to selectively add peaks
-  float mountain_mask = smoothstep(fbm(x * 0.002f, y * 0.002f, 3, g_world_config.seed + seed + 6) * 0.5f + 0.5f);
-
-  float height = base_terrain + mountains * mountain_mask;
+  float height = (base * 1.25) + (ridge * mountain_mask) + 10.f;
 
   // Create frozen lakes by enforcing minimum height
   return fmaxf(height, lake_level);

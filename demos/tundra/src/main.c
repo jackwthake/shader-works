@@ -63,7 +63,7 @@ static void init_performance_counter(performance_counter *stats) {
 
 static u32 get_sun_color(float time_elapsed) {
   (void)time_elapsed;
-  return rgb_to_u32(105.f, 125.f, 200.f);
+  return rgb_to_u32(185.f, 195.f, 235.f);
 }
 
 static void get_fog_color(float time_elapsed, u8 *r, u8 *g, u8 *b) {
@@ -163,9 +163,6 @@ static void on_normal_tick(void *args, size_t size, float dt) {
   // bob camera
   // float camera_bob_offset = sinf(ctx->scene.controller.distance_walked);
   ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;// + camera_bob_offset;
-
-  // update snow particles
-  // update_quads(ctx->scene.camera_pos.position, &ctx->scene.camera_pos);
 
   // update loaded chunks
   update_loaded_chunks(&ctx->scene);
