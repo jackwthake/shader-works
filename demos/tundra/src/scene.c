@@ -12,13 +12,11 @@
 #include "common/noise.h"
 
 extern fragment_shader_t ground_shadow_frag;
-extern fragment_shader_t tree_frag;
 
 // Function to set scene data for shadow calculations (defined in shaders.c)
 extern void set_shadow_scene(scene_t *scene);
 
-extern int generate_tree(model_t *, float, float, float3, float, usize, const usize, const usize, const usize); // in proc_gen.c
-extern void generate_ground_plane(model_t *, float2, float2, float3);                                           // in proc_gen.c
+extern void generate_ground_plane(model_t *, float2, float2, float3);  // in proc_gen.c
 
 static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
   if (chunk == NULL) return;
@@ -34,54 +32,6 @@ static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
 
   generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(g_world_config.ground_segments_per_chunk, g_world_config.ground_segments_per_chunk), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
-
-  float num_trees_float = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0.0f, 7.0f);
-  chunk->num_trees = (usize)(num_trees_float < 0.0f ? 0 : num_trees_float);
-  chunk->trees = chunk->num_trees > 0 ? calloc(chunk->num_trees, sizeof(model_t)) : NULL;
-
-  if (chunk->trees == NULL && chunk->num_trees > 0) {
-    fprintf(stderr, "Failed to allocate memory for %zu trees\n", chunk->num_trees);
-    chunk->num_trees = 0;
-    return;
-  }
-
-  for (usize i = 0; i < chunk->num_trees; ++i) {
-    float tree_x = map_range(hash2(chunk_x * 100 + i, chunk_z * 100 + i * 3, g_world_config.seed), -1.0f, 1.0f, world_x + 2, world_x + g_world_config.chunk_size - 2);
-    float tree_z = map_range(hash2(chunk_z * 100 + i * 7, chunk_x * 100 + i * 5, g_world_config.seed), -1.0f, 1.0f, world_z + 2, world_z + g_world_config.chunk_size - 2);
-    float tree_y = terrainHeight(tree_x, tree_z, g_world_config.seed) - 0.5f;
-
-    if (tree_y <= 0.1f) {
-      continue;
-    }
-
-    float3 tree_pos = make_float3(tree_x, tree_y, tree_z);
-
-    float chunk_center_x = world_x + g_world_config.half_chunk_size;
-    float chunk_center_z = world_z + g_world_config.half_chunk_size;
-    float distance_to_chunk = sqrtf((chunk_center_x * chunk_center_x) + (chunk_center_z * chunk_center_z));
-    float lod_factor = 1.0f;
-    usize segments = 5;
-    if (distance_to_chunk > 100.0f) {
-      lod_factor = 0.5f;
-      segments = 4;
-    } else if (distance_to_chunk > 50.0f) {
-      lod_factor = 0.7f;
-      segments = 4;
-    }
-    float base_radius = map_range(hash2(tree_pos.x, tree_pos.z, g_world_config.seed), -1.0f, 1.0f, 0.4f, 0.55f);
-    float base_angle = map_range(hash2(tree_pos.x, tree_pos.z, g_world_config.seed), -1.0f, 1.0f, 0.0f, 2.0f * PI);
-
-    float branch_chance = map_range(hash2(tree_pos.x, tree_pos.z, g_world_config.seed), -1.0f, 1.0f, 0.85 * lod_factor, 0.95 * lod_factor);
-    usize max_branches = (usize)map_range(hash2(tree_pos.x, tree_pos.z, g_world_config.seed), -1.0f, 1.0f, 4.f * lod_factor, 6.f * lod_factor);
-    usize num_levels = (usize)map_range(hash2(tree_pos.x, tree_pos.z, g_world_config.seed), -1.0f, 1.0f, 4.f * lod_factor, 5.f * lod_factor);
-    if (max_branches < 3) max_branches = 3;
-    if (num_levels < 4) num_levels = 4;
-    if (branch_chance < 0.75) branch_chance = 0.75;
-
-    chunk->trees[i].frag_shader = &tree_frag;
-
-    generate_tree(&(chunk->trees[i]), base_radius, base_angle, tree_pos, branch_chance, 0, max_branches, num_levels, segments);
-  }
 }
 
 static usize render_chunk(renderer_t *state, chunk_t *chunk, transform_t *camera, light_t *lights, const usize num_lights, scene_t *scene) {
@@ -89,12 +39,6 @@ static usize render_chunk(renderer_t *state, chunk_t *chunk, transform_t *camera
   usize triangles_rendered = 0;
   if (chunk->ground_plane.vertex_data != NULL && chunk->ground_plane.num_vertices > 0) {
     triangles_rendered += render_model(state, camera, &chunk->ground_plane, lights, num_lights);
-  }
-
-  for (usize i = 0; i < chunk->num_trees; ++i) {
-    if (chunk->trees[i].vertex_data != NULL && chunk->trees[i].num_vertices > 0) {
-      triangles_rendered += render_model(state, camera, &chunk->trees[i], lights, num_lights);
-    }
   }
 
   return triangles_rendered;
@@ -110,7 +54,7 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
     .min_pitch = -PI/3,
     .max_pitch = PI/3,
     .ground_height = 2.0f,
-    .camera_height_offset = 3.0f,
+    .camera_height_offset = 3.f,
     .last_frame_time = SDL_GetPerformanceCounter(),
     .distance_walked = 0.f
   };

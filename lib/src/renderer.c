@@ -278,7 +278,7 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
   state->depthbuffer = depthbuffer;
   state->screen_dim = make_float2((f32)width, (f32)height);
   state->atlas_dim = make_float2((f32)atlas_width, (f32)atlas_height);
-  state->frustum_bound = tanf(fov_over_2) * 1.4f;
+  state->frustum_bound = tanf(fov_over_2);
   state->screen_height_world = tanf(fov_over_2) * 2;
   state->projection_scale = (float)width / state->screen_height_world;
   state->max_depth = max_depth;

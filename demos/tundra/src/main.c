@@ -43,22 +43,6 @@ struct context_t {
   state_machine_t *sm;
 };
 
-
-// Day/night cycle color keyframes: Dawn -> Noon -> Dusk -> Midnight
-static const u8 sun_colors[][3] = {
-  {30, 50, 120},    // Dawn: deep blue
-  {200, 160, 160},  // Noon: white
-  {255, 100, 150},  // Dusk: light pink
-  {20, 20, 100},    // Midnight: dark blue
-};
-
-static const u8 fog_colors[][3] = {
-  {20, 30, 80},     // Dawn: rich deep blue
-  {240, 245, 250},  // Noon: almost white
-  {255, 150, 80},   // Dusk: pastel orange
-  {0, 0, 0},        // Midnight: black
-};
-
 static void SDL_library_init(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **frame_buf, const char *title, int width, int height, int scale) {
   SDL_Init(SDL_INIT_VIDEO);
 
@@ -77,30 +61,13 @@ static void init_performance_counter(performance_counter *stats) {
   stats->last_counter_time = SDL_GetPerformanceCounter();
 }
 
-static void get_cycle_color(float time_elapsed, const u8 colors[][3], u8 *r, u8 *g, u8 *b) {
-  const float CYCLE_DURATION = 120.0f; // 2 minutes total
-  const int NUM_PHASES = 4;
-
-  float cycle_time = fmodf(time_elapsed, CYCLE_DURATION);
-  float phase = (cycle_time / CYCLE_DURATION) * NUM_PHASES;
-
-  int idx = (int)phase;
-  int next_idx = (idx + 1) % NUM_PHASES;
-  float t = phase - idx;
-
-  *r = (u8)lerp(colors[idx][0], colors[next_idx][0], t);
-  *g = (u8)lerp(colors[idx][1], colors[next_idx][1], t);
-  *b = (u8)lerp(colors[idx][2], colors[next_idx][2], t);
-}
-
 static u32 get_sun_color(float time_elapsed) {
-  // u8 r, g, b;
-  // get_cycle_color(time_elapsed, sun_colors, &r, &g, &b);
+  (void)time_elapsed;
   return rgb_to_u32(105.f, 125.f, 200.f);
 }
 
 static void get_fog_color(float time_elapsed, u8 *r, u8 *g, u8 *b) {
-  // get_cycle_color(time_elapsed, fog_colors, r, g, b);
+  (void)time_elapsed;
   *r = 162; *g = 208.f; *b = 227.f;
 }
 
@@ -150,15 +117,8 @@ static void on_generate(void *args, size_t size) {
     },
     .chunk_map = { 0 },
     .controller = (fps_controller_t) {
-      .move_speed = 10.0f,
-      .mouse_sensitivity = 0.002f,
-      .min_pitch = -PI / 2 + EPSILON,
-      .max_pitch = PI / 2  - EPSILON,
-      .camera_height_offset = 2.0f,
       .delta_time = 1.0f / g_world_config.tick_rate,
       .last_frame_time = 0.0f,
-      .ground_height = 0.0f,
-      .distance_walked = 0.0f
     }
   };
 
@@ -201,8 +161,8 @@ static void on_normal_tick(void *args, size_t size, float dt) {
   apply_fps_movement(ctx, dt);
 
   // bob camera
-  float camera_bob_offset = sinf(ctx->scene.controller.distance_walked / ctx->scene.controller.move_speed) * 0.5;
-  ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset + camera_bob_offset;
+  // float camera_bob_offset = sinf(ctx->scene.controller.distance_walked);
+  ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;// + camera_bob_offset;
 
   // update snow particles
   // update_quads(ctx->scene.camera_pos.position, &ctx->scene.camera_pos);
@@ -220,7 +180,7 @@ static int on_normal_render(void *args, size_t size) {
   struct context_t *ctx = (struct context_t*)args;
 
   usize triangles_rendered = render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
-  triangles_rendered += render_quads(&ctx->renderer, &ctx->scene.camera_pos, &ctx->scene.sun, 1);
+  // triangles_rendered += render_quads(&ctx->renderer, &ctx->scene.camera_pos, &ctx->scene.sun, 1);
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
@@ -395,7 +355,7 @@ int main(int argc, char const *argv[]) {
     get_fog_color(state_context.total_time, &bg_r, &bg_g, &bg_b);
     u32 background_color = rgb_to_u32(bg_r, bg_g, bg_b);
 
-    for(int i = 0; i < config_width * config_height; ++i) {
+    for(size_t i = 0; i < config_width * config_height; ++i) {
       framebuffer[i] = background_color;
       depth_buffer[i] = FLT_MAX;
     }
