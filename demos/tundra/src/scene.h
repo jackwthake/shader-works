@@ -17,6 +17,9 @@ typedef struct {
   float delta_time;
   uint64_t last_frame_time;
   float distance_walked;
+
+  float3 velocity;
+  bool skiing;
 } fps_controller_t;
 
 typedef struct scene_t {

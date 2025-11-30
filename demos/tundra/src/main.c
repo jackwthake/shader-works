@@ -103,6 +103,68 @@ static void apply_fps_movement(struct context_t *ctx, float dt) {
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }
 
+static float3 get_slope_normal(float x, float z, int seed) {
+  float hL = terrainHeight(x - EPSILON, z, seed);
+  float hR = terrainHeight(x + EPSILON, z, seed);
+  float hD = terrainHeight(x, z - EPSILON, seed);
+  float hU = terrainHeight(x, z + EPSILON, seed);
+
+  float dz_dx = (hR - hL) / (2.0f * EPSILON);
+  float dz_dz = (hU - hD) / (2.0f * EPSILON);
+
+  float3 normal = {-dz_dx, 1.0f, -dz_dz};
+
+  return float3_normalize(normal);
+}
+
+static void apply_ski_movement(struct context_t *ctx, float dt) {
+  float3 right, up, forward;
+  transform_get_basis_vectors(&ctx->scene.camera_pos, &right, &up, &forward);
+
+  float3 normal = get_slope_normal(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z, g_world_config.seed);
+  float3 gravity = { 0.0f, -12.f, 0.0f };
+  float slope_dot = float3_dot(gravity, normal);
+
+  float3 downhill_acc = float3_sub(gravity, float3_scale(normal, slope_dot));
+  float3 kick_force = {0};
+
+  const bool *keys = ctx->keys;
+  if (keys[SDL_SCANCODE_W]) {
+    kick_force = float3_scale(forward, -15.f);
+  }
+
+  // apply forces
+  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(downhill_acc, dt));
+  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(kick_force, dt));
+
+  // friction
+  if (keys[SDL_SCANCODE_S]) {
+    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.70f);
+  } else {
+    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.98f);
+  }
+
+  // update position
+  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, float3_scale(ctx->scene.controller.velocity, dt));
+
+  // snap
+  float ground = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
+  ctx->scene.camera_pos.position.y = ground + ctx->scene.controller.camera_height_offset;
+
+  // mouse input
+  float mx, my;
+  SDL_GetRelativeMouseState(&mx, &my);
+
+  ctx->scene.camera_pos.yaw += mx * ctx->scene.controller.mouse_sensitivity;
+  ctx->scene.camera_pos.pitch -= my * ctx->scene.controller.mouse_sensitivity;
+
+  if (ctx->scene.camera_pos.pitch < ctx->scene.controller.min_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.min_pitch;
+  if (ctx->scene.camera_pos.pitch > ctx->scene.controller.max_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.max_pitch;
+
+  ctx->scene.controller.ground_height = ground;
+  update_camera(&ctx->renderer, &ctx->scene.camera_pos);
+}
+
 static void on_generate(void *args, size_t size) {
   (void)size; // unused
   struct context_t *ctx = (struct context_t *)args;
@@ -145,8 +207,6 @@ static void on_normal_enter(void *args, size_t size) {
     .color = rgb_to_u32(200, 160, 160)
   };
 
-  ctx->renderer.wireframe_mode = false;
-
   // Update camera with current position
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }
@@ -157,8 +217,14 @@ static void on_normal_tick(void *args, size_t size, float dt) {
 
   struct context_t *ctx = (struct context_t*)args;
 
+  if (ctx->keys[SDL_SCANCODE_Q]) {
+    ctx->scene.controller.skiing = !ctx->scene.controller.skiing;
+    ctx->scene.controller.velocity = make_float3(0.0f, 0.0f, 0.0f);
+  }
+
   // apply movement
-  apply_fps_movement(ctx, dt);
+  if (ctx->scene.controller.skiing)   apply_ski_movement(ctx, dt);
+  else                                apply_fps_movement(ctx, dt);
 
   // bob camera
   // float camera_bob_offset = sinf(ctx->scene.controller.distance_walked);
@@ -192,12 +258,11 @@ static void on_overhead_enter(void *args, size_t size) {
 
   struct context_t *ctx = (struct context_t*)args;
 
-  ctx->scene.camera_pos.position.y += 45.0f;
+  ctx->scene.camera_pos.position.y += 250.0f;
   ctx->scene.camera_pos.pitch = -PI / 2;
   ctx->scene.camera_pos.yaw = 0;
 
-  ctx->renderer.max_depth = 250;
-  ctx->renderer.wireframe_mode = false;
+  ctx->renderer.max_depth = 500;
 }
 
 static void on_overhead_tick(void *args, size_t size, float dt) {
@@ -331,12 +396,19 @@ int main(int argc, char const *argv[]) {
           running = false;
         }
 
-        if (event.key.key == SDLK_1 && fsm_get_state(&sm) != NORMAL)
-          fsm_change_state(&sm, NORMAL);
-        else if (event.key.key == SDLK_2)
-          fsm_change_state(&sm, OVERHEAD);
-        else if (event.key.key == SDLK_3)
-          renderer.wireframe_mode = !renderer.wireframe_mode;
+        if (event.key.scancode == SDL_SCANCODE_M) {
+          if (fsm_get_state(&sm) != OVERHEAD)
+            fsm_change_state(&sm, OVERHEAD);
+          else
+            fsm_change_state(&sm, NORMAL);
+        }
+
+        if (event.key.key == SDLK_1) {
+          if (renderer.wireframe_mode)
+            renderer.wireframe_mode = false;
+          else
+            renderer.wireframe_mode = true;
+        }
       }
     }
 

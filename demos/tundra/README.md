@@ -34,8 +34,8 @@ Built with the `shader-works` renderer to demonstrate real-world performance and
 | Key | Action |
 |-----|--------|
 | W/A/S/D | Move |
-| 1 | First-person view (default) |
-| 2 | Birds-eye view |
+| Q | Start / Stop XC Skiing |
+| M | Map |
 | ESC | Exit |
 
 ## Building

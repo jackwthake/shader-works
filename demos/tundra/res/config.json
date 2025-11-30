@@ -10,6 +10,6 @@
     "target_tick_rate": 25,
     "chunk_size": 48,
     "ground_segments_per_chunk": 4,
-    "chunk_load_radius": 3
+    "chunk_load_radius": 4
   }
 }
