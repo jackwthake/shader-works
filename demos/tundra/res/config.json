@@ -5,6 +5,9 @@
     "height": 144,
     "scale": 8
   },
+  "graphics": {
+    "use_high_graphics": false
+  },
   "world": {
     "seed": 69,
     "target_tick_rate": 15,

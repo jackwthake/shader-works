@@ -18,13 +18,31 @@ extern void set_shadow_scene(scene_t *scene);
 
 extern void generate_ground_plane(model_t *, float2, float2, float3);  // in proc_gen.c
 
+/**
+ * returns Level of detail based off the passed distance
+ * NOTE: the passed distance must be squared, this is for speed
+ *
+ * DO NOT TWEAK THIS IS VERY WELL TUNED
+ */
 static int get_lod_from_dist(int dist_sq) {
   float chunk_size_sq = g_world_config.chunk_size * g_world_config.chunk_size;
-  if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 2;
-  else if (dist_sq <= (2 * 2) * chunk_size_sq) return 3;
-  else if (dist_sq <= (3 * 3) * chunk_size_sq) return 8;
-  else if (dist_sq <= (4 * 4) * chunk_size_sq) return 20;
-  else if (dist_sq <= (5 * 5) * chunk_size_sq) return 15;
+
+  if (g_world_config.use_high_graphics) { /* High quality */
+    if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 2;
+    else if (dist_sq <= (2 * 2) * chunk_size_sq) return 3;
+    else if (dist_sq <= (2.5f * 2.5f) * chunk_size_sq) return 4;
+    else if (dist_sq <= (3 * 3) * chunk_size_sq) return 5;
+    else if (dist_sq <= (3.5f * 3.5f) * chunk_size_sq) return 9;
+    else if (dist_sq <= (4 * 4) * chunk_size_sq) return 10;
+    else if (dist_sq <= (4.5f * 4.5f) * chunk_size_sq) return 15;
+  } else { /* Low quality*/
+    if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 4;
+    else if (dist_sq <= (2.5f * 2.5f) * chunk_size_sq) return 5;
+    else if (dist_sq <= (3 * 3) * chunk_size_sq) return 8;
+    else if (dist_sq <= (3.5f * 3.5f) * chunk_size_sq) return 9;
+    else if (dist_sq <= (4 * 4) * chunk_size_sq) return 12;
+    else if (dist_sq <= (4.5f * 4.5f) * chunk_size_sq) return 15;
+  }
 
   return 20;
 }
@@ -50,6 +68,21 @@ static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z, float playe
 
   generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(chunk->lod, chunk->lod), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
+
+  // generate points of interest
+  if (ridgeNoise(chunk_x, chunk_z, g_world_config.seed) > 0.95f) {
+    chunk->static_objs = calloc(1, sizeof(model_t));
+    chunk->num_static_objs = 1;
+
+    float obj_x = (chunk->x * g_world_config.chunk_size) + ((hash2(chunk->x, chunk->z, g_world_config.seed) + 1) * g_world_config.chunk_size);
+    float obj_z = (chunk->z * g_world_config.chunk_size) + ((hash2(chunk->x, chunk->z, g_world_config.seed + 1) + 1) * g_world_config.chunk_size);
+    float3 pos = {obj_x, get_interpolated_terrain_height(obj_x, obj_z) + 3, obj_z};
+
+    generate_cube(chunk->static_objs, pos, make_float3(8.f, 8.f, 8.f));
+    chunk->static_objs->use_textures = false;
+  } else {
+    chunk->num_static_objs = 0;
+  }
 }
 
 static void validate_lod_level(scene_t *scene, chunk_map_node_t *node) {
@@ -78,6 +111,12 @@ static usize render_chunk(renderer_t *state, chunk_t *chunk, transform_t *camera
     triangles_rendered += render_model(state, camera, &chunk->ground_plane, lights, num_lights);
   }
 
+  for (usize i = 0; i < chunk->num_static_objs; ++i) {
+    if (chunk->static_objs[i].vertex_data != NULL && chunk->static_objs[i].num_vertices > 0) {
+      triangles_rendered += render_model(state, camera, &chunk->static_objs[i], lights, num_lights);
+    }
+  }
+
   return triangles_rendered;
 }
 
@@ -88,16 +127,16 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
   scene->controller = (fps_controller_t){
     .move_speed = 8.0f,
     .mouse_sensitivity = 0.0015f,
-    .min_pitch = -PI/3,
-    .max_pitch = PI/3,
-    .ground_height = 2.0f,
+    .min_pitch = -PI/2,
+    .max_pitch = PI/2,
+    .ground_height = 3.0f,
     .camera_height_offset = 3.f,
     .last_frame_time = SDL_GetPerformanceCounter(),
     .distance_walked = 0.f
   };
 
   scene->camera_pos = (transform_t){ 0 };
-  scene->fog_start = 0.65;
+  scene->fog_start = 0.75;
 
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);
 }

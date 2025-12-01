@@ -22,6 +22,8 @@ world_config_t g_world_config = {0};
 #define DEFAULT_CHUNK_LOAD_RADIUS 2
 #define DEFAULT_TICK_RATE 25.f;
 
+#define DEFAULT_USE_HIGH_GRAPHICS 1
+
 int load_config(unsigned int *width, unsigned int *height, unsigned int *scale, char *title, size_t title_size) {
   FILE *config_file = fopen("config.json", "r");
 
@@ -93,10 +95,17 @@ int load_world_config(void) {
   g_world_config.ground_segments_per_chunk = DEFAULT_GROUND_SEGMENTS_PER_CHUNK;
   g_world_config.chunk_load_radius = DEFAULT_CHUNK_LOAD_RADIUS;
   g_world_config.tick_rate = DEFAULT_TICK_RATE;
+  g_world_config.use_high_graphics = DEFAULT_USE_HIGH_GRAPHICS;
 
   if (!g_config) {
     printf("Config not loaded, using default world settings\n");
   } else {
+    cJSON *graphics = cJSON_GetObjectItem(g_config, "graphics");
+    if (graphics) {
+      cJSON *json_graphcis = cJSON_GetObjectItem(graphics, "use_high_graphics");
+      if (cJSON_IsBool(json_graphcis)) g_world_config.use_high_graphics = json_graphcis->valueint;
+    }
+
     // Extract world settings
     cJSON *world = cJSON_GetObjectItem(g_config, "world");
     if (world) {

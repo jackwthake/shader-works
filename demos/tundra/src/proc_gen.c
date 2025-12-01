@@ -20,13 +20,12 @@ float terrainHeight(float x, float y, int seed) {
 
   float mountain_mask = noise2D(x * 0.0125, y * 0.0125, seed);
   float base = 5.f + fbm(x * 0.0001f, y * 0.0001f, 4, seed);
-  float small = ridgeNoise(x * 0.00005f, y * 0.00005f, seed + 1);
 
   float ridge = ridgeNoise(x * 0.01, y * 0.01, seed);
 
   ridge = powf(ridge, 2.5f) * 55.f;
 
-  float height = (base * 1.25) + small + (ridge * mountain_mask) + 10.f;
+  float height = base + (ridge * mountain_mask) + 10.f;
 
   // Create frozen lakes by enforcing minimum height
   return fmaxf(height, lake_level);

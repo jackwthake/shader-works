@@ -3,6 +3,7 @@
 
 #include <cJSON.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 // Global config object
 extern cJSON *g_config;
@@ -17,6 +18,7 @@ typedef struct {
   float ground_segment_size;
   int chunk_load_radius;
   int max_chunks;
+  bool use_high_graphics;
 } world_config_t;
 
 extern world_config_t g_world_config;

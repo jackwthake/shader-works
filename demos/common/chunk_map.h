@@ -8,8 +8,8 @@
 typedef struct {
   int x, z;
   model_t ground_plane;
-  model_t *trees;
-  usize num_trees;
+  model_t *trees, *static_objs;
+  usize num_trees, num_static_objs;
   int lod;
 } chunk_t;
 

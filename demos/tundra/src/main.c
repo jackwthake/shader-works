@@ -246,7 +246,6 @@ static int on_normal_render(void *args, size_t size) {
   struct context_t *ctx = (struct context_t*)args;
 
   usize triangles_rendered = render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
-  // triangles_rendered += render_quads(&ctx->renderer, &ctx->scene.camera_pos, &ctx->scene.sun, 1);
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
@@ -394,10 +393,7 @@ int main(int argc, char const *argv[]) {
         }
 
         if (event.key.key == SDLK_1) {
-          if (renderer.wireframe_mode)
-            renderer.wireframe_mode = false;
-          else
-            renderer.wireframe_mode = true;
+          renderer.wireframe_mode = !renderer.wireframe_mode;
         }
       }
     }
