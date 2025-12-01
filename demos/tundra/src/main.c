@@ -118,41 +118,20 @@ static float3 get_slope_normal(float x, float z, int seed) {
 }
 
 static void apply_ski_movement(struct context_t *ctx, float dt) {
-  float3 right, up, forward;
-  transform_get_basis_vectors(&ctx->scene.camera_pos, &right, &up, &forward);
-
   float3 normal = get_slope_normal(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z, g_world_config.seed);
-  float3 gravity = { 0.0f, -12.f, 0.0f };
+  float3 gravity = { 0.0f, -24.f, 0.0f };
   float slope_dot = float3_dot(gravity, normal);
 
   float3 downhill_acc = float3_sub(gravity, float3_scale(normal, slope_dot));
   float3 kick_force = {0};
 
-  const bool *keys = ctx->keys;
-  if (keys[SDL_SCANCODE_W]) {
-    kick_force = float3_scale(forward, -15.f);
+  if (ctx->scene.controller.kick_timer > 0.0f) {
+    ctx->scene.controller.kick_timer -= dt;
   }
 
-  // apply forces
-  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(downhill_acc, dt));
-  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(kick_force, dt));
-
-  // friction
-  if (keys[SDL_SCANCODE_S]) {
-    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.70f);
-
-    if (float3_magnitude(ctx->scene.controller.velocity) <= 0.5)
-      ctx->scene.controller.velocity = (float3){0};
-  } else {
-    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.98f);
+  if (ctx->scene.controller.side_step_timer > 0.0f) {
+    ctx->scene.controller.side_step_timer -= dt;
   }
-
-  // update position
-  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, float3_scale(ctx->scene.controller.velocity, dt));
-
-  // snap
-  float ground = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
-  ctx->scene.camera_pos.position.y = ground + ctx->scene.controller.camera_height_offset;
 
   // mouse input
   float mx, my;
@@ -164,6 +143,76 @@ static void apply_ski_movement(struct context_t *ctx, float dt) {
   if (ctx->scene.camera_pos.pitch < ctx->scene.controller.min_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.min_pitch;
   if (ctx->scene.camera_pos.pitch > ctx->scene.controller.max_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.max_pitch;
 
+  float ground = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
+  ctx->scene.camera_pos.position.y = ground + ctx->scene.controller.camera_height_offset;
+  ctx->scene.controller.ground_height = ground;
+  update_camera(&ctx->renderer, &ctx->scene.camera_pos);
+
+  float3 right, up, forward;
+  transform_get_basis_vectors(&ctx->scene.camera_pos, &right, &up, &forward);
+
+  const bool *keys = ctx->keys;
+  if (keys[SDL_SCANCODE_W] && ctx->scene.controller.kick_timer <= 0.0f) {
+    kick_force = float3_scale(forward, -115.f);
+
+    ctx->scene.controller.kick_timer = ctx->scene.controller.kick_interval;
+  }
+
+  // apply forces
+  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(downhill_acc, dt));
+  ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, float3_scale(kick_force, dt));
+
+  // steer
+  float3 vel = ctx->scene.controller.velocity;
+  float speed = float3_magnitude(vel);
+
+  if (speed > 1.0f) {
+    float3 vel_dir = float3_normalize(vel);
+    float3 target_dir = float3_scale(forward, -1.0f);
+    target_dir.y = 0.0f;
+    target_dir = float3_normalize(target_dir);
+
+    float alignment = float3_dot(vel_dir, target_dir);
+
+    if (alignment < 0.98f) {
+      float3 steer_delta = float3_sub(target_dir, vel_dir);
+
+      float grip = 12.0f;
+      float3 grip_force = float3_scale(steer_delta, grip * speed * dt);
+      float3 turn_scrub_factor = float3_scale(grip_force, -0.15f);
+
+      ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, grip_force);
+      ctx->scene.controller.velocity = float3_add(ctx->scene.controller.velocity, turn_scrub_factor);
+    }
+  }
+
+  // friction
+  if (keys[SDL_SCANCODE_S]) {
+    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.70f);
+
+    if (float3_magnitude(ctx->scene.controller.velocity) <= 1.0f)
+      ctx->scene.controller.velocity = (float3){0};
+  } else {
+    ctx->scene.controller.velocity = float3_scale(ctx->scene.controller.velocity, 0.975f);
+  }
+
+  if (float3_magnitude(ctx->scene.controller.velocity) <= 0.5f)
+    ctx->scene.controller.velocity = (float3){0};
+
+  // update position
+  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, float3_scale(ctx->scene.controller.velocity, dt));
+
+  if (float3_magnitude(ctx->scene.controller.velocity) <= 2.0f) {
+    if (ctx->scene.controller.side_step_timer <= 0.0f) {
+      if (keys[SDL_SCANCODE_A]) ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, float3_scale(right, 2.f));
+      if (keys[SDL_SCANCODE_D]) ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, float3_scale(right, -2.f));
+
+      ctx->scene.controller.side_step_timer = ctx->scene.controller.kick_interval / 3.f;
+    }
+  }
+
+  // snap
+  ctx->scene.camera_pos.position.y = ground + ctx->scene.controller.camera_height_offset;
   ctx->scene.controller.ground_height = ground;
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }
@@ -223,6 +272,7 @@ static void on_normal_tick(void *args, size_t size, float dt) {
   if (ctx->keys[SDL_SCANCODE_Q]) {
     ctx->scene.controller.skiing = !ctx->scene.controller.skiing;
     ctx->scene.controller.velocity = make_float3(0.0f, 0.0f, 0.0f);
+    ctx->scene.controller.kick_timer = ctx->scene.controller.kick_interval;
   }
 
   // apply movement

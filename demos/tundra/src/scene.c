@@ -26,7 +26,7 @@ extern void generate_ground_plane(model_t *, float2, float2, float3);  // in pro
  */
 static int get_lod_from_dist(int dist_sq) {
   float chunk_size_sq = g_world_config.chunk_size * g_world_config.chunk_size;
-
+  // compiler will optimize out the constant math
   if (g_world_config.use_high_graphics) { /* High quality */
     if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 2;
     else if (dist_sq <= (2 * 2) * chunk_size_sq) return 3;
@@ -132,11 +132,13 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
     .ground_height = 3.0f,
     .camera_height_offset = 3.f,
     .last_frame_time = SDL_GetPerformanceCounter(),
-    .distance_walked = 0.f
+    .distance_walked = 0.f,
+    .kick_timer = 0.0f,
+    .kick_interval = 1.25f
   };
 
   scene->camera_pos = (transform_t){ 0 };
-  scene->fog_start = 0.75;
+  scene->fog_start = 0.7;
 
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);
 }

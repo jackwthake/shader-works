@@ -17,7 +17,7 @@ float3 float3_add(float3 a, float3 b) {
 }
 
 float3 float3_sub(float3 a, float3 b) {
-  return (float3){a.x - b.x, a.y - b.y, a.z - b.z}; 
+  return (float3){a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
 float3 float3_scale(float3 v, float s) {
@@ -50,13 +50,21 @@ float3 float3_cross(float3 a, float3 b) {
   };
 }
 
+float3 float3_lerp(float3 start, float3 end, float t) {
+  return (float3) {
+    start.x, + t * (end.x, start.x),
+    start.y, + t * (end.y, start.y),
+    start.z, + t * (end.z, start.z)
+  };
+}
+
 /** float2 implementation */
 float2 float2_add(float2 a, float2 b) {
   return (float2){a.x + b.x, a.y + b.y};
 }
 
 float2 float2_sub(float2 a, float2 b) {
-  return (float2){a.x - b.x, a.y - b.y}; 
+  return (float2){a.x - b.x, a.y - b.y};
 }
 
 float2 float2_scale(float2 v, float s) {

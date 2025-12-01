@@ -40,6 +40,7 @@ f32 float3_dot(float3 a, float3 b);
 float3 float3_cross(float3 a, float3 b);
 f32 float3_magnitude(float3 v);
 float3 float3_normalize(float3 v);
+float3 float3_lerp(float3 start, float3 end, float t);
 
 // Float2 operations
 float2 make_float2(f32 x, f32 y);

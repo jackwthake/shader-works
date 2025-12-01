@@ -20,6 +20,9 @@ typedef struct {
 
   float3 velocity;
   bool skiing;
+
+  float kick_timer, side_step_timer;
+  float kick_interval;
 } fps_controller_t;
 
 typedef struct scene_t {
