@@ -18,7 +18,7 @@ typedef struct {
   float ground_segment_size;
   int chunk_load_radius;
   int max_chunks;
-  bool use_high_graphics;
+  int graphics_quality;
 } world_config_t;
 
 extern world_config_t g_world_config;

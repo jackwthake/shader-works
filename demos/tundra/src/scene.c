@@ -27,7 +27,15 @@ extern void generate_ground_plane(model_t *, float2, float2, float3);  // in pro
 static int get_lod_from_dist(int dist_sq) {
   float chunk_size_sq = g_world_config.chunk_size * g_world_config.chunk_size;
   // compiler will optimize out the constant math
-  if (g_world_config.use_high_graphics) { /* High quality */
+  if (g_world_config.graphics_quality == 3) { /* High quality */
+    if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 1;
+    else if (dist_sq <= (2 * 2) * chunk_size_sq) return 2;
+    else if (dist_sq <= (2.5f * 2.5f) * chunk_size_sq) return 3;
+    else if (dist_sq <= (3 * 3) * chunk_size_sq) return 5;
+    else if (dist_sq <= (3.5f * 3.5f) * chunk_size_sq) return 6;
+    else if (dist_sq <= (4 * 4) * chunk_size_sq) return 10;
+    else if (dist_sq <= (4.5f * 4.5f) * chunk_size_sq) return 15;
+  } else if (g_world_config.graphics_quality == 2) { /* Medium quality */
     if (dist_sq >= 0 && dist_sq <= chunk_size_sq) return 2;
     else if (dist_sq <= (2 * 2) * chunk_size_sq) return 3;
     else if (dist_sq <= (2.5f * 2.5f) * chunk_size_sq) return 4;
@@ -253,7 +261,7 @@ usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, 
       // If dot < 0, chunk is behind the camera (except in overhead mode)
       // Add chunk_size buffer to account for chunk size and avoid culling visible chunks
       float dot = is_overhead ? 1.0f : float3_dot(to_chunk, forward);
-      if (dot > (g_world_config.chunk_size * 2)) {
+      if (dot > g_world_config.chunk_size * 1.1) {
         // Chunk is fully behind the player, skip rendering
         continue;
       }
