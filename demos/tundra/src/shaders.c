@@ -274,6 +274,10 @@ static particle_system_t particle_system = {
   .frame_time = 0.016f
 };
 
+// Set to `false` to disable the snow/falling particle system at runtime
+// without removing the implementation.
+static bool snow_particles_enabled = false;
+
 static void init_particles(particle_system_t *ps) {
   for (int i = 0; i < ps->max_particles; i++) {
     particles[i].model = (model_t){0};
@@ -321,6 +325,10 @@ static void spawn_particle(particle_system_t *ps, int index, float3 player_pos, 
 
 void update_quads(float3 player_pos, transform_t *camera_transform) {
   particle_system_t *ps = &particle_system;
+
+  // Early-out if snow particles are disabled. This keeps all particle code
+  // present but prevents any updates/spawns from occurring.
+  if (!snow_particles_enabled) return;
 
   if (!particles_initialized) {
     init_particles(ps);
@@ -375,6 +383,9 @@ void update_quads(float3 player_pos, transform_t *camera_transform) {
 usize render_quads(renderer_t *restrict renderer, transform_t *restrict camera, light_t *restrict lights, usize num_lights) {
   particle_system_t *ps = &particle_system;
   usize total_triangles = 0;
+
+  // If snow particles are disabled, skip rendering entirely.
+  if (!snow_particles_enabled) return 0;
 
   for (int i = 0; i < ps->max_particles; i++) {
     if (particles[i].active && particles[i].model.vertex_data) {

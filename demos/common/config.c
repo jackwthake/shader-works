@@ -11,15 +11,15 @@ world_config_t g_world_config = {0};
 
 // Default values
 #define DEFAULT_TITLE "Demo"
-#define DEFAULT_WIDTH 200
-#define DEFAULT_HEIGHT 125
-#define DEFAULT_SCALE 8
+#define DEFAULT_WIDTH 320
+#define DEFAULT_HEIGHT 240
+#define DEFAULT_SCALE 4
 
 // Default world values
 #define DEFAULT_WORLD_SEED 2
 #define DEFAULT_CHUNK_SIZE 32
-#define DEFAULT_GROUND_SEGMENTS_PER_CHUNK 4
-#define DEFAULT_CHUNK_LOAD_RADIUS 1
+#define DEFAULT_GROUND_SEGMENTS_PER_CHUNK 32
+#define DEFAULT_CHUNK_LOAD_RADIUS 3
 
 int load_config(unsigned int *width, unsigned int *height, unsigned int *scale, char *title, size_t title_size) {
   FILE *config_file = fopen("config.json", "r");

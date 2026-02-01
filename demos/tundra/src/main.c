@@ -14,7 +14,7 @@
 #include "scene.h"
 
 // Default values
-#define MAX_DEPTH 40
+#define MAX_DEPTH 95.0f // 3 chunks - 1
 
 typedef enum {
   GENERATE,
@@ -220,7 +220,7 @@ static int on_normal_render(void *args, size_t size) {
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
-  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth / 2.f, ctx->renderer.max_depth - 1.0f, fog_r, fog_g, fog_b);
+  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * 0.95, ctx->renderer.max_depth - 1.0f, fog_r, fog_g, fog_b);
 
   return triangles_rendered;
 }

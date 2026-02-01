@@ -19,13 +19,13 @@ float terrainHeight(float x, float y, int seed) {
   const float lake_level = 0.0f;
 
   // Large-scale gentle rolling terrain (very low frequency for gradual hills)
-  float large_hills = fbm(x * 0.003f, y * 0.003f, 4, g_world_config.seed + seed) * 25.0f;
+  float large_hills = fbm(x * 0.004f, y * 0.004f, 4, g_world_config.seed + seed) * 25.0f;
 
   // Medium-scale terrain features
-  float medium_hills = fbm(x * 0.008f, y * 0.008f, 5, g_world_config.seed + seed + 1) * 12.0f;
+  float medium_hills = fbm(x * 0.02f, y * 0.02f, 5, g_world_config.seed + seed + 1) * 12.0f;
 
   // Small-scale detail
-  float detail = fbm(x * 0.02f, y * 0.02f, 6, g_world_config.seed + seed + 2) * 4.0f;
+  float detail = fbm(x * 0.2f, y * 0.2f, 6, g_world_config.seed + seed + 2) * 4.0f;
 
   // Domain warping for more interesting mountain shapes
   float warp_x = fbm(x * 0.005f, y * 0.005f, 3, g_world_config.seed + seed + 3) * 20.0f;
@@ -51,7 +51,7 @@ float terrainHeight(float x, float y, int seed) {
 }
 
 float get_interpolated_terrain_height(float x, float z) {
-  float grid_size = 1.0f; // Sample every 1 unit
+  float grid_size = 8.0f; // Sample every 8 units
 
   // Find which grid cell we're in
   float grid_x = x / grid_size;
