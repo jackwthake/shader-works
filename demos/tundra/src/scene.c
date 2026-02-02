@@ -11,6 +11,9 @@
 
 #include "common/noise.h"
 
+// Global terrain height function pointer - gets set by the active scene
+float (*terrainHeight)(float x, float y, int seed) = NULL;
+
 extern fragment_shader_t ground_shadow_frag;
 extern fragment_shader_t tree_frag;
 

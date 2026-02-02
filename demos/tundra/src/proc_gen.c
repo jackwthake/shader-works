@@ -13,15 +13,6 @@ inline float map_range(float value, float old_min, float old_max, float new_min,
   return new_min + (value - old_min) * (new_max - new_min) / (old_max - old_min);
 }
 
-// Terrain height function combining multiple noise layers for gradual hills and mountains
-float terrainHeight(float x, float y, int seed) {
-// Just two layers: One for the "Rolling Hope" and one for tiny "Snow Crinkles"
-  float rolling_hills = fbm(x * 0.005f, y * 0.005f, 3, seed) * 15.0f;
-  float micro_detail  = fbm(x * 0.1f,   y * 0.1f,   2, seed + 1) * 2.0f;
-
-  return rolling_hills + micro_detail + 5.0f; // Offset by 5 so we stay above 'Lake Level'
-}
-
 float get_interpolated_terrain_height(float x, float z) {
   float grid_size = 8.0f; // Sample every 8 units
 

@@ -1,5 +1,5 @@
-#ifndef __SCENES_H__
-#define __SCENES_H__
+#ifndef __STAGES_H__
+#define __STAGES_H__
 
 #include "../util/state.h"
 
@@ -32,4 +32,4 @@ typedef enum {
     SCENE_08,
 } scene_index_t;
 
-#endif // __SCENES_H__
+#endif // __STAGES_H__

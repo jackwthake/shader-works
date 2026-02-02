@@ -1,5 +1,6 @@
-#include "scenes.h"
+#include "stages.h"
 
+#include <stdio.h>
 #include <math.h>
 #include <SDL3/SDL.h>
 
@@ -8,6 +9,12 @@
 
 #include "../const.h"
 #include "../scene.h"
+
+#define STAGE_01_DISTANCE_TRIGGER 500.0f
+
+static float get_distance_from_origin(float3 pos) {
+  return sqrtf(pos.x * pos.x + pos.z * pos.z);
+}
 
 static void get_cycle_color(float time_elapsed, const u8 colors[][3], u8 *r, u8 *g, u8 *b) {
   const float CYCLE_DURATION = 120.0f; // 2 minutes total
@@ -103,6 +110,8 @@ void scene_01_enter(void *args, size_t size) {
   (void)size; // unused
   context_t *ctx = (context_t *)args;
 
+  terrainHeight = scene_01_terrainHeight;
+
   if (!ctx) return;
 
   ctx->scene = (scene_t) {
@@ -161,6 +170,12 @@ void scene_01_tick(void *args, size_t size, float dt) {
   update_loaded_chunks(&ctx->scene);
 
   ctx->scene.sun.color = get_sun_color(ctx->total_time);
+
+  // check for stage change
+  if (get_distance_from_origin(ctx->scene.camera_pos.position) > STAGE_01_DISTANCE_TRIGGER) {
+    fsm_change_state(ctx->sm, SCENE_02);
+    printf("Transitioning to Scene 02\n");
+  }
 }
 
 int scene_01_render(void *args, size_t size) {

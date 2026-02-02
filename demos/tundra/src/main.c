@@ -1,6 +1,5 @@
 #include <shader-works/renderer.h>
 
-#include <assert.h>
 #include <float.h> // FLT_MAX
 #include <math.h>
 #include <stdio.h>
@@ -11,7 +10,7 @@
 #include "common/config.h"
 #include "common/noise.h"
 
-#include "scenes/scenes.h"
+#include "stages/stages.h"
 #include "const.h"
 
 #define NUM_SCENES 9

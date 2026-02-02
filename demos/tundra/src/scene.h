@@ -30,7 +30,7 @@ typedef struct scene_t {
 
 extern float map_range(float value, float old_min, float old_max, float new_min, float new_max);
 
-extern float terrainHeight(float x, float y, int seed);
+extern float (*terrainHeight)(float x, float y, int seed); // set by each stage
 extern float get_interpolated_terrain_height(float x, float z);
 
 // Implementation found in scene.c
