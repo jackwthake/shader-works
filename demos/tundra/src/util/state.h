@@ -4,7 +4,11 @@
 #include <stddef.h>
 
 // Callbacks for state lifecycle and execution
+typedef float (*terrain_func_t)(float x, float y, int seed);
+
 typedef struct {
+  terrain_func_t height_map;                  // Used to alter terrain generation between scenes
+
   void (*enter)(void *, size_t);              // Called when entering state
   void (*tick)(void *, size_t, float dt);     // Called each fixed timestep
   int (*render)(void *, size_t);              // Called each frame, returns triangle count

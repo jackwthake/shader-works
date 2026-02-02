@@ -10,55 +10,21 @@
 
 #include "common/config.h"
 #include "common/noise.h"
-#include "util/state.h"
-#include "scene.h"
 
-// Default values
-#define MAX_DEPTH 95.0f // 3 chunks - 1
+#include "scenes/scenes.h"
+#include "const.h"
 
-typedef enum {
-  GENERATE,
-  NORMAL,
-  OVERHEAD,
-  NUM_STATES
-} state;
-
-typedef struct {
-  uint64_t fps_counter;
-  uint64_t tps_counter;
-  uint64_t triangle_counter;
-  uint64_t last_counter_time;
-} performance_counter;
-
-struct context_t {
-  u32 *framebuffer;
-  f32 *depth_buffer;
-
-  renderer_t renderer;
-  scene_t scene;
-  const bool *keys;
-
-  float total_time;
-
-  state_machine_t *sm;
-};
-
-static const float TICK_RATE = 20.0f; // 20 TPS
-static const float TICK_INTERVAL = 1.0f / TICK_RATE;
-
-// Day/night cycle color keyframes: Dawn -> Noon -> Dusk -> Midnight
-static const u8 sun_colors[][3] = {
-  {30, 50, 120},    // Dawn: deep blue
-  {200, 160, 160},  // Noon: white
-  {255, 100, 150},  // Dusk: light pink
-  {20, 20, 100},    // Midnight: dark blue
-};
-
-static const u8 fog_colors[][3] = {
-  {20, 30, 80},     // Dawn: rich deep blue
-  {240, 245, 250},  // Noon: almost white
-  {255, 150, 80},   // Dusk: pastel orange
-  {0, 0, 0},        // Midnight: black
+#define NUM_SCENES 9
+state_interface_t *scenes[NUM_SCENES] = {
+    &scene_menu,
+    &scene_01,
+    &scene_02,
+    &scene_03,
+    &scene_04,
+    &scene_05,
+    &scene_06,
+    &scene_07,
+    &scene_08,
 };
 
 static void SDL_library_init(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **frame_buf, const char *title, int width, int height, int scale) {
@@ -79,223 +45,21 @@ static void init_performance_counter(performance_counter *stats) {
   stats->last_counter_time = SDL_GetPerformanceCounter();
 }
 
-static void get_cycle_color(float time_elapsed, const u8 colors[][3], u8 *r, u8 *g, u8 *b) {
-  const float CYCLE_DURATION = 120.0f; // 2 minutes total
-  const int NUM_PHASES = 4;
+static void init_state_machine(state_machine_t *sm, context_t *state_context) {
+  fsm_init(sm, SCENE_01, NUM_SCENES);
 
-  float cycle_time = fmodf(time_elapsed, CYCLE_DURATION);
-  float phase = (cycle_time / CYCLE_DURATION) * NUM_PHASES;
+  // fsm_set_state_interface(sm, SCENE_MENU, &scene_menu);
+  fsm_set_state_interface(sm, SCENE_01, &scene_01);
+  fsm_set_state_interface(sm, SCENE_02, &scene_02);
+  // fsm_set_state_interface(sm, SCENE_03, &scene_03);
+  // fsm_set_state_interface(sm, SCENE_04, &scene_04);
+  // fsm_set_state_interface(sm, SCENE_05, &scene_05);
+  // fsm_set_state_interface(sm, SCENE_06, &scene_06);
+  // fsm_set_state_interface(sm, SCENE_07, &scene_07);
+  // fsm_set_state_interface(sm, SCENE_08, &scene_08);
 
-  int idx = (int)phase;
-  int next_idx = (idx + 1) % NUM_PHASES;
-  float t = phase - idx;
-
-  *r = (u8)lerp(colors[idx][0], colors[next_idx][0], t);
-  *g = (u8)lerp(colors[idx][1], colors[next_idx][1], t);
-  *b = (u8)lerp(colors[idx][2], colors[next_idx][2], t);
+  fsm_update_internal_state(sm, state_context, sizeof(context_t));
 }
-
-static u32 get_sun_color(float time_elapsed) {
-  u8 r, g, b;
-  get_cycle_color(time_elapsed, sun_colors, &r, &g, &b);
-  return rgb_to_u32(r, g, b);
-}
-
-static void get_fog_color(float time_elapsed, u8 *r, u8 *g, u8 *b) {
-  get_cycle_color(time_elapsed, fog_colors, r, g, b);
-}
-
-static void apply_fps_movement(struct context_t *ctx, float dt) {
-  const bool *keys = ctx->keys;
-  float3 movement = {0}, right, up, forward;
-  float speed = ctx->scene.controller.move_speed * dt;
-
-  // movement
-  transform_get_basis_vectors(&ctx->scene.camera_pos, &right, &up, &forward);
-
-  if (keys[SDL_SCANCODE_W]) movement = float3_add(movement, float3_scale(forward, -speed));
-  if (keys[SDL_SCANCODE_S]) movement = float3_add(movement, float3_scale(forward, speed));
-  if (keys[SDL_SCANCODE_A]) movement = float3_add(movement, float3_scale(right, speed));
-  if (keys[SDL_SCANCODE_D]) movement = float3_add(movement, float3_scale(right, -speed));
-
-  // apply movement
-  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, movement);
-  float new_ground_height = get_interpolated_terrain_height(ctx->scene.camera_pos.position.x, ctx->scene.camera_pos.position.z);
-
-  // mouse input
-  float mx, my;
-  SDL_GetRelativeMouseState(&mx, &my);
-
-  ctx->scene.camera_pos.yaw += mx * ctx->scene.controller.mouse_sensitivity;
-  ctx->scene.camera_pos.pitch -= my * ctx->scene.controller.mouse_sensitivity;
-
-  if (ctx->scene.camera_pos.pitch < ctx->scene.controller.min_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.min_pitch;
-  if (ctx->scene.camera_pos.pitch > ctx->scene.controller.max_pitch) ctx->scene.camera_pos.pitch = ctx->scene.controller.max_pitch;
-
-  ctx->scene.controller.ground_height = new_ground_height;
-  update_camera(&ctx->renderer, &ctx->scene.camera_pos);
-}
-
-static void on_generate(void *args, size_t size) {
-  (void)size; // unused
-  struct context_t *ctx = (struct context_t *)args;
-
-  if (!ctx) return;
-
-  ctx->scene = (scene_t) {
-    .camera_pos = {
-      .pitch = -0.3f,  // Look down slightly to see the terrain
-      .yaw = 0.0f,
-      .position = {0, 0, 0}
-    },
-    .chunk_map = { 0 },
-    .controller = (fps_controller_t) {
-      .move_speed = 15.0f,
-      .mouse_sensitivity = 0.002f,
-      .min_pitch = -PI / 2 + EPSILON,
-      .max_pitch = PI / 2  - EPSILON,
-      .camera_height_offset = 3.0f,
-      .delta_time = TICK_INTERVAL,
-      .last_frame_time = 0.0f,
-      .ground_height = 0.0f
-    }
-  };
-
-  init_scene(&ctx->scene, g_world_config.max_chunks);
-
-  // Set initial camera position and height
-  float terrain_height = get_interpolated_terrain_height(0.0f, 0.0f);
-  ctx->scene.controller.ground_height = terrain_height;
-  ctx->scene.camera_pos.position.y = terrain_height + ctx->scene.controller.camera_height_offset;
-
-  fsm_change_state(ctx->sm, NORMAL);
-}
-
-static void on_normal_enter(void *args, size_t size) {
-  (void)size; // unused
-  if (!args) return;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  ctx->renderer.max_depth = MAX_DEPTH;
-  ctx->scene.sun = (light_t) {
-    .is_directional = true,
-    .direction = make_float3(1, -1, 1),
-    .color = rgb_to_u32(200, 160, 160)
-  };
-
-  ctx->renderer.wireframe_mode = false;
-
-  // Update camera with current position
-  update_camera(&ctx->renderer, &ctx->scene.camera_pos);
-}
-
-static void on_normal_tick(void *args, size_t size, float dt) {
-  (void)size; // unused
-  if (!args) return;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  // apply movement
-  apply_fps_movement(ctx, dt);
-  ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;
-
-  // update snow particles
-  update_quads(ctx->scene.camera_pos.position, &ctx->scene.camera_pos);
-
-  // update loaded chunks
-  update_loaded_chunks(&ctx->scene);
-
-  ctx->scene.sun.color = get_sun_color(ctx->total_time);
-}
-
-static int on_normal_render(void *args, size_t size) {
-  (void)size; // unused
-  if (!args) return 0;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  usize triangles_rendered = render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
-  triangles_rendered += render_quads(&ctx->renderer, &ctx->scene.camera_pos, &ctx->scene.sun, 1);
-
-  u8 fog_r, fog_g, fog_b;
-  get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
-  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * 0.95, ctx->renderer.max_depth - 1.0f, fog_r, fog_g, fog_b);
-
-  return triangles_rendered;
-}
-
-static void on_overhead_enter(void *args, size_t size) {
-  (void)size; // unused
-  if (!args) return;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  ctx->scene.camera_pos.position.y += 45.0f;
-  ctx->scene.camera_pos.pitch = -PI / 2;
-  ctx->scene.camera_pos.yaw = 0;
-
-  ctx->renderer.max_depth = 250;
-  ctx->renderer.wireframe_mode = false;
-}
-
-static void on_overhead_tick(void *args, size_t size, float dt) {
-  (void)size; // unused
-  if (!args) return;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  float3 world_forward = make_float3(0, 0, -1); // Forward is negative Z (up on screen)
-  float3 world_right = make_float3(1, 0, 0);    // Right is positive X
-  float3 movement = {0};
-  float speed = ctx->scene.controller.move_speed * dt;
-  const bool *keys = ctx->keys;
-
-
-  if (keys[SDL_SCANCODE_W]) movement = float3_add(movement, float3_scale(world_forward, speed));
-  if (keys[SDL_SCANCODE_S]) movement = float3_add(movement, float3_scale(world_forward, -speed));
-  if (keys[SDL_SCANCODE_A]) movement = float3_add(movement, float3_scale(world_right, speed));
-  if (keys[SDL_SCANCODE_D]) movement = float3_add(movement, float3_scale(world_right, -speed));
-
-  ctx->scene.camera_pos.position = float3_add(ctx->scene.camera_pos.position, movement);
-  update_loaded_chunks(&ctx->scene);
-  update_camera(&ctx->renderer, &ctx->scene.camera_pos);
-}
-
-static int on_overhead_render(void *args, size_t size) {
-  (void)size; // unused
-  if (!args) return 0;
-
-  struct context_t *ctx = (struct context_t*)args;
-
-  model_t cube = { 0 };
-  float3 pos = make_float3(ctx->scene.camera_pos.position.x, ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset, ctx->scene.camera_pos.position.z);
-  generate_cube(&cube, pos, (float3){ 2, 1, 2 });
-
-  usize triangles_rendered = render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
-  return triangles_rendered + render_model(&ctx->renderer, &ctx->scene.camera_pos, &cube, &ctx->scene.sun, 1);
-}
-
-static state_interface_t generate = {
-  .enter = on_generate,
-  .tick = NULL,
-  .render = NULL,
-  .exit = NULL,
-};
-
-static state_interface_t normal = {
-  .enter = on_normal_enter,
-  .tick = on_normal_tick,
-  .render = on_normal_render,
-  .exit = NULL
-};
-
-static state_interface_t overhead = {
-  .enter = on_overhead_enter,
-  .tick = on_overhead_tick,
-  .render = on_overhead_render,
-  .exit = NULL
-};
 
 int main(int argc, char const *argv[]) {
   (void)argc; (void)argv;
@@ -326,9 +90,8 @@ int main(int argc, char const *argv[]) {
 
   // Initialize state machine
   state_machine_t sm = {0};
-  fsm_init(&sm, GENERATE, NUM_STATES);
 
-  struct context_t state_context = {
+  context_t state_context = {
     .framebuffer = framebuffer,
     .depth_buffer = depth_buffer,
     .renderer = renderer,
@@ -338,11 +101,7 @@ int main(int argc, char const *argv[]) {
     .total_time = 0.0f
   };
 
-  fsm_set_state_interface(&sm, GENERATE, &generate);
-  fsm_set_state_interface(&sm, NORMAL, &normal);
-  fsm_set_state_interface(&sm, OVERHEAD, &overhead);
-
-  fsm_update_internal_state(&sm, &state_context, sizeof(struct context_t));
+  init_state_machine(&sm, &state_context);
   fsm_start(&sm);
 
   bool running = true;

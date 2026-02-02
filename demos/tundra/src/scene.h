@@ -8,6 +8,8 @@
 #include "common/chunk_map.h"
 #include "common/config.h"
 
+#include "util/state.h" // terrain_func_t
+
 typedef struct {
   float move_speed;
   float mouse_sensitivity;

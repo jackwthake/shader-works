@@ -15,39 +15,11 @@ inline float map_range(float value, float old_min, float old_max, float new_min,
 
 // Terrain height function combining multiple noise layers for gradual hills and mountains
 float terrainHeight(float x, float y, int seed) {
-  // Define minimum height for frozen lakes
-  const float lake_level = 0.0f;
+// Just two layers: One for the "Rolling Hope" and one for tiny "Snow Crinkles"
+  float rolling_hills = fbm(x * 0.005f, y * 0.005f, 3, seed) * 15.0f;
+  float micro_detail  = fbm(x * 0.1f,   y * 0.1f,   2, seed + 1) * 2.0f;
 
-  // Large-scale gentle rolling terrain (very low frequency for gradual hills)
-  float large_hills = fbm(x * 0.004f, y * 0.004f, 4, g_world_config.seed + seed) * 25.0f;
-
-  // Medium-scale terrain features
-  float medium_hills = fbm(x * 0.02f, y * 0.02f, 5, g_world_config.seed + seed + 1) * 12.0f;
-
-  // Small-scale detail
-  float detail = fbm(x * 0.2f, y * 0.2f, 6, g_world_config.seed + seed + 2) * 4.0f;
-
-  // Domain warping for more interesting mountain shapes
-  float warp_x = fbm(x * 0.005f, y * 0.005f, 3, g_world_config.seed + seed + 3) * 20.0f;
-  float warp_y = fbm(x * 0.005f, y * 0.005f, 3, g_world_config.seed + seed + 4) * 20.0f;
-
-  // Mountain peaks using warped coordinates
-  float mountains = ridgeNoise((x + warp_x) * 0.004f, (y + warp_y) * 0.004f, g_world_config.seed + seed + 5);
-  mountains = powf(mountains, 1.5f) * 35.0f; // More dramatic peaks
-
-  // Blend everything together with smooth transitions
-  float base_terrain = large_hills + medium_hills * 0.7f + detail * 0.3f;
-
-  // Shift terrain down to ensure some areas go below 0.0f for lakes
-  base_terrain -= 8.0f; // This ensures low areas become lakes
-
-  // Use the mountain noise as a mask to selectively add peaks
-  float mountain_mask = smoothstep(fbm(x * 0.002f, y * 0.002f, 3, g_world_config.seed + seed + 6) * 0.5f + 0.5f);
-
-  float height = base_terrain + mountains * mountain_mask;
-
-  // Create frozen lakes by enforcing minimum height
-  return fmaxf(height, lake_level);
+  return rolling_hills + micro_detail + 5.0f; // Offset by 5 so we stay above 'Lake Level'
 }
 
 float get_interpolated_terrain_height(float x, float z) {

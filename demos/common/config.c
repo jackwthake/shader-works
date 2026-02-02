@@ -11,8 +11,8 @@ world_config_t g_world_config = {0};
 
 // Default values
 #define DEFAULT_TITLE "Demo"
-#define DEFAULT_WIDTH 320
-#define DEFAULT_HEIGHT 240
+#define DEFAULT_WIDTH 256
+#define DEFAULT_HEIGHT 144
 #define DEFAULT_SCALE 4
 
 // Default world values
