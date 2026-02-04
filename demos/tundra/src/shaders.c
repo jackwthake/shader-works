@@ -168,6 +168,15 @@ u32 ground_shadow_func(u32 input, fragment_context_t *ctx, void *args, usize arg
     base_color = rgb_to_u32(r, g, b);
   }
 
+  // Check triangle steepness - if normal is too far from vertical, it's steep
+  float steepness_threshold = 0.65f; // Dot product threshold (0 = vertical, 1 = horizontal)
+  float vertical = fabsf(ctx->normal.y); // Y component indicates how vertical the surface is
+  
+  if (vertical < steepness_threshold) {
+    // Surface is steep - apply gray color
+    base_color = rgb_to_u32(100, 100, 100);
+  }
+
   u32 lit_color = default_lighting_frag_shader.func(base_color, ctx, NULL, 0);
 
   // Apply tree shadows if scene data is available

@@ -1,0 +1,14 @@
+{
+  "window": {
+    "title": "Tundra",
+    "width": 256,
+    "height": 256,
+    "scale": 4
+  },
+  "world": {
+    "seed": 2,
+    "chunk_size": 32,
+    "ground_segments_per_chunk": 32,
+    "chunk_load_radius": 3
+  }
+}

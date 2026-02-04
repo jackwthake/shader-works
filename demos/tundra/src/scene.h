@@ -26,6 +26,12 @@ typedef struct scene_t {
 
   chunk_map_t chunk_map;
   light_t sun;
+  
+  float3 sun_color;
+  float3 fog_color;
+
+  float max_tree_chance;
+  float fog_start_fasctor;
 } scene_t;
 
 extern float map_range(float value, float old_min, float old_max, float new_min, float new_max);

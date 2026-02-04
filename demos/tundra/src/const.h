@@ -40,22 +40,7 @@ typedef struct {
 static const float TICK_RATE = 20.0f; // 20 TPS
 static const float TICK_INTERVAL = 1.0f / TICK_RATE;
 
-// Day/night cycle color keyframes: Dawn -> Noon -> Dusk -> Midnight
-static const u8 sun_colors[][3] = {
-  {30, 50, 120},    // Dawn: deep blue
-  {200, 160, 160},  // Noon: white
-  {255, 100, 150},  // Dusk: light pink
-  {20, 20, 100},    // Midnight: dark blue
-};
-
-static const u8 fog_colors[][3] = {
-  {20, 30, 80},     // Dawn: rich deep blue
-  {240, 245, 250},  // Noon: almost white
-  {255, 150, 80},   // Dusk: pastel orange
-  {0, 0, 0},        // Midnight: black
-};
-
-void get_fog_color(float time_elapsed, u8 *r, u8 *g, u8 *b);
-u32 get_sun_color(float time_elapsed);
+void get_fog_color(scene_t *scene, u8 *r, u8 *g, u8 *b);
+u32 get_sun_color(scene_t *scene);
 
 #endif // __CONST_H__

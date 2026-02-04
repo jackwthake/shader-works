@@ -47,12 +47,7 @@ if(TUNDRA_SOURCES)
         -Wshadow
     )
 
-    # Copy config.json to build directory
-    add_custom_command(TARGET tundra POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/res/config.json
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config.json
-    )
+    # (no post-build copy required)
 else()
     message(STATUS "No source files found in demos/tundra/src/ directory")
 endif()

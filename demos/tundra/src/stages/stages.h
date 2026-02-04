@@ -2,6 +2,7 @@
 #define __STAGES_H__
 
 #include "../util/state.h"
+#include "../const.h"
 
 // Scene state interfaces
 extern state_interface_t scene_menu;
@@ -31,5 +32,14 @@ typedef enum {
     SCENE_07,
     SCENE_08,
 } scene_index_t;
+
+void init_player_camera(context_t *ctx);
+
+void apply_fps_movement(context_t *ctx, float dt);
+
+int render_scene(context_t *ctx, float fog_start);
+
+void get_cycle_color(float time_elapsed, const u8 colors[][3], u8 *r, u8 *g, u8 *b);
+float get_distance_from_origin(float3 pos);
 
 #endif // __STAGES_H__

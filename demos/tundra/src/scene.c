@@ -23,7 +23,7 @@ extern void set_shadow_scene(scene_t *scene);
 extern int generate_tree(model_t *, float, float, float3, float, usize, const usize, const usize, const usize); // in proc_gen.c
 extern void generate_ground_plane(model_t *, float2, float2, float3);                                           // in proc_gen.c
 
-static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
+static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z, float max_trees) {
   if (chunk == NULL) return;
 
   chunk->x = chunk_x;
@@ -38,7 +38,7 @@ static void generate_chunk(chunk_t *chunk, int chunk_x, int chunk_z) {
   generate_ground_plane(&chunk->ground_plane, make_float2(g_world_config.chunk_size, g_world_config.chunk_size), make_float2(g_world_config.ground_segment_size, g_world_config.ground_segment_size), make_float3(corner_x + g_world_config.half_chunk_size, 0, corner_z + g_world_config.half_chunk_size));
   chunk->ground_plane.frag_shader = &ground_shadow_frag;
 
-  float num_trees_float = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0.0f, 7.0f);
+  float num_trees_float = map_range(hash2(chunk_x, chunk_z, g_world_config.seed), -1.0f, 1.0f, 0.0f, max_trees);
   chunk->num_trees = (usize)(num_trees_float < 0.0f ? 0 : num_trees_float);
   chunk->trees = chunk->num_trees > 0 ? calloc(chunk->num_trees, sizeof(model_t)) : NULL;
 
@@ -158,7 +158,7 @@ void update_loaded_chunks(scene_t *scene) {
 
       if (!is_chunk_loaded(&scene->chunk_map, chunk_x, chunk_z)) {
         chunk_t new_chunk = {0};
-        generate_chunk(&new_chunk, chunk_x, chunk_z);
+        generate_chunk(&new_chunk, chunk_x, chunk_z, scene->max_tree_chance);
         insert_chunk(&scene->chunk_map, &new_chunk);
       }
     }

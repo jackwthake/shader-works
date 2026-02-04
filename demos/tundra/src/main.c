@@ -125,13 +125,6 @@ int main(int argc, char const *argv[]) {
         if (event.key.key == SDLK_ESCAPE) {
           running = false;
         }
-
-        if (event.key.key == SDLK_1 && fsm_get_state(&sm) != NORMAL)
-          fsm_change_state(&sm, NORMAL);
-        else if (event.key.key == SDLK_2)
-          fsm_change_state(&sm, OVERHEAD);
-        else if (event.key.key == SDLK_3)
-          renderer.wireframe_mode = !renderer.wireframe_mode;
       }
     }
 
@@ -144,7 +137,7 @@ int main(int argc, char const *argv[]) {
     }
 
     u8 bg_r, bg_g, bg_b;
-    get_fog_color(state_context.total_time, &bg_r, &bg_g, &bg_b);
+    get_fog_color(&state_context.scene, &bg_r, &bg_g, &bg_b);
     u32 background_color = rgb_to_u32(bg_r, bg_g, bg_b);
 
     for(int i = 0; i < config_width * config_height; ++i) {
