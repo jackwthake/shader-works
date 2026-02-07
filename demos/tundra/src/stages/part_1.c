@@ -99,8 +99,11 @@ void scene_01_tick(void *args, size_t size, float dt) {
   // update loaded chunks
   update_loaded_chunks(&ctx->scene);
 
+  // distance from player to dog
+  float player_distance = float3_magnitude(float3_sub(ctx->scene.dog.position, ctx->scene.camera_pos.position));
+
   // update dog
-  update_dog(&ctx->scene.dog, dt);
+  update_dog(&ctx->scene.dog, player_distance, dt);
 
   // check for stage change
   if (get_distance_from_origin(ctx->scene.camera_pos.position) > STAGE_01_DISTANCE_TRIGGER) {

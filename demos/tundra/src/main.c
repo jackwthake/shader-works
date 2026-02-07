@@ -13,6 +13,8 @@
 #include "stages/stages.h"
 #include "const.h"
 
+extern float get_target_distance(dog_t *dog);
+
 #define NUM_SCENES 9
 state_interface_t *scenes[NUM_SCENES] = {
     &scene_menu,
@@ -157,9 +159,10 @@ int main(int argc, char const *argv[]) {
     uint64_t counter_time = SDL_GetPerformanceCounter();
     if ((float)(counter_time - stats.last_counter_time) / (float)SDL_GetPerformanceFrequency() >= 1.0f) {
       uint64_t avg_triangles_per_frame = stats.fps_counter > 0 ? stats.triangle_counter / stats.fps_counter : 0;
-      printf("TPS: %lu, FPS: %lu, Triangles/frame: %lu, Player: (%.1f, %.1f, %.1f), Dog Active? %d, Dog Position (%.1f, %.1f, %.1f)\n",
+      printf("TPS: %lu, FPS: %lu, Triangles/frame: %lu, Player: (%.1f, %.1f, %.1f), Dog Active? %d, Dog Position (%.1f, %.1f, %.1f) Dog waypoint dist: %.2f Dog waypoint index: %u\n",
               stats.tps_counter, stats.fps_counter, avg_triangles_per_frame,
-              state_context.scene.camera_pos.position.x, state_context.scene.camera_pos.position.y, state_context.scene.camera_pos.position.z, state_context.scene.dog.active, state_context.scene.dog.active ? state_context.scene.dog.position.x : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.y : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.z : 0.0f);
+              state_context.scene.camera_pos.position.x, state_context.scene.camera_pos.position.y, state_context.scene.camera_pos.position.z, state_context.scene.dog.active, state_context.scene.dog.active ? state_context.scene.dog.position.x : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.y : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.z : 0.0f, 
+              state_context.scene.dog.active ? get_target_distance(&state_context.scene.dog) : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.waypoint_idx : 0);
       stats.tps_counter = 0;
       stats.fps_counter = 0;
       stats.triangle_counter = 0;

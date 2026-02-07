@@ -4,6 +4,8 @@
 #include <shader-works/maths.h>
 #include <shader-works/renderer.h>
 
+#define MAX_DOG_WAYPOINTS 20
+
 typedef enum {
   DOG_STATE_IDLE,
   DOG_STATE_WALKING,
@@ -21,8 +23,9 @@ typedef struct {
 
   float3 forward; // Direction the dog is facing
   float3 right;   // Right vector for orientation
-  float3 target_destination; // Where the dog is trying to go
-  float target_yaw;
+  float3 *target_destinations; // Where the dog is trying to go
+  float *target_yaws;
+  unsigned int waypoint_idx;
 
   float size;
   dog_state_t state;
@@ -32,6 +35,6 @@ typedef struct {
 } dog_t;
 
 void init_dog(dog_t *dog, float3 position, float3 color, float size);
-void update_dog(dog_t *dog, float delta_time);
+void update_dog(dog_t *dog, float player_distance, float delta_time);
 
 #endif // __DOG_H__
