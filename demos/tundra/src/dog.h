@@ -16,6 +16,13 @@ typedef struct {
   float3 position;
   float3 velocity;
   float3 color;
+
+  float speed; // Movement speed, can be adjusted based on state
+
+  float3 forward; // Direction the dog is facing
+  float3 right;   // Right vector for orientation
+  float3 target_destination; // Where the dog is trying to go
+
   float size;
   dog_state_t state;
 
