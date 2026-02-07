@@ -2,8 +2,8 @@
   "window": {
     "title": "Tundra",
     "width": 256,
-    "height": 256,
-    "scale": 4
+    "height": 192,
+    "scale": 5
   },
   "world": {
     "seed": 2,

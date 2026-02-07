@@ -118,8 +118,8 @@ int scene_01_render(void *args, size_t size) {
   return render_scene(ctx, ctx->scene.fog_start_fasctor);
 }
 
-void scene_01_exit(void *, size_t) {
-
+void scene_01_exit(void *args, size_t size) {
+  (void)args; (void)size;
 }
 
 float scene_02_height_map(float x, float y, int seed) {
@@ -128,6 +128,7 @@ float scene_02_height_map(float x, float y, int seed) {
 }
 
 void scene_02_enter(void *args, size_t size) {
+  (void)size;
   context_t *ctx = (context_t *)args;
 
   terrainHeight = scene_02_height_map;

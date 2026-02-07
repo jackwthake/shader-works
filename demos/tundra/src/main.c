@@ -141,7 +141,7 @@ int main(int argc, char const *argv[]) {
     get_fog_color(&state_context.scene, &bg_r, &bg_g, &bg_b);
     u32 background_color = rgb_to_u32(bg_r, bg_g, bg_b);
 
-    for(int i = 0; i < config_width * config_height; ++i) {
+    for(unsigned int i = 0; i < config_width * config_height; ++i) {
       framebuffer[i] = background_color;
       depth_buffer[i] = FLT_MAX;
     }

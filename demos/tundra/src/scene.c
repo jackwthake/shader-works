@@ -170,15 +170,6 @@ typedef struct {
   float distance;
 } chunk_distance_t;
 
-static int compare_chunks_by_distance(const void *a, const void *b) {
-  const chunk_distance_t *chunk_a = (const chunk_distance_t*)a;
-  const chunk_distance_t *chunk_b = (const chunk_distance_t*)b;
-
-  if (chunk_a->distance < chunk_b->distance) return -1;
-  if (chunk_a->distance > chunk_b->distance) return 1;
-  return 0;
-}
-
 usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, light_t *restrict lights, const usize num_lights) {
   set_shadow_scene(scene);
 
@@ -224,11 +215,7 @@ usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, 
   }
 
    if (scene->dog.active) {
-    float dog_cam_dist = float3_magnitude(float3_sub(scene->dog.model.transform.position, scene->camera_pos.position));
-    // printf("[Render] Dog distance from camera: %.2f, max_depth: %.2f\n", dog_cam_dist, renderer.max_depth);
-    usize dog_tris = render_model(state, &scene->camera_pos, &scene->dog.model, &scene->sun, 1);
-    // printf("[Render] Dog triangles rendered: %zu\n", dog_tris);
-    total_triangles_rendered += dog_tris;
+    total_triangles_rendered += render_model(state, &scene->camera_pos, &scene->dog.model, &scene->sun, 1);
   }
 
   free(chunks);
