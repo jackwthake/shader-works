@@ -214,13 +214,21 @@ usize render_loaded_chunks(renderer_t *restrict state, scene_t *restrict scene, 
   float3 right, up, forward;
   transform_get_basis_vectors(&scene->camera_pos, &right, &up, &forward);
 
-  qsort(sorted_chunks, chunk_count, sizeof(chunk_distance_t), compare_chunks_by_distance);
+  // qsort(sorted_chunks, chunk_count, sizeof(chunk_distance_t), compare_chunks_by_distance);
   for (usize i = 0; i < chunk_count; i++) {
     if (sorted_chunks[i].chunk) {
       // Render all loaded chunks - let the individual models handle their own culling
       // The backward-facing check was too aggressive and culled chunks that should be visible
       total_triangles_rendered += render_chunk(state, sorted_chunks[i].chunk, &scene->camera_pos, lights, num_lights, scene);
     }
+  }
+
+   if (scene->dog.active) {
+    float dog_cam_dist = float3_magnitude(float3_sub(scene->dog.model.transform.position, scene->camera_pos.position));
+    // printf("[Render] Dog distance from camera: %.2f, max_depth: %.2f\n", dog_cam_dist, renderer.max_depth);
+    usize dog_tris = render_model(state, &scene->camera_pos, &scene->dog.model, &scene->sun, 1);
+    // printf("[Render] Dog triangles rendered: %zu\n", dog_tris);
+    total_triangles_rendered += dog_tris;
   }
 
   free(chunks);

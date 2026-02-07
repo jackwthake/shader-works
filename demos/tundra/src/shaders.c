@@ -207,6 +207,12 @@ u32 white_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) 
   return rgb_to_u32(255, 255, 255);
 }
 
+// dog fragment shader
+u32 dog_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {
+  (void)input; (void)ctx; (void)args; (void)argc;
+  return rgb_to_u32(128, 66, 28);
+}
+
 // Billboard vertex shader for camera-facing quads
 float3 billboard_vertex_shader(vertex_context_t *context, void *argv, usize argc) {
   (void)argv; (void)argc;
@@ -228,6 +234,7 @@ float3 billboard_vertex_shader(vertex_context_t *context, void *argv, usize argc
 fragment_shader_t ground_shadow_frag = { .func = ground_shadow_func, .argv = NULL, .argc = 0, .valid = true };
 fragment_shader_t tree_frag = { .func = tree_frag_func, .argv = NULL, .argc = 0, .valid = true};
 fragment_shader_t white_frag = { .func = white_frag_func, .argv = NULL, .argc = 0, .valid = true};
+fragment_shader_t dog_frag = { .func = dog_frag_func, .argv = NULL, .argc = 0, .valid = true};
 vertex_shader_t billboard_vs = { .func = billboard_vertex_shader, .argv = NULL, .argc = 0, .valid = true};
 
 // Function to set the scene data for shadow calculations

@@ -47,6 +47,7 @@ static void init_performance_counter(performance_counter *stats) {
 static void init_state_machine(state_machine_t *sm, context_t *state_context) {
   fsm_init(sm, SCENE_01, NUM_SCENES);
 
+  // link state interfaces
   // fsm_set_state_interface(sm, SCENE_MENU, &scene_menu);
   fsm_set_state_interface(sm, SCENE_01, &scene_01);
   fsm_set_state_interface(sm, SCENE_02, &scene_02);
@@ -156,9 +157,9 @@ int main(int argc, char const *argv[]) {
     uint64_t counter_time = SDL_GetPerformanceCounter();
     if ((float)(counter_time - stats.last_counter_time) / (float)SDL_GetPerformanceFrequency() >= 1.0f) {
       uint64_t avg_triangles_per_frame = stats.fps_counter > 0 ? stats.triangle_counter / stats.fps_counter : 0;
-      printf("TPS: %lu, FPS: %lu, Triangles/frame: %lu, Player: (%.1f, %.1f, %.1f)\n",
+      printf("TPS: %lu, FPS: %lu, Triangles/frame: %lu, Player: (%.1f, %.1f, %.1f), Dog Active? %d, Dog Position (%.1f, %.1f, %.1f)\n",
               stats.tps_counter, stats.fps_counter, avg_triangles_per_frame,
-              state_context.scene.camera_pos.position.x, state_context.scene.camera_pos.position.y, state_context.scene.camera_pos.position.z);
+              state_context.scene.camera_pos.position.x, state_context.scene.camera_pos.position.y, state_context.scene.camera_pos.position.z, state_context.scene.dog.active, state_context.scene.dog.active ? state_context.scene.dog.position.x : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.y : 0.0f, state_context.scene.dog.active ? state_context.scene.dog.position.z : 0.0f);
       stats.tps_counter = 0;
       stats.fps_counter = 0;
       stats.triangle_counter = 0;

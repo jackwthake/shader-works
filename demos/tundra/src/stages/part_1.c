@@ -64,7 +64,7 @@ void scene_01_enter(void *args, size_t size) {
       .mouse_sensitivity = 0.002f,
       .min_pitch = -PI / 2 + EPSILON,
       .max_pitch = PI / 2  - EPSILON,
-      .camera_height_offset = 3.0f,
+      .camera_height_offset = 2.0f,
       .delta_time = TICK_INTERVAL,
       .last_frame_time = 0.0f,
       .ground_height = 0.0f
@@ -78,6 +78,9 @@ void scene_01_enter(void *args, size_t size) {
   init_scene(&ctx->scene, g_world_config.max_chunks);
 
   init_player_camera(ctx);
+
+  // Initialize dog
+  init_dog(&ctx->scene.dog, make_float3(1.0f, 0.0f, -5.0f), make_float3(200.0f, 100.0f, 50.0f), 1.0f);
 }
 
 void scene_01_tick(void *args, size_t size, float dt) {
@@ -95,6 +98,9 @@ void scene_01_tick(void *args, size_t size, float dt) {
 
   // update loaded chunks
   update_loaded_chunks(&ctx->scene);
+
+  // update dog
+  update_dog(&ctx->scene.dog, dt);
 
   // check for stage change
   if (get_distance_from_origin(ctx->scene.camera_pos.position) > STAGE_01_DISTANCE_TRIGGER) {

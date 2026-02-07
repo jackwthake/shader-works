@@ -10,6 +10,8 @@
 
 #include "util/state.h" // terrain_func_t
 
+#include "dog.h"
+
 typedef struct {
   float move_speed;
   float mouse_sensitivity;
@@ -23,6 +25,7 @@ typedef struct {
 typedef struct scene_t {
   transform_t camera_pos;
   fps_controller_t controller;
+  dog_t dog;
 
   chunk_map_t chunk_map;
   light_t sun;
