@@ -107,16 +107,6 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
   (void)max_loaded_chunks;
   if (!scene) return;
 
-  scene->controller = (fps_controller_t){
-    .move_speed = 8.0f,
-    .mouse_sensitivity = 0.0015f,
-    .min_pitch = -PI/3,
-    .max_pitch = PI/3,
-    .ground_height = 2.0f,
-    .camera_height_offset = 6.0f,
-    .last_frame_time = SDL_GetPerformanceCounter()
-  };
-
   scene->camera_pos = (transform_t){ 0 };
 
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);

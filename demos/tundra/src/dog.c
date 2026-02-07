@@ -8,10 +8,10 @@
 #include "scene.h"
 
 // --- Steering Constants ---
-#define MAX_FORCE 20.0f
+#define MAX_FORCE 18.0f
 #define WANDER_DISTANCE 2.0f
 #define WANDER_RADIUS 1.5f
-#define WANDER_JITTER 2.0f
+#define WANDER_JITTER 5.0f
 #define ARRIVAL_RADIUS 20.0f
 
 extern fragment_shader_t dog_frag;
@@ -102,8 +102,8 @@ static void generate_waypoints(dog_t *dog) {
     
     // Search in a "fan" in the -z direction
     // Samples at different angles and distances
-    for (float angle = -0.7f; angle <= 0.7f; angle += 0.35f) { // ~40 degree spread
-      for (float dist = 5.0f; dist <= 20.0f; dist += 5.0f) {
+    for (float angle = -0.8f; angle <= 0.8f; angle += 0.4f) { // ~40 degree spread
+      for (float dist = 10.0f; dist <= 25.0f; dist += 5.0f) {
         
         float3 sample_pos;
         sample_pos.x = current_search_origin.x + sinf(angle) * dist;
@@ -113,7 +113,7 @@ static void generate_waypoints(dog_t *dog) {
         // The "Score" combines height (exploration) and -z progress (consistency)
         // We give a bonus for being higher, but also for being further 'north' (-z)
         float z_progress = (current_search_origin.z - sample_pos.z); 
-        float score = (sample_pos.y * 2.0f) + z_progress; 
+        float score = (sample_pos.y * 3.0f) + z_progress; 
         
         if (score > max_score) {
           max_score = score;
@@ -122,7 +122,7 @@ static void generate_waypoints(dog_t *dog) {
       }
     }
     
-    best_point.x += cosf(i * 0.5f) * 35.0f; // Add some variation to prevent perfect grid-like paths
+    // best_point.x += cosf(i * 0.5f) * 35.0f; // Add some variation to prevent perfect grid-like paths
     dog->target_destinations[i] = best_point;
     // Calculate yaw relative to the previous point to keep the orientation correct
     float3 diff = float3_sub(best_point, current_search_origin);
@@ -187,8 +187,6 @@ void init_dog(dog_t *dog, float3 position, float3 color, float size) {
   printf("Dog model vertices: %zu, faces: %zu, frag_shader: %p\n", dog->model.num_vertices, dog->model.num_faces, (void*)dog->model.frag_shader);
   printf("Dog model transform: (%.2f, %.2f, %.2f)\n", dog->model.transform.position.x, dog->model.transform.position.y, dog->model.transform.position.z);
   printf("Dog model vertex_data: %p, face_normals: %p\n", (void*)dog->model.vertex_data, (void*)dog->model.face_normals);
-
-  next_waypoint(dog); // Start moving towards the first waypoint immediately
 }
 
 void update_dog(dog_t *dog, float player_distance, float delta_time) {
@@ -213,7 +211,7 @@ void update_dog(dog_t *dog, float player_distance, float delta_time) {
 
   dog->position = float3_add(dog->position, float3_scale(dog->velocity, delta_time));
 
-  if (get_target_distance(dog) < 5.0f && player_distance <= 15.0f) {
+  if (get_target_distance(dog) < 4.0f && player_distance <= 10.0f) {
     next_waypoint(dog);
   }
 

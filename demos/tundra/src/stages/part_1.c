@@ -60,7 +60,7 @@ void scene_01_enter(void *args, size_t size) {
     },
     .chunk_map = { 0 },
     .controller = (fps_controller_t) {
-      .move_speed = 15.0f,
+      .move_speed = 5.0f,
       .mouse_sensitivity = 0.002f,
       .min_pitch = -PI / 2 + EPSILON,
       .max_pitch = PI / 2  - EPSILON,
@@ -80,7 +80,7 @@ void scene_01_enter(void *args, size_t size) {
   init_player_camera(ctx);
 
   // Initialize dog
-  init_dog(&ctx->scene.dog, make_float3(1.0f, 0.0f, -5.0f), make_float3(200.0f, 100.0f, 50.0f), 1.0f);
+  init_dog(&ctx->scene.dog, make_float3(5.0f, 0.0f, -15.0f), make_float3(200.0f, 100.0f, 50.0f), 0.6f);
 }
 
 void scene_01_tick(void *args, size_t size, float dt) {

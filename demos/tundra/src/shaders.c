@@ -210,7 +210,7 @@ u32 white_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) 
 // dog fragment shader
 u32 dog_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {
   (void)input; (void)ctx; (void)args; (void)argc;
-  return rgb_to_u32(128, 66, 28);
+  return default_lighting_frag_shader.func(rgb_to_u32(128, 66, 28), ctx, args, argc);
 }
 
 // Billboard vertex shader for camera-facing quads
