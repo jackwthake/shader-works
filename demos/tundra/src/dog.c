@@ -12,9 +12,6 @@ extern fragment_shader_t dog_frag;
 static void rotate_dog_to_terrrain(dog_t *dog) {
   if (!dog || !dog->active) return;
 
-  // Get terrain height at dog's position
-  float terrain_height = terrainHeight(dog->position.x, dog->position.z, g_world_config.seed);
-
   // Calculate the normal of the terrain at this position using central differences
   float epsilon = 0.1f;
   float height_left = terrainHeight(dog->position.x - epsilon, dog->position.z, g_world_config.seed);
@@ -22,27 +19,28 @@ static void rotate_dog_to_terrrain(dog_t *dog) {
   float height_down = terrainHeight(dog->position.x, dog->position.z - epsilon, g_world_config.seed);
   float height_up = terrainHeight(dog->position.x, dog->position.z + epsilon, g_world_config.seed);
 
-  float3 normal = make_float3(height_left - height_right, 2.0f * epsilon, height_down - height_up);
-  normal = float3_normalize(normal);
+  float terrain_height = terrainHeight(dog->position.x, dog->position.z, g_world_config.seed);
+  float3 normal = float3_normalize(make_float3(height_left - height_right, 2.0f * epsilon, height_down - height_up));
 
-  // Create a rotation matrix that aligns the dog's up vector with the terrain normal
-  float3 up = normal;
-  // float3 forward = make_float3(0, 0, 1); // Assuming dog model faces +Z by default
-  // float3 right = float3_cross(forward, up);
-  // forward = float3_cross(up, right);
-  dog->forward = float3_normalize(float3_cross(make_float3(0, -1, 0), up));
+  float3 flat_forward = make_float3(sinf(dog->target_yaw), 0, cosf(dog->target_yaw));
+  float3 right = float3_normalize(float3_cross(flat_forward, normal));
+  float3 forward = float3_normalize(float3_cross(normal, right));
 
-  // lerp the right vector for smoother rotation
-  float3 desired_right = float3_normalize(float3_cross(up, dog->forward));
-  dog->right = float3_normalize(float3_add(float3_scale(dog->right, 0.9f), float3_scale(desired_right, 0.1f)));
+  dog->forward = float3_normalize(float3_add(float3_scale(dog->forward, 0.8f), float3_scale(forward, 0.2f)));
+  dog->right = float3_normalize(float3_add(float3_scale(dog->right, 0.8f), float3_scale(right, 0.2f)));
 
-  // Update dog's model transform to include this rotation
-  dog->model.transform.yaw = atan2f(dog->right.z, dog->right.x);
-  dog->model.transform.pitch = asinf(-up.z); // simple approximation, may not
+  dog->model.transform.yaw = atan2f(dog->forward.x, dog->forward.z);
+  dog->model.transform.pitch = asinf(-dog->forward.y);
 
-  // Ensure dog's position is on the terrain surface
-  dog->position.y = terrain_height + dog->size / 2.0f; // assuming size is diameter
+  dog->position.y = terrain_height + (dog->size / 2.0f);
   dog->model.transform.position = dog->position;
+}
+
+static void set_waypoint(dog_t *dog, float3 destination) {
+  if (!dog) return;
+
+  dog->target_destination = destination;
+  dog->target_yaw = atan2f(destination.x - dog->position.x, destination.z - dog->position.z);
 }
 
 void init_dog(dog_t *dog, float3 position, float3 color, float size) {
@@ -52,6 +50,7 @@ void init_dog(dog_t *dog, float3 position, float3 color, float size) {
   dog->color = color;
   dog->size = size;
   dog->velocity = make_float3(0, 0, 0);
+  dog->speed = 8.5f; // units per second
   dog->state = DOG_STATE_IDLE;
   dog->active = true;
 
@@ -75,8 +74,7 @@ void init_dog(dog_t *dog, float3 position, float3 color, float size) {
   printf("Dog model vertex_data: %p, face_normals: %p\n", (void*)dog->model.vertex_data, (void*)dog->model.face_normals);
 
   // pick destination atleast 200 units in the -z direction
-  dog->target_destination = make_float3(position.x, position.y, position.z - 250.0f);
-  dog->speed = 8.5f; // units per second
+  set_waypoint(dog, make_float3(position.x, position.y, position.z - 200.0f));
 }
 
 void update_dog(dog_t *dog, float delta_time) {

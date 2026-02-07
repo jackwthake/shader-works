@@ -22,6 +22,7 @@ typedef struct {
   float3 forward; // Direction the dog is facing
   float3 right;   // Right vector for orientation
   float3 target_destination; // Where the dog is trying to go
+  float target_yaw;
 
   float size;
   dog_state_t state;
