@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="./demos/tundra/screenshots/gameplay.gif" width="400"/>
+  <img src="./demos/tundra/screenshots/ski.gif" width="400"/>
   <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
 </p>
 <p align="center">
