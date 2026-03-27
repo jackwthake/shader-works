@@ -13,11 +13,11 @@
 
 <p align="center">
   <img src="./demos/tundra/screenshots/ski.gif" width="400"/>
-  <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
+  <img src="./demos/tundra/screenshots/static-3.png" width="400"/>
 </p>
 <p align="center">
   <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
-  <img src="./examples/screenshots/02_textured_scene_wireframe.gif" width="400"/>
+  <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
 </p>
 
 A **portable software 3D renderer** written in pure C with zero external dependencies. Renders 2000-3000 triangles at 30-40 FPS on a 2019 MacBook Air without a GPU. Runs on everything from desktop computers to ARM Cortex-M4 microcontrollers.
