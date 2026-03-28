@@ -40,6 +40,7 @@ typedef struct renderer_t {
   u32 *framebuffer;     // framebuffer, client allocated
   f32 *depthbuffer;     // depth buffer, client allocated
   u32 *texture_atlas;   // pointer to texture atlas data (static data)
+  u32 *skybox_buffer;   // panoramic skybox texture, client allocated
 
   f32 time;             // Time since renderer initialization
   u64 start_time;       // Start time in milliseconds
@@ -62,10 +63,11 @@ extern void u32_to_rgb(u32 color, u8 *r, u8 *g, u8 *b);
 // Initialize the renderer state
 // framebuffer: pointer to pre-allocated framebuffer (u32 per pixel)
 // depthbuffer: pointer to pre-allocated depth buffer (f32 per pixel)
+// skybox_buffer: pointer to pre-allocated panoramic skybox texture (u32 per pixel), or NULL
 // width, height: dimensions of the framebuffer
 // atlas_width, atlas_height: dimensions of the texture atlas
 // max_depth: maximum depth value for depth buffering
-void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth);
+void init_renderer(renderer_t *state, u32 win_width, u32 win_height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, u32 *skybox_buffer, f32 max_depth);
 
 // Update camera basis vectors based on transform
 // cam: pointer to camera transform

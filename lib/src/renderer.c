@@ -269,13 +269,14 @@ void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end,
 }
 
 // Initialize renderer state
-void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, f32 max_depth) {
+void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u32 atlas_height, u32 *framebuffer, f32 *depthbuffer, u32 *skybox_buffer, f32 max_depth) {
   assert(state != NULL);
   assert(framebuffer != NULL);
   assert(depthbuffer != NULL);
 
   state->framebuffer = framebuffer;
   state->depthbuffer = depthbuffer;
+  state->skybox_buffer = skybox_buffer;
   state->screen_dim = make_float2((f32)width, (f32)height);
   state->atlas_dim = make_float2((f32)atlas_width, (f32)atlas_height);
   state->frustum_bound = tanf(fov_over_2);

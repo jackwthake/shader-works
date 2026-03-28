@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
   renderer_t renderer_state = { 0 };
   bool running = true;
-  
+
   // Initialize SDL and create window/renderer
   SDL_Init(SDL_INIT_VIDEO);
   SDL_CreateWindowAndRenderer(WIN_TITLE, WIN_WIDTH * WIN_SCALE, WIN_HEIGHT * WIN_SCALE, 0, &window, &renderer);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
   SDL_SetTextureScaleMode(framebuffer_tex, SDL_SCALEMODE_NEAREST);
 
   // Initialize shader-works renderer
-  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, MAX_DEPTH);
+  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   // Initialize game objects
   model_t cube_model = {0};
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
   cube_model.frag_shader = &default_lighting_frag_shader; // apply our directional light
   cube_model.vertex_shader = &default_vertex_shader;      // Use default vertex shader
   cube_model.use_textures = false;                        // Use flat shading
-  
+
   transform_t camera = {0};                               // cameras are just transforms
   camera.position = make_float3(0.0f, 2.0f, 0.0f);
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     // rotate cube
     cube_model.transform.yaw  += 1.0f * 0.025;
     cube_model.transform.pitch += 0.5f * 0.025;
-    
+
     // slowly move cube back and forth
     cube_model.transform.position.z = ((sinf(SDL_GetTicks() / 1000.0f) * 4.f) - 7.0f);
 
@@ -95,13 +95,13 @@ int main(int argc, char *argv[]) {
     SDL_UpdateTexture(framebuffer_tex, NULL, framebuffer, WIN_WIDTH * sizeof(u32));
     SDL_RenderTexture(renderer, framebuffer_tex, NULL, NULL);
     SDL_RenderPresent(renderer);
-    
+
     SDL_Delay(1); // Small delay to prevent 100% CPU usage
   }
-  
+
   // Cleanup resources
   delete_model(&cube_model);
-  
+
   SDL_DestroyTexture(framebuffer_tex);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);

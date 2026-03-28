@@ -78,6 +78,33 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
   return rgb_to_u32(r, g, b);
 }
 
+// Skybox fragment shader that samples from panoramic texture buffer
+// argv should point to skybox_shader_args_t structure
+u32 skybox_frag_shader_func(u32 input_color, fragment_context_t *context, void *args, usize argc) {
+  skybox_shader_args_t *sargs = (skybox_shader_args_t *)args;
+
+  // If args or buffer missing, return fallback
+  if (!sargs || !sargs->skybox_buffer) {
+    return rgb_to_u32(135, 206, 235);  // Sky blue fallback
+  }
+
+  // Map UV coordinates to buffer pixel coordinates
+  // U maps to X (wraps horizontally for panoramic)
+  // V maps to Y (clamps vertically)
+  int tex_x = (int)(context->uv.x * (sargs->width - 1));
+  int tex_y = (int)(context->uv.y * (sargs->height - 1));
+
+  // Clamp to valid range
+  if (tex_x < 0) tex_x = 0;
+  if (tex_x >= (int)sargs->width) tex_x = sargs->width - 1;
+  if (tex_y < 0) tex_y = 0;
+  if (tex_y >= (int)sargs->height) tex_y = sargs->height - 1;
+
+  // Sample from skybox buffer
+  u32 color = sargs->skybox_buffer[tex_y * sargs->width + tex_x];
+  return color;
+}
+
 // Built-in default vertex shader that just returns the original vertex position
 vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
@@ -86,6 +113,10 @@ fragment_shader_t default_frag_shader = { .func = default_frag_shader_func, .arg
 
 // Built-in default lighting shader that applies simple lighting
 fragment_shader_t default_lighting_frag_shader = { .func = default_lighting_frag_shader_func, .argv = NULL, .argc = 0, .valid = true };
+
+// Built-in skybox shader that samples from panoramic texture
+// Note: This is a template; actual skybox shader must be created with args via make_fragment_shader()
+static fragment_shader_t skybox_shader_template = { .func = skybox_frag_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Helper functions to create shaders
 fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {

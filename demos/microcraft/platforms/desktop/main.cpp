@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
 
   renderer_t renderer_state = {0};
   // Atlas dimensions: 10 tiles x 3 rows, each tile is 8x8 pixels
-  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 80, 24, framebuffer, depthbuffer, MAX_DEPTH);
+  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 80, 24, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   renderer_state.texture_atlas = files[1].data;
 

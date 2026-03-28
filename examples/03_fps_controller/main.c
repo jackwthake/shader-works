@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
   SDL_SetWindowRelativeMouseMode(window, true);
 
   renderer_t renderer_state = {0};
-  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, MAX_DEPTH);
+  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   fragment_shader_t soft_red_shader = make_fragment_shader(soft_red_shader_func, NULL, 0);
   fragment_shader_t soft_green_shader = make_fragment_shader(soft_green_shader_func, NULL, 0);

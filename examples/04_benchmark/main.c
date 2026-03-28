@@ -36,7 +36,7 @@ static void benchmark_scene(FILE *csv, int sphere_subdivisions, int num_frames) 
   f32 *depthbuffer = malloc(WIN_WIDTH * WIN_HEIGHT * sizeof(f32));
 
   renderer_t renderer_state = {0};
-  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, MAX_DEPTH);
+  init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   // Create test scene - sphere with varying complexity
   model_t sphere = {0};

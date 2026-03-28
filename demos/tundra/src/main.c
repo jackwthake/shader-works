@@ -1,4 +1,5 @@
 #include <shader-works/renderer.h>
+#include <shader-works/primitives.h>
 
 #include <assert.h>
 #include <float.h> // FLT_MAX
@@ -33,10 +34,14 @@ typedef struct {
 struct context_t {
   u32 *framebuffer;
   f32 *depth_buffer;
+  u32 *skybox_buffer;
 
   renderer_t renderer;
   scene_t scene;
   const bool *keys;
+
+  model_t skybox_sphere;
+  skybox_shader_args_t skybox_shader_args;
 
   float total_time;
 
@@ -217,6 +222,26 @@ static void apply_ski_movement(struct context_t *ctx, float dt) {
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }
 
+static void regenerate_skybox_sphere(struct context_t *ctx) {
+  if (ctx->skybox_sphere.vertex_data) free(ctx->skybox_sphere.vertex_data);
+  if (ctx->skybox_sphere.face_normals) free(ctx->skybox_sphere.face_normals);
+  if (ctx->skybox_sphere.frag_shader) free(ctx->skybox_sphere.frag_shader);
+  ctx->skybox_sphere = (model_t){0};
+
+  f32 skybox_radius = ctx->renderer.max_depth * 0.95f;
+  generate_sphere(&ctx->skybox_sphere, skybox_radius, 32, 16, make_float3(0, 0, 0));
+
+  ctx->skybox_sphere.use_textures = true;  // CRITICAL: Enable UV interpolation
+  ctx->skybox_sphere.disable_behind_camera_culling = true; // Always render skybox triangles, even if "facing away" from camera
+  ctx->skybox_sphere.transform.pitch = M_PI / 2; // Rotate so that texture aligns correctly with world axes
+
+  // Setup skybox shader
+  ctx->skybox_sphere.frag_shader = malloc(sizeof(fragment_shader_t));
+  if (ctx->skybox_sphere.frag_shader) {
+    *ctx->skybox_sphere.frag_shader = make_fragment_shader(skybox_frag_shader_func, &ctx->skybox_shader_args, sizeof(skybox_shader_args_t));
+  }
+}
+
 static void on_generate(void *args, size_t size) {
   (void)size; // unused
   struct context_t *ctx = (struct context_t *)args;
@@ -259,6 +284,9 @@ static void on_normal_enter(void *args, size_t size) {
     .color = rgb_to_u32(200, 160, 160)
   };
 
+  // Regenerate skybox with new max_depth
+  regenerate_skybox_sphere(ctx);
+
   // Update camera with current position
   update_camera(&ctx->renderer, &ctx->scene.camera_pos);
 }
@@ -279,14 +307,13 @@ static void on_normal_tick(void *args, size_t size, float dt) {
   if (ctx->scene.controller.skiing)   apply_ski_movement(ctx, dt);
   else                                apply_fps_movement(ctx, dt);
 
-  // bob camera
-  // float camera_bob_offset = sinf(ctx->scene.controller.distance_walked);
   ctx->scene.camera_pos.position.y = ctx->scene.controller.ground_height + ctx->scene.controller.camera_height_offset;// + camera_bob_offset;
 
   // update loaded chunks
   update_loaded_chunks(&ctx->scene);
 
   ctx->scene.sun.color = get_sun_color(ctx->total_time);
+  ctx->skybox_sphere.transform.position = ctx->scene.camera_pos.position; // Keep skybox centered on camera
 }
 
 static int on_normal_render(void *args, size_t size) {
@@ -295,7 +322,12 @@ static int on_normal_render(void *args, size_t size) {
 
   struct context_t *ctx = (struct context_t*)args;
 
-  usize triangles_rendered = render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
+  // Render skybox sphere first (centered at camera)
+  transform_t skybox_transform = ctx->scene.camera_pos;
+  usize triangles_rendered = render_model(&ctx->renderer, &skybox_transform, &ctx->skybox_sphere, &ctx->scene.sun, 1);
+
+  // Render scene geometry (will overdraw skybox via depth test)
+  triangles_rendered += render_loaded_chunks(&ctx->renderer, &ctx->scene, &ctx->scene.sun, 1);
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
@@ -315,6 +347,9 @@ static void on_overhead_enter(void *args, size_t size) {
   ctx->scene.camera_pos.yaw = 0;
 
   ctx->renderer.max_depth = 500;
+
+  // Regenerate skybox with new max_depth
+  regenerate_skybox_sphere(ctx);
 }
 
 static void on_overhead_tick(void *args, size_t size, float dt) {
@@ -378,13 +413,48 @@ int main(int argc, char const *argv[]) {
 
   u32 *framebuffer = (u32 *)malloc(config_width * config_height * sizeof(u32));
   f32 *depth_buffer = (f32 *)malloc(config_width * config_height * sizeof(f32));
+  u32 *skybox_buffer = (u32 *)malloc((config_width / 0.5) * (config_height / 0.5) * sizeof(u32));
 
   // Initialize state and window
   SDL_library_init(&sdl_window, &sdl_renderer, &sdl_framebuff, config_title, config_width, config_height, config_scale);
   SDL_SetWindowRelativeMouseMode(sdl_window, true);
 
   renderer_t renderer = {0};
-  init_renderer(&renderer, config_width, config_height, 0, 0, framebuffer, depth_buffer, MAX_DEPTH);
+  init_renderer(&renderer, config_width, config_height, 0, 0, framebuffer, depth_buffer, skybox_buffer, MAX_DEPTH);
+
+  // Fill skybox buffer with cloud noise pattern
+  u32 sky_blue = rgb_to_u32(135, 206, 235);
+  u32 cloud_white = rgb_to_u32(255, 255, 255);
+
+  for (unsigned int y = 0; y < config_height; y++) {
+    for (unsigned int x = 0; x < config_width; x++) {
+      // Normalize coordinates to 0-1 range for noise sampling
+      float u = (float)x / config_width;
+      float v = (float)y / config_height;
+
+      // Sample Perlin noise at this position with moderate scale
+      // Scale up coordinates to get detail, use seed from world config
+      float noise_val = noise2D(u * 8.0f, v * 8.0f, g_world_config.seed);
+
+      // Map noise from [-1, 1] to [0, 1]
+      float cloud_density = (noise_val + 1.0f) * 0.5f;
+
+      // Create gradient blend: mostly blue with transparent cloud effect
+      // Clouds only become visible above 0.4, fully white at 1.0
+      float blend = 0.0f;
+      if (cloud_density > 0.4f) {
+        blend = (cloud_density - 0.4f) / 0.6f;  // Maps 0.4-1.0 to 0-1
+        if (blend > 1.0f) blend = 1.0f;
+      }
+
+      // Interpolate between sky blue and white
+      u8 r = (u8)(135.0f + (255.0f - 135.0f) * blend);
+      u8 g = (u8)(206.0f + (255.0f - 206.0f) * blend);
+      u8 b = (u8)(235.0f + (255.0f - 235.0f) * blend);
+      u32 color = rgb_to_u32(r, g, b);
+      skybox_buffer[y * config_width + x] = color;
+    }
+  }
 
   performance_counter stats;
   init_performance_counter(&stats);
@@ -395,15 +465,28 @@ int main(int argc, char const *argv[]) {
   state_machine_t sm = {0};
   fsm_init(&sm, GENERATE, NUM_STATES);
 
+  // Create skybox shader args (will be used by regenerate_skybox_sphere)
+  skybox_shader_args_t skybox_args = {
+    .skybox_buffer = skybox_buffer,
+    .width = config_width,
+    .height = config_height
+  };
+
   struct context_t state_context = {
     .framebuffer = framebuffer,
     .depth_buffer = depth_buffer,
+    .skybox_buffer = skybox_buffer,
     .renderer = renderer,
+    .skybox_sphere = {0},
+    .skybox_shader_args = skybox_args,
 
     .keys = SDL_GetKeyboardState(NULL),
     .sm = &sm,
-    .total_time = 0.0f
+    .total_time = 0.0f,
   };
+
+  // Generate initial skybox sphere
+  regenerate_skybox_sphere(&state_context);
 
   fsm_set_state_interface(&sm, GENERATE, &generate);
   fsm_set_state_interface(&sm, NORMAL, &normal);
@@ -456,9 +539,7 @@ int main(int argc, char const *argv[]) {
       stats.tps_counter++;
     }
 
-    u8 bg_r, bg_g, bg_b;
-    get_fog_color(state_context.total_time, &bg_r, &bg_g, &bg_b);
-    u32 background_color = rgb_to_u32(bg_r, bg_g, bg_b);
+    u32 background_color = rgb_to_u32(0, 0, 0);
 
     for(size_t i = 0; i < config_width * config_height; ++i) {
       framebuffer[i] = background_color;
@@ -489,8 +570,14 @@ int main(int argc, char const *argv[]) {
   free_chunk_map(&state_context.scene.chunk_map);
   fsm_free(&sm);
 
+  // Cleanup skybox
+  if (state_context.skybox_sphere.vertex_data) free(state_context.skybox_sphere.vertex_data);
+  if (state_context.skybox_sphere.face_normals) free(state_context.skybox_sphere.face_normals);
+  if (state_context.skybox_sphere.frag_shader) free(state_context.skybox_sphere.frag_shader);
+
   free(framebuffer);
   free(depth_buffer);
+  free(skybox_buffer);
 
   SDL_DestroyTexture(sdl_framebuff);
   SDL_DestroyRenderer(sdl_renderer);

@@ -80,4 +80,14 @@ extern vertex_shader_t default_vertex_shader;
 extern fragment_shader_t default_frag_shader;
 extern fragment_shader_t default_lighting_frag_shader;
 
+// Skybox shader structures and functions
+typedef struct {
+  u32 *skybox_buffer;  // Pointer to panoramic texture buffer
+  u32 width;           // Texture width in pixels
+  u32 height;          // Texture height in pixels
+} skybox_shader_args_t;
+
+// Skybox fragment shader function
+u32 skybox_frag_shader_func(u32 input_color, fragment_context_t *context, void *args, usize argc);
+
 #endif // SHADER_WORKS_SHADERS_H
