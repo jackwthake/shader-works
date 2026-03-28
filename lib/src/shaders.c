@@ -88,21 +88,65 @@ u32 skybox_frag_shader_func(u32 input_color, fragment_context_t *context, void *
     return rgb_to_u32(135, 206, 235);  // Sky blue fallback
   }
 
-  // Map UV coordinates to buffer pixel coordinates
-  // U maps to X (wraps horizontally for panoramic)
-  // V maps to Y (clamps vertically)
-  int tex_x = (int)(context->uv.x * (sargs->width - 1));
-  int tex_y = (int)(context->uv.y * (sargs->height - 1));
+  // Detect proximity to poles (top/bottom of sphere)
+  float pole_blend = 0.0f;
+  if (context->uv.y < 0.1f || context->uv.y > 0.9f) {
+    // Near poles: smooth out seams by blending multiple U samples
+    pole_blend = fminf(context->uv.y, 1.0f - context->uv.y) / 0.1f;  // Blend factor from 0 to 1
+    pole_blend = 1.0f - pole_blend;  // Invert: 1.0 at pole, 0.0 away from pole
+  }
 
-  // Clamp to valid range
-  if (tex_x < 0) tex_x = 0;
-  if (tex_x >= (int)sargs->width) tex_x = sargs->width - 1;
+  // Sample primary location
+  int tex_y = (int)(context->uv.y * (sargs->height - 1));
   if (tex_y < 0) tex_y = 0;
   if (tex_y >= (int)sargs->height) tex_y = sargs->height - 1;
 
-  // Sample from skybox buffer
-  u32 color = sargs->skybox_buffer[tex_y * sargs->width + tex_x];
-  return color;
+  // If not near pole, just sample normally
+  if (pole_blend < 0.01f) {
+    int tex_x = (int)(context->uv.x * (sargs->width - 1));
+    if (tex_x < 0) tex_x = 0;
+    if (tex_x >= (int)sargs->width) tex_x = sargs->width - 1;
+    u32 color = sargs->skybox_buffer[tex_y * sargs->width + tex_x];
+    return color;
+  }
+
+  // Near pole: average multiple samples around the full horizontal band
+  u32 r_sum = 0, g_sum = 0, b_sum = 0;
+  int num_samples = 8;  // Sample 8 points around the pole
+
+  for (int i = 0; i < num_samples; i++) {
+    float sample_u = (float)i / num_samples;
+    int sample_x = (int)(sample_u * (sargs->width - 1));
+    if (sample_x < 0) sample_x = 0;
+    if (sample_x >= (int)sargs->width) sample_x = sargs->width - 1;
+
+    u32 sample_color = sargs->skybox_buffer[tex_y * sargs->width + sample_x];
+    r_sum += (sample_color >> 16) & 0xFF;
+    g_sum += (sample_color >> 8) & 0xFF;
+    b_sum += sample_color & 0xFF;
+  }
+
+  // Average the samples
+  u8 r_avg = (u8)(r_sum / num_samples);
+  u8 g_avg = (u8)(g_sum / num_samples);
+  u8 b_avg = (u8)(b_sum / num_samples);
+  u32 pole_color = rgb_to_u32(r_avg, g_avg, b_avg);
+
+  // Blend between primary sample and pole average
+  int tex_x = (int)(context->uv.x * (sargs->width - 1));
+  if (tex_x < 0) tex_x = 0;
+  if (tex_x >= (int)sargs->width) tex_x = sargs->width - 1;
+  u32 primary_color = sargs->skybox_buffer[tex_y * sargs->width + tex_x];
+
+  u8 primary_r = (primary_color >> 16) & 0xFF;
+  u8 primary_g = (primary_color >> 8) & 0xFF;
+  u8 primary_b = primary_color & 0xFF;
+
+  u8 r = (u8)(primary_r * (1.0f - pole_blend) + r_avg * pole_blend);
+  u8 g = (u8)(primary_g * (1.0f - pole_blend) + g_avg * pole_blend);
+  u8 b = (u8)(primary_b * (1.0f - pole_blend) + b_avg * pole_blend);
+
+  return rgb_to_u32(r, g, b);
 }
 
 // Built-in default vertex shader that just returns the original vertex position

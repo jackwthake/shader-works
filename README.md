@@ -13,7 +13,7 @@
 
 <p align="center">
   <img src="./demos/tundra/screenshots/ski.gif" width="400"/>
-  <img src="./demos/tundra/screenshots/static-3.png" width="400"/>
+  <img src="./demos/tundra/screenshots/static-5.png" width="400"/>
 </p>
 <p align="center">
   <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
@@ -126,7 +126,7 @@ int main() {
 # Demos
 
 ## Tundra
-![Tundra gameplay](./demos/tundra/screenshots/gameplay.gif)
+![Tundra gameplay](./demos/tundra/screenshots/static-4.png)
 
 An explorable infinite world featuring:
 - **Infinite procedural terrain** using Perlin noise

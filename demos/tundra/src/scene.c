@@ -146,7 +146,7 @@ void init_scene(scene_t *scene, usize max_loaded_chunks) {
   };
 
   scene->camera_pos = (transform_t){ 0 };
-  scene->fog_start = 0.7;
+  scene->fog_start = 0.85;
 
   init_chunk_map(&scene->chunk_map, CHUNK_MAP_NUM_BUCKETS);
 }

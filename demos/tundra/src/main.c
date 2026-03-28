@@ -331,7 +331,7 @@ static int on_normal_render(void *args, size_t size) {
 
   u8 fog_r, fog_g, fog_b;
   get_fog_color(ctx->total_time, &fog_r, &fog_g, &fog_b);
-  apply_fog_to_screen(&ctx->renderer, ctx->renderer.max_depth * ctx->scene.fog_start, ctx->renderer.max_depth, fog_r, fog_g, fog_b);
+  apply_fog_to_screen(&ctx->renderer, ctx->scene.fog_start, ctx->renderer.max_depth, fog_r, fog_g, fog_b);
 
   return triangles_rendered;
 }
@@ -397,6 +397,47 @@ static state_interface_t overhead = {
   .exit = NULL
 };
 
+// Regenerate skybox texture with time-based noise evolution
+void regenerate_skybox_texture(u32 *skybox_buffer, u32 width, u32 height, int base_seed, float time_offset) {
+  for (unsigned int y = 0; y < height; y++) {
+    for (unsigned int x = 0; x < width; x++) {
+      // Normalize coordinates to 0-1 range for noise sampling
+      float u = (float)x / width;
+      float v = (float)y / height;
+
+      // Sample Perlin noise with time-based offset for animation
+      // Layer multiple octaves at different scales for sharp cloud definition
+      float noise_val = noise2D(u * 24.0f + time_offset * 0.3f,
+                                v * 24.0f + time_offset * 0.2f,
+                                base_seed);
+      noise_val += noise2D(u * 33.0f - time_offset * 0.15f,
+                          v * 33.0f - time_offset * 0.1f,
+                          base_seed + 100) * 0.4f;
+      noise_val += noise2D(u * 5.0f + time_offset * 0.1f,
+                          v * 5.0f + time_offset * 0.15f,
+                          base_seed + 200) * 0.3f;
+
+      // Map noise from [-1, 1] to [0, 1]
+      float cloud_density = fminf(fmaxf((noise_val + 1.0f) * 0.5f, 0.0f), 1.0f);
+
+      // Create gradient blend: mostly blue with transparent cloud effect
+      // Clouds only become visible above 0.4, fully white at 1.0
+      float blend = 0.0f;
+      if (cloud_density > 0.4f) {
+        blend = (cloud_density - 0.4f) / 0.6f;  // Maps 0.4-1.0 to 0-1
+        if (blend > 1.0f) blend = 1.0f;
+      }
+
+      // Interpolate between sky blue and white
+      u8 r = (u8)(135.0f + (255.0f - 155.0f) * blend);
+      u8 g = (u8)(206.0f + (255.0f - 226.0f) * blend);
+      u8 b = (u8)(235.0f + (255.0f - 255.0f) * blend);
+      u32 color = rgb_to_u32(r, g, b);
+      skybox_buffer[y * width + x] = color;
+    }
+  }
+}
+
 int main(int argc, char const *argv[]) {
   (void)argc; (void)argv;
 
@@ -422,39 +463,8 @@ int main(int argc, char const *argv[]) {
   renderer_t renderer = {0};
   init_renderer(&renderer, config_width, config_height, 0, 0, framebuffer, depth_buffer, skybox_buffer, MAX_DEPTH);
 
-  // Fill skybox buffer with cloud noise pattern
-  u32 sky_blue = rgb_to_u32(135, 206, 235);
-  u32 cloud_white = rgb_to_u32(255, 255, 255);
-
-  for (unsigned int y = 0; y < config_height; y++) {
-    for (unsigned int x = 0; x < config_width; x++) {
-      // Normalize coordinates to 0-1 range for noise sampling
-      float u = (float)x / config_width;
-      float v = (float)y / config_height;
-
-      // Sample Perlin noise at this position with moderate scale
-      // Scale up coordinates to get detail, use seed from world config
-      float noise_val = noise2D(u * 8.0f, v * 8.0f, g_world_config.seed);
-
-      // Map noise from [-1, 1] to [0, 1]
-      float cloud_density = (noise_val + 1.0f) * 0.5f;
-
-      // Create gradient blend: mostly blue with transparent cloud effect
-      // Clouds only become visible above 0.4, fully white at 1.0
-      float blend = 0.0f;
-      if (cloud_density > 0.4f) {
-        blend = (cloud_density - 0.4f) / 0.6f;  // Maps 0.4-1.0 to 0-1
-        if (blend > 1.0f) blend = 1.0f;
-      }
-
-      // Interpolate between sky blue and white
-      u8 r = (u8)(135.0f + (255.0f - 135.0f) * blend);
-      u8 g = (u8)(206.0f + (255.0f - 206.0f) * blend);
-      u8 b = (u8)(235.0f + (255.0f - 235.0f) * blend);
-      u32 color = rgb_to_u32(r, g, b);
-      skybox_buffer[y * config_width + x] = color;
-    }
-  }
+  // Initialize skybox texture with current time
+  regenerate_skybox_texture(skybox_buffer, config_width, config_height, g_world_config.seed, 0.0f);
 
   performance_counter stats;
   init_performance_counter(&stats);
@@ -547,6 +557,9 @@ int main(int argc, char const *argv[]) {
     }
 
     int triangles_rendered = fsm_render_state(&sm);
+
+    // Regenerate skybox texture every frame for animation
+    regenerate_skybox_texture(skybox_buffer, config_width, config_height, g_world_config.seed, state_context.total_time);
 
     SDL_UpdateTexture(sdl_framebuff, NULL, framebuffer, config_width * sizeof(u32));
     SDL_RenderTexture(sdl_renderer, sdl_framebuff, NULL, NULL);
