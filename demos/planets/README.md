@@ -1,8 +1,9 @@
 # Planets
 
-| | |
-|:-------------------------:|:-------------------------:|
-| ![Planet 1](./screenshots/ss-1.png) | ![Planet 2](./screenshots/ss-3.png)
+<p align="center">
+  <img src="./screenshots/ss-1.png" width="400"/>
+  <img src="./screenshots/ss-2.png" width="400"/>
+</p>
 
 **Procedurally generated planets rendered with diffuse lighting and seamless textures.**
 

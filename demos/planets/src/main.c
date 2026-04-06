@@ -16,7 +16,7 @@
 #define WIN_SCALE 8
 #define WIN_TITLE "Planets Demo - Press SPACE for new planet"
 #define MAX_DEPTH 15
-#define TEXTURE_SIZE 200
+#define TEXTURE_SIZE 300
 
 typedef struct {
   model_t model;
@@ -24,6 +24,7 @@ typedef struct {
   u32 *surface_texture, *background_texture;
   float3 sun_color, sun_direction;
   fragment_shader_t frag_shader;
+  float temperature;
 } planet_t;
 
 // Color conversion functions using SDL (required by shader-works)
@@ -134,8 +135,9 @@ void generate_background_texture(planet_t *p, int seed) {
   }
 
   // sun color, direction
-  p->sun_color = make_float3(255, rand_float_range(60, 255), rand_float_range(60, 255));
-  p->sun_direction = make_float3(-rand_float_range(0.1f, 0.9f), -rand_float_range(0.1f, 0.9f), -rand_float_range(0.1f, 0.9f));
+  float intensity = rand_float_range(230, 255);
+  p->sun_color = make_float3(rand_float_range(230, 255), intensity * 0.9, intensity);
+  p->sun_direction = (float3){ 0, 0, -1 };
 }
 
 void generate_surface_texture(planet_t *p, int seed) {
@@ -154,30 +156,81 @@ void generate_surface_texture(planet_t *p, int seed) {
       float x_coord = cosf(angle) * 1.5f;
       float y_coord = sinf(angle) * 1.5f + (float)y / TEXTURE_SIZE * 4.0f;
 
-      float fbm_val = fbm(x_coord, y_coord, 5, seed);
-      float ridge_val = ridgeNoise(x_coord, y_coord, seed + 1000);
+      // Layer 1: Large-scale landforms using FBM (soft rolling hills)
+      float base_terrain = fbm(x_coord * 0.4f, y_coord * 0.4f, 5, seed);
 
-      float noise_val = pow(fbm_val * 0.5f + ridge_val * 0.5f, 1.2f) - 0.5f;
+      // Layer 2: Mid-scale detail using Perlin noise (adds variation)
+      float detail_noise = noise2D(x_coord * 1.5f, y_coord * 1.5f, seed + 100);
 
-      float normalized = (noise_val + 1.0f) * 0.5f;
+      // Layer 3: Sharp peaks using ridge noise (creates dramatic mountains)
+      float ridge_peaks = ridgeNoise(x_coord * 1.0f, y_coord * 1.0f, seed + 200);
+
+      // Layer 4: Fine-scale ridge detail
+      float fine_ridges = ridgeNoise(x_coord * 2.0f, y_coord * 2.0f, seed + 300);
+
+      // Composite the noise layers with strategic mixing - emphasize peaks and troughs
+      // Base terrain with ocean bias (negative offset for more water)
+      float composite = base_terrain * 0.25f;           // 25% large-scale variation
+      composite += detail_noise * 0.15f;                // 15% mid-scale detail
+      composite += ridge_peaks * 0.35f;                 // 35% sharp peaks (increased)
+      composite += fine_ridges * 0.25f;                 // 25% fine detail (increased)
+
+      // Apply a slight compression to emphasize oceans and mountains
+      composite -= 0.5f;  // Ocean bias - pushes baseline lower
+      composite += p->temperature * 0.05f; // Temperature influence - warmer planets have more land
+
+      // Normalize to [0, 1]
+      float normalized = (composite + 1.0f) * 0.5f;
       normalized = fmaxf(0.0f, fminf(1.0f, normalized));
 
-      normalized = powf(normalized, 0.95f);
+      // Apply aggressive curve: compress middle range, push toward extremes for compact peaks/troughs
+      // Use a power function to create more dramatic peaks and valleys
+      normalized = powf(normalized, 1.5f);  // Amplify extremes
+      if (normalized < 0.35f) {
+        normalized = normalized * 0.75f;  // Compress oceans slightly
+      } else if (normalized > 0.60f) {
+        normalized = 0.35f + (normalized - 0.35f) * 1.4f;  // Amplify mountains more aggressively
+      }
 
-      u32 color_val = rgb_to_u32(0, 0, 100);
-      if (normalized < 0.3f) {
-        color_val = rgb_to_u32(0, 0, (u8)normalize_to_range(normalized, 50, 150));
-      } else if (normalized < 0.4f) {
-        color_val = rgb_to_u32(0, (u8)normalize_to_range(normalized - 0.3f, 100, 255), 200);
-      } else if (normalized < 0.5f) {
-        color_val = rgb_to_u32(200, 200, 100);
+      normalized = fmaxf(0.0f, fminf(1.0f, normalized));
+
+      // Terrain coloring with distinct biomes
+      u32 color_val;
+      if (normalized < 0.25f) {
+        // Deep ocean - dark blue
+        float depth = normalized / 0.25f;
+        u8 blue = (u8)normalize_to_range(depth, 20, 100);
+        color_val = rgb_to_u32(0, 5, blue);
+      } else if (normalized < 0.32f) {
+        // Shallow ocean - brighter blue
+        float shallow = (normalized - 0.25f) / 0.07f;
+        u8 blue = (u8)normalize_to_range(shallow, 100, 180);
+        color_val = rgb_to_u32(10, 50, blue);
+      } else if (normalized < 0.37f) {
+        // Beach/sand - tan
+        float beach = (normalized - 0.32f) / 0.04f;
+        u8 val = (u8)normalize_to_range(beach, 180, 220);
+        color_val = rgb_to_u32(val, (u8)(val * 0.9f), (u8)(val * 0.7f));
+      } else if (normalized < 0.40f) {
+        // Grassland - green
+        float grass = (normalized - 0.36f) / 0.14f;
+        u8 green = (u8)normalize_to_range(grass, 100, 200);
+        color_val = rgb_to_u32(30, green, 20);
+      } else if (normalized < 0.55f) {
+        // Forest/dark terrain - dark green/brown
+        float forest = (normalized - 0.50f) / 0.15f;
+        u8 val = (u8)normalize_to_range(forest, 50, 100);
+        color_val = rgb_to_u32(val, (u8)(val * 1.2f), (u8)(val * 0.6f));
       } else if (normalized < 0.6f) {
-        color_val = rgb_to_u32(0, (u8)normalize_to_range(normalized - 0.5f, 150, 255), 0);
-      } else if (normalized < 0.8f) {
-        u8 val = (u8)normalize_to_range(normalized - 0.6f, 70, 150);
+        // Rocky mountains - gray
+        float rocky = (normalized - 0.55f) / 0.10f;
+        u8 val = (u8)normalize_to_range(rocky, 80, 160);
         color_val = rgb_to_u32(val, val, val);
       } else {
-        color_val = rgb_to_u32(255, 255, 255);
+        // Snow peaks - white
+        float snow = (normalized - 0.65f) / 0.35f;
+        u8 val = (u8)normalize_to_range(snow, 180, 255);
+        color_val = rgb_to_u32(val, val, val);
       }
 
       p->surface_texture[y * TEXTURE_SIZE + x] = color_val;
@@ -192,8 +245,9 @@ void new_planet(planet_t *p) {
   srand(seed);
 
   p->radius = rand_float_range(1.75f, 2.5f);
-  p->rotation_speed = rand_float_range(0.0001f, 0.0025f);
+  p->rotation_speed = -rand_float_range(0.0001f, 0.0025f);
   p->model.transform.pitch = rand_float_range(0.0f, 1.5f * M_PI);
+  p->temperature = rand_float_range(-1.0f, 1.0f); // -1 = cold, 0 = temperate, 1 = hot
 
   generate_sphere(&p->model, p->radius, 96, 96, make_float3(0.0f, 0.f, -8.0f));
 
