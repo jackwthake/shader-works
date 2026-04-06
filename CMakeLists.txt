@@ -156,4 +156,6 @@ if(SHADER_WORKS_BUILD_DEMOS)
     add_subdirectory(demos/common)
     # Add microcraft
     add_subdirectory(demos/microcraft)
+    # Add planets
+    add_subdirectory(demos/planets)
 endif()

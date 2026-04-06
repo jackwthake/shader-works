@@ -55,6 +55,8 @@ Benchmarked on Intel Core i5-8210Y (4 cores @ 3.6GHz) at 800×600 resolution wit
 
 **Note:** These measurements represent pure rendering performance without overhead from windowing systems (SDL), game logic, input handling, or vertical sync. Real-world applications will see lower FPS due to these additional costs. See `examples/04_benchmark` for details.
 
+![Planet](./demos/planets/screenshots/ss-1.png)
+
 # Key Features
 
 - **100% Software Rendering** — Complete 3D graphics pipeline from vertex transformation to pixel output with no GPU dependency
