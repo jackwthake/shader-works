@@ -13,10 +13,10 @@
 
 <p align="center">
   <img src="./demos/tundra/screenshots/ski.gif" width="400"/>
-  <img src="./demos/tundra/screenshots/static-5.png" width="400"/>
+  <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
 </p>
 <p align="center">
-  <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
+  <img src="./demos/zombies/screenshots/ss-1.png" width="400"/>
   <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
 </p>
 

@@ -35,7 +35,14 @@ void delete_world(world_t *world) {
   }
 }
 
-void add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, int floor_height) {
+static sector_t *add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, int floor_height) {
+  // Check if a sector already exists at this exact X, Z
+  sector_t *check = world->sectors;
+  while (check) {
+      if (check->x == x && check->z == z) return NULL;
+      check = check->next;
+  }
+
   sector_t *new_sector = malloc(sizeof(sector_t));
   new_sector->x = x;
   new_sector->z = z;
@@ -77,6 +84,7 @@ void add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, 
 
   world->tail = new_sector;
   world->num_sectors++;
+  return new_sector;
 }
 
 // Helper to find a sector sharing an edge with 'self'
@@ -112,7 +120,7 @@ sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side) {
 }
 
 // mallocs a new wall model and sets transforms
-static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float z2, float y_low, float y_high, float3 normal, float yaw) {
+static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float z2, float y_low, float y_high, float yaw) {
   s->num_walls++;
   s->walls = realloc(s->walls, s->num_walls * sizeof(model_t));
   model_t *m = &s->walls[s->num_walls - 1];
@@ -141,10 +149,9 @@ static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float
 static void process_wall_side(world_t *world, sector_t *s, direction_t side, float wall_start, float wall_end, float fixed_pos, bool is_horizontal) {
   sector_t *n = find_neighbor(world, s, side);
 
-  static const float3 norms[] = { {0,0,-1}, {0,0,1}, {-1,0,0}, {1,0,0} };
+  // static const float3 norms[] = { {0,0,-1}, {0,0,1}, {-1,0,0}, {1,0,0} };
   static const float yaws[]   = { 0, PI, PI/2.0f, -PI/2.0f };
 
-  float3 norm = norms[side];
   float yaw   = yaws[side];
 
   // Inner lambda-style macro to simplify coordinate mapping
@@ -152,12 +159,12 @@ static void process_wall_side(world_t *world, sector_t *s, direction_t side, flo
       float _x1, _z1, _x2, _z2; \
       if (is_horizontal) { _x1 = s1; _x2 = s2; _z1 = fixed_pos; _z2 = fixed_pos; } \
       else { _z1 = s1; _z2 = s2; _x1 = fixed_pos; _x2 = fixed_pos; } \
-      create_wall_segment(s, _x1, _z1, _x2, _z2, y_l, y_h, norm, yaw); \
+      create_wall_segment(s, _x1, _z1, _x2, _z2, y_l, y_h, yaw); \
   }
 
   if (!n) {
       // No neighbor: generate full solid wall
-      SPAWN_WALL(wall_start, wall_end, 0.0f, (float)s->ceiling_height);
+      SPAWN_WALL(wall_start, wall_end, (float)s->floor_height, (float)s->ceiling_height);
   } else {
     float n_start = is_horizontal ? n->x : n->z;
     float n_end   = is_horizontal ? n->x + n->w : n->z + n->d;
@@ -166,17 +173,55 @@ static void process_wall_side(world_t *world, sector_t *s, direction_t side, flo
     float overlap_2 = fminf(wall_end, n_end);
 
     // left / bottom wing
-    if (overlap_1 > wall_start) SPAWN_WALL(wall_start, overlap_1, 0, (float)s->ceiling_height);
+    if (overlap_1 > wall_start) SPAWN_WALL(wall_start, overlap_1, (float)s->floor_height, (float)s->ceiling_height);
 
     // right / top wing
-    if (overlap_2 < wall_end) SPAWN_WALL(overlap_2, wall_end, 0, (float)s->ceiling_height);
+    if (overlap_2 < wall_end) SPAWN_WALL(overlap_2, wall_end, (float)s->floor_height, (float)s->ceiling_height);
 
     // header
     if (s->ceiling_height > n->ceiling_height) SPAWN_WALL(overlap_1, overlap_2, (float)n->ceiling_height, (float)s->ceiling_height);
+
     // footer
-    if (n->floor_height > s->floor_height) SPAWN_WALL(overlap_1, overlap_2, s->floor_height, n->floor_height);
+    if (n->floor_height > s->floor_height) SPAWN_WALL(overlap_1, overlap_2, (float)s->floor_height, (float)n->floor_height);
   }
   #undef SPAWN_WALL
+}
+
+void generate_random_map(world_t *world, int room_count) {
+  // Start at origin
+  int cur_x = 0;
+  int cur_z = 0;
+
+  // Default room size
+  int r_w = 10;
+  int r_d = 10;
+
+  for (int i = 0; i < room_count; i++) {
+    int f_h = (rand() % 3); // 0, 1, 2
+    int c_h = f_h + 5 + (rand() % 3); // 4, 5, 6
+    // 1. Try to add the sector.
+    // add_sector should return NULL if a sector already exists at those coordinates
+    // to prevent overlapping "glitch" rooms.
+    sector_t *new_s = add_sector(world, cur_x - r_w/2, cur_z - r_d/2, r_w, r_d, c_h, f_h);
+
+    // 2. Pick a random direction for the NEXT room
+    direction_t move_dir = (direction_t)(rand() % 4);
+
+    switch (move_dir) {
+      case DIR_NORTH: cur_z += r_d; break;
+      case DIR_SOUTH: cur_z -= r_d; break;
+      case DIR_EAST:  cur_x += r_w; break;
+      case DIR_WEST:  cur_x -= r_w; break;
+    }
+
+    // 3. Variety: Randomly change heights for "Steps" and "Headers"
+    if (new_s) {
+      new_s->floor_height = f_h;
+      new_s->ceiling_height = c_h;
+    }
+  }
+
+  finalize_world_geometry(world);
 }
 
 void finalize_world_geometry(world_t *world) {

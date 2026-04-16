@@ -15,18 +15,16 @@ void update_player_sector(transform_t *p, fps_controller_t *controller, world_t 
     for (direction_t dir = 0; dir < 4; dir++) {
         sector_t *n = find_neighbor(world, s, dir);
 
-        if (n) {
+      if (n) {
           // Is the player inside this neighbor?
-          if (p->position.x >= n->x && p->position.x <= n->x + n->w &&
-            p->position.z >= n->z && p->position.z <= n->z + n->d) {
-
-            controller->current_sector = n; // Hand-off the new sector to the controller
-            return;
-          }
+        if (p->position.x >= n->x && p->position.x <= n->x + n->w && p->position.z >= n->z && p->position.z <= n->z + n->d) {
+          controller->current_sector = n; // Hand-off the new sector to the controller
+          return;
         }
       }
+    }
 
-      // If we get here, the player walked into the "Void" (no neighbor)
+    // If we get here, the player walked into the "Void" (no neighbor)
   }
 }
 

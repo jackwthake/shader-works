@@ -32,9 +32,11 @@ typedef struct {
 void init_world(world_t *world);
 void delete_world(world_t *world);
 
-void add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, int floor_height);
-void finalize_world_geometry(world_t *world);
 sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side);
+
+void generate_random_map(world_t *world, int room_count);
+void finalize_world_geometry(world_t *world);
+
 void render_world(renderer_t *renderer, world_t *world, transform_t *camera);
 
 #endif // __WORLD_H__
