@@ -88,3 +88,7 @@ float2 float2_normalize(float2 v) {
   if (fabsf(mag) < EPSILON) return (float2){0, 0};
   return float2_scale(v, 1.0f / mag);
 }
+
+f32 lerp(f32 current, f32 target, f32 t) {
+    return (1.0f - t) * current + t * target;
+}

@@ -52,4 +52,7 @@ f32 float2_dot(float2 a, float2 b);
 f32 float2_magnitude(float2 v);
 float2 float2_normalize(float2 v);
 
+
+f32 lerp(f32 current, f32 target, f32 t);
+
 #endif // SHADER_WORKS_MATHS_H

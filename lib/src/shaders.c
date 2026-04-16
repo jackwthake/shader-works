@@ -149,6 +149,36 @@ u32 skybox_frag_shader_func(u32 input_color, fragment_context_t *context, void *
   return rgb_to_u32(r, g, b);
 }
 
+inline u32 apply_dither_u32(u32 color, float2 frag_coord, float steps) {
+  if (color == 0x00000000) return 0x00000000;
+
+  u8 r_in, g_in, b_in;
+  u32_to_rgb(color, &r_in, &g_in, &b_in);
+
+  // 1. Create the screen-space checkerboard pattern
+  int ix = (int)frag_coord.x;
+  int iy = (int)frag_coord.y;
+  // JDH Vibe: The dither should be subtle but visible
+  float dither = ((ix % 2) ^ (iy % 2)) ? 0.05f : -0.05f;
+
+  // 2. Process each channel
+  float r = (r_in / 255.0f) + dither;
+  float g = (g_in / 255.0f) + dither;
+  float b = (b_in / 255.0f) + dither;
+
+  // 3. Quantize (Snap to steps)
+  r = floorf(r * steps) / steps;
+  g = floorf(g * steps) / steps;
+  b = floorf(b * steps) / steps;
+
+  // 4. Clamp and return
+  u8 fr = (u8)(fmaxf(0.0f, fminf(1.0f, r)) * 255.0f);
+  u8 fg = (u8)(fmaxf(0.0f, fminf(1.0f, g)) * 255.0f);
+  u8 fb = (u8)(fmaxf(0.0f, fminf(1.0f, b)) * 255.0f);
+
+  return rgb_to_u32(fr, fg, fb);
+}
+
 // Built-in default vertex shader that just returns the original vertex position
 vertex_shader_t default_vertex_shader = { .func = default_vertex_shader_func, .argv = NULL, .argc = 0, .valid = true };
 

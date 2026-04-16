@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 float smoothstep(float t);
-float lerp(float a, float b, float t);
 float hash2(int x, int y, int seed);
 
 float noise2D(float x, float y, int seed);

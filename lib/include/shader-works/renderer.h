@@ -12,7 +12,13 @@
 #endif
 
 // Rendering constants
-#define fov_over_2 (1.0472f / 2.0f) // 60 degrees in radians / 2
+#define BASE_FOV (1.0472f) // 60 degrees in radians
+#define FOV_OVER_2 (BASE_FOV / 2.0f) // 60 degrees in radians / 2
+#define BASE_SCREEN_HEIGHT_WORLD (2.0f * tanf(FOV_OVER_2)) // Height of the view frustum at a distance of 1 unit
+
+#ifndef UNUSED
+#define UNUSED(X) (void)(X)
+#endif
 
 #include <shader-works/primitives.h> // model_t
 
@@ -90,6 +96,9 @@ usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t 
 // fog_end: distance at which fog fully obscures
 // fog_r, fog_g, fog_b: RGB color of the fog
 void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
+
+// Apply dithering effect to a color based on fragment coordinates and number of steps, used in fragment shaders to reduce color banding
+u32 apply_dither_u32(u32 color, float2 frag_coord, float steps);
 
 void transform_get_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat);
 void transform_get_inverse_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat);

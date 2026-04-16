@@ -45,6 +45,7 @@ typedef struct {
 // position: center position of the plane (x, y, z)
 // Returns 0 on success, non-zero on failure
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position);
+int generate_plane_with_norm(model_t* model, float2 size, float2 segment_size, float3 position, float3 normal);
 
 // Generates a cube centered at position with given size
 // model: pointer to model structure to populate
@@ -52,6 +53,14 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
 // size: dimensions of the cube (width, height, depth)
 // Returns 0 on success, non-zero on failure
 int generate_cube(model_t* model, float3 position, float3 size);
+
+// Generates a cube centered at position with given size, with face normals for internal viewing
+// model: pointer to model structure to populate
+// position: center position of the cube (x, y, z)
+// size: dimensions of the cube (width, height, depth)
+// Returns 0 on success, non-zero on failure
+int generate_inward_cube(model_t* model, float3 position, float3 size);
+
 
 // Generates a sphere centered at position with given radius, segments, and rings
 // model: pointer to model structure to populate

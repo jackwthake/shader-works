@@ -6,6 +6,10 @@
 #include <stdbool.h>
 
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position) {
+  return generate_plane_with_norm(model, size, segment_size, position, (float3){0.0f, -1.0f, 0.0f});
+}
+
+int generate_plane_with_norm(model_t* model, float2 size, float2 segment_size, float3 position, float3 normal) {
   if (!model || segment_size.x <= 0 || segment_size.y <= 0) return -1;
 
   // Calculate number of segments from size and segment_size
@@ -88,10 +92,9 @@ int generate_plane(model_t* model, float2 size, float2 segment_size, float3 posi
   model->scale = (float3){1.0f, 1.0f, 1.0f};
 
   // Set up face normals for the plane
-  // Since it's a flat plane, all face normals point upward
-  float3 up_normal = { 0.0f, -1.0f, 0.0f };
+  // Since it's a flat plane, all face normals point in the given normal direction
   for (usize i = 0; i < total_triangles; i++) {
-    model->face_normals[i] = up_normal;
+    model->face_normals[i] = normal;
   }
 
   free(grid_verts);
@@ -189,6 +192,94 @@ int generate_cube(model_t* model, float3 position, float3 size) {
   model->scale = size;  // Store original size in scale
 
   // Initialize the transform
+  model->transform.position = position;
+  model->transform.yaw = 0.0f;
+  model->transform.pitch = 0.0f;
+
+  return 0;
+}
+
+int generate_inward_cube(model_t* model, float3 position, float3 size) {
+  if (!model) return -1;
+
+  const int CUBE_VERTS = 36;  // 6 faces * 2 triangles * 3 vertices
+
+  model->vertex_data = malloc(CUBE_VERTS * sizeof(vertex_data_t));
+  model->face_normals = malloc((CUBE_VERTS / 3) * sizeof(float3));
+
+  if (!model->vertex_data || !model->face_normals) {
+    free(model->vertex_data);
+    free(model->face_normals);
+    return -1;
+  }
+
+  float3 half = {size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
+  int v = 0;
+
+  // Front face (-Z) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+
+  // Back face (+Z) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}};
+
+  // Left face (+X) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
+
+  // Right face (-X) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}};
+
+  // Top face (+Y) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y, -half.z}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y, -half.z}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x,  half.y,  half.z}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x,  half.y,  half.z}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+
+  // Bottom face (-Y) - Winding flipped to be visible from inside
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y,  half.z}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y,  half.z}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{-half.x, -half.y, -half.z}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+  model->vertex_data[v++] = (vertex_data_t){{ half.x, -half.y, -half.z}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+
+  // Generate face normals pointing INWARD to the center
+for (int i = 0; i < CUBE_VERTS / 3; i++) {
+  float3 normal;
+  if (i < 2)       normal = (float3){0.0f, 0.0f, 1.0f};   // Front wall points In (+Z)
+  else if (i < 4)  normal = (float3){0.0f, 0.0f, -1.0f};  // Back wall points In (-Z)
+  else if (i < 6)  normal = (float3){-1.0f, 0.0f, 0.0f};  // Left wall points In (-X)
+  else if (i < 8)  normal = (float3){1.0f, 0.0f, 0.0f};   // Right wall points In (+X)
+  else if (i < 10) normal = (float3){0.0f, -1.0f, 0.0f};  // Ceiling points In (-Y)
+  else             normal = (float3){0.0f, 1.0f, 0.0f};   // Floor points In (+Y)
+
+  model->face_normals[i] = normal;
+}
+
+  model->num_vertices = CUBE_VERTS;
+  model->num_faces = CUBE_VERTS / 3;
+  model->scale = size;
   model->transform.position = position;
   model->transform.yaw = 0.0f;
   model->transform.pitch = 0.0f;

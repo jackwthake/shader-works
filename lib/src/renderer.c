@@ -279,8 +279,8 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
   state->skybox_buffer = skybox_buffer;
   state->screen_dim = make_float2((f32)width, (f32)height);
   state->atlas_dim = make_float2((f32)atlas_width, (f32)atlas_height);
-  state->frustum_bound = tanf(fov_over_2);
-  state->screen_height_world = tanf(fov_over_2) * 2;
+  state->frustum_bound = BASE_SCREEN_HEIGHT_WORLD / 2.0f; // frustum_bound is half the width of the view frustum at a distance of 1 unit
+  state->screen_height_world = BASE_SCREEN_HEIGHT_WORLD;
   state->projection_scale = (float)width / state->screen_height_world;
   state->max_depth = max_depth;
 
@@ -296,12 +296,14 @@ void init_renderer(renderer_t *state, u32 width, u32 height, u32 atlas_width, u3
   state->cam_forward = make_float3(0, 0, 0);
 }
 
-// Update camera basis vectors based on its current transform
+// Update camera basis vectors and recalculate projection/culling math
 void update_camera(renderer_t *restrict state, transform_t *restrict cam) {
   assert(state != NULL);
   assert(cam != NULL);
 
   transform_get_basis_vectors(cam, &state->cam_right, &state->cam_up, &state->cam_forward);
+  state->projection_scale = (float)state->screen_dim.y / state->screen_height_world;
+  state->frustum_bound = state->screen_height_world * 2.0f;
 }
 
 bool render_triangle(triangle_context_t *restrict ctx) {

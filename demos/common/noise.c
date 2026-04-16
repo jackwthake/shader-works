@@ -1,14 +1,10 @@
 #include "noise.h"
 #include <math.h>
+#include <shader-works/maths.h>
 
 // Smooth step function for better interpolation
 inline float smoothstep(float t) {
   return t * t * (3.0f - 2.0f * t);
-}
-
-// Simple 1D interpolation
-inline float lerp(float a, float b, float t) {
-  return a + t * (b - a);
 }
 
 // Hash function to get pseudo-random gradients with seed
