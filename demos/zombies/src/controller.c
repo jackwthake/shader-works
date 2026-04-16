@@ -28,7 +28,7 @@ void update_player_sector(transform_t *p, fps_controller_t *controller, world_t 
   }
 }
 
-void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, world_t *world, bool *mouse_captured) {
+void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, bool *mouse_captured) {
   float running_fov_height = BASE_SCREEN_HEIGHT_WORLD * 1.5f;
   const bool *keys = SDL_GetKeyboardState(NULL);
 
@@ -58,8 +58,6 @@ void update_controller(renderer_t *renderer, fps_controller_t *controller, trans
   camera->position = float3_add(camera->position, movement);
   controller->is_moving = (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_S] ||
                            keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_D]);
-
-  update_player_sector(camera, controller, world);
 
   if (controller->is_moving) {
     controller->bob_timer += controller->delta_time * 11.0f;

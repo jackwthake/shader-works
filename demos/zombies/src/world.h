@@ -5,6 +5,7 @@
 
 #define MAX_LIGHTS 10
 
+
 typedef enum {
   DIR_NORTH,
   DIR_SOUTH,
@@ -19,6 +20,7 @@ typedef struct sector_t {
 
   model_t floor, ceiling;
   struct sector_t *next, *prev;
+  bool visited; // For portal rendering
 } sector_t;
 
 typedef struct {

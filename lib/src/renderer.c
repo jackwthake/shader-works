@@ -235,38 +235,27 @@ static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_boun
   return outside_left || outside_right || outside_top || outside_bottom;
 }
 
-// Apply fog effect based on depth
-static u32 apply_fog(u32 color, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
-  f32 fog_factor = (fabsf(depth) - fog_start) / (fog_end - fog_start);
-
-  // Clamp fog factor
-  if (fog_factor < 0.0f) fog_factor = 0.0f;
-  if (fog_factor > 1.0f) fog_factor = 1.0f;
-
-  // For full fog (fog_factor >= 0.99)
-  if (fog_factor >= 0.99f) {
-    return rgb_to_u32(fog_r, fog_g, fog_b);
-  }
-
-  uint8_t r, g, b;
-  u32_to_rgb(color, &r, &g, &b);
-
-  // Interpolate between original color and fog color
-  r = (uint8_t)(r * (1.0f - fog_factor) + fog_r * fog_factor);
-  g = (uint8_t)(g * (1.0f - fog_factor) + fog_g * fog_factor);
-  b = (uint8_t)(b * (1.0f - fog_factor) + fog_b * fog_factor);
-  return rgb_to_u32(r, g, b);
-}
-
 void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
-  assert(state != NULL);
-
   int total_pixels = (int)(state->screen_dim.x * state->screen_dim.y);
-  for (int i = 0; i < total_pixels; ++i) {
-    if (state->depthbuffer[i] == FLT_MAX) continue; // Skip untouched pixels
+  f32 inv_range = 1.0f / (fog_end - fog_start);
 
-    // Apply fog effect based on depth
-    state->framebuffer[i] = apply_fog(state->framebuffer[i], state->depthbuffer[i], fog_start, fog_end, fog_r, fog_g, fog_b);
+  for (int i = 0; i < total_pixels; ++i) {
+    f32 d = state->depthbuffer[i];
+    if (d >= FLT_MAX - 1.0f) continue;
+
+    f32 fog_factor = (d - fog_start) * inv_range;
+    if (fog_factor <= 0.0f) continue;
+    if (fog_factor > 1.0f) fog_factor = 1.0f;
+
+    // Access the pixel as 4 separate bytes to avoid shift confusion
+    u8 *pixel = (u8*)&state->framebuffer[i];
+    f32 inv_fog = 1.0f - fog_factor;
+
+    // Assuming Standard Little-Endian order (BGRA or RGBA)
+    // We update each byte individually based on its index
+    pixel[0] = (u8)(pixel[0] * inv_fog + fog_b * fog_factor); // Blue usually at index 0
+    pixel[1] = (u8)(pixel[1] * inv_fog + fog_g * fog_factor); // Green at index 1
+    pixel[2] = (u8)(pixel[2] * inv_fog + fog_r * fog_factor); // Red at index 2
   }
 }
 

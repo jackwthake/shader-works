@@ -23,34 +23,51 @@ inline float map_range(float value, float old_min, float old_max, float new_min,
   return new_min + (value - old_min) * (new_max - new_min) / (old_max - old_min);
 }
 
+inline float fast_hash(int x, int y, int seed) {
+  uint32_t h = seed ^ (x * 2654435761u) ^ (y * 1013904223u);
+  h ^= h >> 16;
+  h *= 0x85ebca6bu;
+  h ^= h >> 13;
+  h *= 0xc2b2ae35u;
+  h ^= h >> 16;
+  // Map to 0.0 - 1.0 range
+  return (float)(h & 0xFFFFFF) / 16777216.0f;
+}
+
 u32 ground_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {
   UNUSED(input); UNUSED(args); UNUSED(argc);
 
-  float check_size = 0.25f;
-  float speed = 1.5f;
+  const float inv_check_size = 4.0f;
+  const float speed = 1.5f;
+  float time_offset = ctx->time * speed;
 
   float x_coord = ctx->world_pos.x;
-  float y_coord = ctx->world_pos.z;
+  float z_coord = ctx->world_pos.z;
 
-  // If the absolute value of the Y normal is low, we are looking at a wall
-  if (fabsf(ctx->normal.y) < 0.5f) {
-    y_coord = ctx->world_pos.y;
-
-    if (fabsf(ctx->normal.x) > 0.5f) {
+  // Axis selection (Triplanar logic)
+  if (ctx->normal.y < 0.5f && ctx->normal.y > -0.5f) {
+    z_coord = ctx->world_pos.y;
+    if (ctx->normal.x > 0.5f || ctx->normal.x < -0.5f) {
         x_coord = ctx->world_pos.z;
     }
   }
 
-  float x = floorf((x_coord + ctx->time * speed) / check_size);
-  float y = floorf((y_coord + ctx->time * speed) / check_size);
+  // Calculate grid indices
+  int xi = (int)((x_coord + time_offset) * inv_check_size);
+  int yi = (int)((z_coord + time_offset) * inv_check_size);
 
-  float intensity = map_range(noise2D(x, y, 69), -1.0f, 1.0f, 0.85f, 1.0f);
+  // Fast Hash (Single call instead of noise2D)
+  float noise_val = fast_hash(xi, yi, 69);
+  float intensity = 0.85f + (noise_val * 0.15f);
 
-  u8 r = (u8)(90.f * intensity);
-  u8 g = (u8)(0.f * intensity);
-  u8 b = (u8)(160.f * intensity);
+  u8 r = (u8)(90.0f * intensity);
+  u8 g = 0;
+  u8 b = (u8)(160.0f * intensity);
 
-  u32 lit = default_lighting_frag_shader.func(rgb_to_u32(r, g, b), ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
+  u32 base_color = rgb_to_u32(r, g, b);
+
+  // Lighting and Dither
+  u32 lit = default_lighting_frag_shader.func(base_color, ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
   return apply_dither_u32(lit, ctx->screen_pos, 8.0f);
 }
 

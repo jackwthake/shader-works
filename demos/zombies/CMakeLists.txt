@@ -33,6 +33,5 @@ if(ZOMBIES_SOURCES)
         -Wpedantic
         -Wstrict-prototypes
         -Wshadow
-        -ggdb
     )
 endif()

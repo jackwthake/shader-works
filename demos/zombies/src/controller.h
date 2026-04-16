@@ -22,6 +22,6 @@ typedef struct {
   sector_t *current_sector;
 } fps_controller_t;
 
-void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, world_t *world, bool *mouse_captured);
-
+void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, bool *mouse_captured);
+void update_player_sector(transform_t *p, fps_controller_t *controller, world_t *world);
 #endif // __CONRTOLLER_H__

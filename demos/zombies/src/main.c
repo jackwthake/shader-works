@@ -64,7 +64,7 @@ int main(int argc, char const *argv[]) {
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   init_world(&world);
-  generate_random_map(&world, 5);
+  generate_random_map(&world, MAX_LIGHTS + 3);
 
   transform_t camera = {0, 0, (float3){0, 2, 0}};
   fps_controller_t controller = {
@@ -90,7 +90,8 @@ int main(int argc, char const *argv[]) {
     sdl_consume_events(&running, &mouse_captured, window);
 
     // tick world
-    update_controller(&renderer_state, &controller, &camera, &world, &mouse_captured);
+    update_controller(&renderer_state, &controller, &camera, &mouse_captured);
+    update_player_sector(&camera, &controller, &world);
     update_camera(&renderer_state, &camera);
 
     // clear framebuffer and depthbuffer
@@ -101,7 +102,7 @@ int main(int argc, char const *argv[]) {
     }
 
     render_world(&renderer_state, &world, &camera);
-    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 15, 10, 80);
+    // apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 50, 20, 60);
 
     sdl_present(&renderer_state, renderer, fb_tex);
     SDL_Delay(1);

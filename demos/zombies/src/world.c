@@ -54,6 +54,7 @@ static sector_t *add_sector(world_t *world, int x, int z, int w, int d, int ceil
   new_sector->prev = world->tail;
   new_sector->num_walls = 0;
   new_sector->walls = NULL;
+  new_sector->visited = false;
 
   new_sector->floor = (model_t){0};
   new_sector->ceiling = (model_t){0};
