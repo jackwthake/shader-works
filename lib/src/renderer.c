@@ -12,6 +12,8 @@
 
 #include <shader-works/maths.h>
 
+#define MAGENTA 0xF81F
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -379,9 +381,6 @@ bool render_triangle(triangle_context_t *restrict ctx) {
   float2 uv_b_prime = float2_divide(uv_b, safe_b_z);
   float2 uv_c_prime = float2_divide(uv_c, safe_c_z);
 
-  // Precompute color for this triangle (use different colors for debugging)
-  uint32_t flat_color = rgb_to_u32(255, 10, 255); // Magenta for all triangles
-
   ctx->frag_ctx.normal = triangle_normal;
 
   // Rasterize only within the computed bounding box
@@ -406,7 +405,7 @@ bool render_triangle(triangle_context_t *restrict ctx) {
 
             // Only draw visible pixels at triangle edges
             if (weights.x < 0.02f || weights.y < 0.02f || weights.z < 0.02f) {
-              output_color = rgb_to_u32(0, 0, 0); // Black for wireframe edges
+              output_color = 0x0000; // Black for wireframe edges
               ctx->state->framebuffer[pixel_idx] = output_color; // Draw the edge pixel
             }
             continue;
@@ -432,7 +431,7 @@ bool render_triangle(triangle_context_t *restrict ctx) {
 
             output_color = ctx->state->texture_atlas[tex_y * (int)ctx->state->atlas_dim.x + tex_x];
           } else {
-            output_color = flat_color; // Use flat color if no texture
+            output_color = ctx->model->flat_color; // Use flat color if no texture
           }
 
           // Interpolate world position using barycentric coordinates
@@ -461,7 +460,7 @@ bool render_triangle(triangle_context_t *restrict ctx) {
           ctx->frag_ctx.view_dir = float3_normalize(float3_sub(ctx->cam->position, ctx->frag_ctx.world_pos));
 
           if((output_color = ctx->frag_shader->func(output_color, &ctx->frag_ctx, ctx->frag_shader->argv, ctx->frag_shader->argc))
-                                          == rgb_to_u32(255, 0, 255)) {
+                                          == MAGENTA) {
             continue; // Discard pixel if shader returns transparent color (don't update depth)
           }
 

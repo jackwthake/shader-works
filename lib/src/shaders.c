@@ -190,7 +190,7 @@ fragment_shader_t default_lighting_frag_shader = { .func = default_lighting_frag
 
 // Built-in skybox shader that samples from panoramic texture
 // Note: This is a template; actual skybox shader must be created with args via make_fragment_shader()
-static fragment_shader_t skybox_shader_template = { .func = skybox_frag_shader_func, .argv = NULL, .argc = 0, .valid = true };
+fragment_shader_t skybox_shader_template = { .func = skybox_frag_shader_func, .argv = NULL, .argc = 0, .valid = true };
 
 // Helper functions to create shaders
 fragment_shader_t make_fragment_shader(fragment_shader_func func, void *argv, usize argc) {

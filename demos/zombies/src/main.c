@@ -63,8 +63,9 @@ int main(int argc, char const *argv[]) {
   sys_init(&window, &renderer, &fb_tex, &mouse_captured);
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
   init_world(&world);
-  add_sector(&world, -10, -10, 20, 20, 4);
-  add_sector(&world, 10, 10, 10, 20, 4);
+  add_sector(&world, -10, -10, 20, 20, 8);
+  add_sector(&world, 10, 1, 10, 20, 4);
+  add_walls(&world);
 
   transform_t camera = {0, 0, (float3){0, 2, 0}};
   fps_controller_t controller = {
@@ -98,6 +99,7 @@ int main(int argc, char const *argv[]) {
     }
 
     render_world(&renderer_state, &world, &camera);
+    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 15, 10, 80);
 
     sdl_present(&renderer_state, renderer, fb_tex);
     SDL_Delay(1);

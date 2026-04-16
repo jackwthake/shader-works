@@ -23,6 +23,7 @@ typedef struct {
   // Cache-friendly: all vertex data together
   vertex_data_t *vertex_data;
   float3 *face_normals;
+  u32 flat_color;
 
   usize num_vertices;
   usize num_faces;
