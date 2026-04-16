@@ -63,9 +63,10 @@ int main(int argc, char const *argv[]) {
   sys_init(&window, &renderer, &fb_tex, &mouse_captured);
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
   init_world(&world);
-  add_sector(&world, -10, -10, 20, 20, 8);
-  add_sector(&world, 10, 1, 10, 20, 4);
-  add_walls(&world);
+
+  add_sector(&world, -10, -10, 20, 20, 8, 0);
+  add_sector(&world, 10, 1, 20, 20, 4, 1);
+  finalize_world_geometry(&world);
 
   transform_t camera = {0, 0, (float3){0, 2, 0}};
   fps_controller_t controller = {
@@ -74,7 +75,10 @@ int main(int argc, char const *argv[]) {
     .min_pitch = -PI/2 + 0.1f,
     .max_pitch = PI/2 - 0.1f,
     .ground_height = 2.0f,
-    .last_frame_time = SDL_GetPerformanceCounter()
+    .last_frame_time = SDL_GetPerformanceCounter(),
+    .bob_timer = 0.0f,
+    .is_moving = false,
+    .current_sector = world.sectors
   };
 
   update_camera(&renderer_state, &camera);
@@ -88,8 +92,10 @@ int main(int argc, char const *argv[]) {
     sdl_consume_events(&running, &mouse_captured, window);
 
     // tick world
-    update_controller(&renderer_state, &controller, &camera, &mouse_captured);
+    update_controller(&renderer_state, &controller, &camera, &world, &mouse_captured);
     update_camera(&renderer_state, &camera);
+
+    printf("Camera Pos: (%.2f, %.2f, %.2f) Yaw: %.2f Pitch: %.2f\n", camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch);
 
     // clear framebuffer and depthbuffer
     u32 clear_col = rgb_to_u32(15, 10, 80);

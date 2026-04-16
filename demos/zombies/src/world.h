@@ -5,8 +5,15 @@
 
 #define MAX_LIGHTS 10
 
+typedef enum {
+  DIR_NORTH,
+  DIR_SOUTH,
+  DIR_EAST,
+  DIR_WEST
+} direction_t;
+
 typedef struct sector_t {
-  int x, y, w, d, ceiling_height;
+  int x, z, w, d, ceiling_height, floor_height;
   model_t *walls;
   usize num_walls;
 
@@ -25,8 +32,9 @@ typedef struct {
 void init_world(world_t *world);
 void delete_world(world_t *world);
 
-void add_sector(world_t *world, int x, int y, int w, int d, int ceiling_height);
-void add_walls(world_t *world);
+void add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, int floor_height);
+void finalize_world_geometry(world_t *world);
+sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side);
 void render_world(renderer_t *renderer, world_t *world, transform_t *camera);
 
 #endif // __WORLD_H__

@@ -1,6 +1,11 @@
 #include "world.h"
 
 #include <stdlib.h>
+#include <math.h>
+
+#include <shader-works/maths.h>
+
+#include "world.h"
 
 extern fragment_shader_t ground_frag;
 
@@ -30,33 +35,35 @@ void delete_world(world_t *world) {
   }
 }
 
-void add_sector(world_t *world, int x, int y, int w, int d, int ceiling_height) {
+void add_sector(world_t *world, int x, int z, int w, int d, int ceiling_height, int floor_height) {
   sector_t *new_sector = malloc(sizeof(sector_t));
   new_sector->x = x;
-  new_sector->y = y;
+  new_sector->z = z;
   new_sector->w = w;
   new_sector->d = d;
   new_sector->ceiling_height = ceiling_height;
+  new_sector->floor_height = floor_height;
   new_sector->next = NULL;
   new_sector->prev = world->tail;
   new_sector->num_walls = 0;
+  new_sector->walls = NULL;
 
   new_sector->floor = (model_t){0};
   new_sector->ceiling = (model_t){0};
 
   // generate floor plane for sector
-  generate_plane_with_norm(&new_sector->floor, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, 0.0f, y + d * 0.5f}, (float3){0.0f, -1.0f, 0.0f});
+  generate_plane_with_norm(&new_sector->floor, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, (float)floor_height, z + d * 0.5f}, (float3){0.0f, -1.0f, 0.0f});
   new_sector->floor.vertex_shader = &default_vertex_shader;
   new_sector->floor.frag_shader = &ground_frag;
 
   // generate ceiling plane for sector
-  generate_plane_with_norm(&new_sector->ceiling, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, (float)ceiling_height, y + d * 0.5f}, (float3){0.0f, 1.0f, 0.0f});
+  generate_plane_with_norm(&new_sector->ceiling, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, (float)ceiling_height, z + d * 0.5f}, (float3){0.0f, 1.0f, 0.0f});
   new_sector->ceiling.vertex_shader = &default_vertex_shader;
   new_sector->ceiling.frag_shader = &ground_frag;
 
   // add one light in the center of the sector
   if (world->num_lights < MAX_LIGHTS) {
-    world->lights[world->num_lights].position = (float3){ x + w * 0.5f, ceiling_height - 1.0f, y + d * 0.5f };
+    world->lights[world->num_lights].position = (float3){ x + w * 0.5f, (float)floor_height + 1.0f, z + d * 0.5f };
     world->lights[world->num_lights].color = rgb_to_u32(255, 255, 255);
     world->lights[world->num_lights].is_directional = false;
     world->num_lights++;
@@ -72,48 +79,120 @@ void add_sector(world_t *world, int x, int y, int w, int d, int ceiling_height) 
   world->num_sectors++;
 }
 
-void add_walls(world_t *world) {
-  sector_t *sector = world->sectors;
-  while (sector) {
-    sector->num_walls = 4;
-    sector->walls = calloc(sector->num_walls, sizeof(model_t));
-
-    for (int i = 0; i < 4; i++) {
-      model_t *wall = &sector->walls[i];
-      float3 pos = {0};
-      float2 wall_size = {0};
-      float wall_yaw = 0.0f;
-
-      // Determine wall geometry based on index (N, S, E, W)
-      if (i == 0) { // North (Far)
-        wall_size = (float2){ (float)sector->w, (float)sector->ceiling_height };
-        pos = (float3){ sector->x + sector->w * 0.5f, sector->ceiling_height * 0.5f, (float)sector->x + sector->d };
-        wall_yaw = 0.0f;
-      } else if (i == 1) { // South (Near)
-        wall_size = (float2){ (float)sector->w, (float)sector->ceiling_height };
-        pos = (float3){ sector->x + sector->w * 0.5f, sector->ceiling_height * 0.5f, (float)sector->x };
-        wall_yaw = PI;
-      } else if (i == 2) { // East (Right)
-        wall_size = (float2){ (float)sector->d, (float)sector->ceiling_height };
-        pos = (float3){ (float)sector->x + sector->w, sector->ceiling_height * 0.5f, sector->x + sector->d * 0.5f };
-        wall_yaw = PI / 2.0f;
-      } else if (i == 3) { // West (Left)
-        wall_size = (float2){ (float)sector->d, (float)sector->ceiling_height };
-        pos = (float3){ (float)sector->x, sector->ceiling_height * 0.5f, sector->x + sector->d * 0.5f };
-        wall_yaw = -PI / 2.0f;
-      }
-
-      generate_plane_with_norm(wall, wall_size, (float2){1.0f, 1.0f}, (float3){0,0,0}, (float3){0, 1, 0});
-
-      wall->transform.pitch = PI / 2.0f; // Stand it up
-      wall->transform.yaw = wall_yaw;    // Face it toward the player
-      wall->transform.position = pos;    // Move it to the edge
-
-      wall->vertex_shader = &default_vertex_shader;
-      wall->frag_shader = &ground_frag;
+// Helper to find a sector sharing an edge with 'self'
+sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side) {
+  sector_t *other = world->sectors;
+  while (other) {
+    if (other == self) {
+      other = other->next;
+      continue;
     }
 
-    sector = sector->next;
+    switch (side) {
+      case DIR_NORTH:
+        if (other->z == self->z + self->d &&
+          other->x < self->x + self->w && other->x + other->w > self->x) return other;
+        break;
+      case DIR_SOUTH:
+        if (other->z + other->d == self->z &&
+          other->x < self->x + self->w && other->x + other->w > self->x) return other;
+        break;
+      case DIR_EAST:
+          if (other->x == self->x + self->w &&
+              other->z < self->z + self->d && other->z + other->d > self->z) return other;
+          break;
+      case DIR_WEST:
+        if (other->x + other->w == self->x &&
+          other->z < self->z + self->d && other->z + other->d > self->z) return other;
+        break;
+    }
+    other = other->next;
+  }
+  return NULL;
+}
+
+// mallocs a new wall model and sets transforms
+static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float z2, float y_low, float y_high, float3 normal, float yaw) {
+  s->num_walls++;
+  s->walls = realloc(s->walls, s->num_walls * sizeof(model_t));
+  model_t *m = &s->walls[s->num_walls - 1];
+  *m = (model_t){0};
+
+  float w = sqrtf(powf(x2 - x1, 2) + powf(z2 - z1, 2));
+  float h = y_high - y_low;
+
+  // generate a "neutral" plane facing up (0,1,0)
+  generate_plane_with_norm(m, (float2){w, h}, (float2){1,1}, (float3){0,0,0}, (float3){0,1,0});
+
+  m->transform.position = (float3){
+    (x1 + x2) * 0.5f,
+    (y_low + y_high) * 0.5f,
+    (z1 + z2) * 0.5f
+  };
+
+  m->transform.pitch = PI / 2.0f; // Stand it up
+  m->transform.yaw = yaw;         // Face it inward
+
+  m->vertex_shader = &default_vertex_shader;
+  m->frag_shader = &ground_frag;
+}
+
+// Determines if a wall is solid, split, or has a header
+static void process_wall_side(world_t *world, sector_t *s, direction_t side, float wall_start, float wall_end, float fixed_pos, bool is_horizontal) {
+  sector_t *n = find_neighbor(world, s, side);
+
+  static const float3 norms[] = { {0,0,-1}, {0,0,1}, {-1,0,0}, {1,0,0} };
+  static const float yaws[]   = { 0, PI, PI/2.0f, -PI/2.0f };
+
+  float3 norm = norms[side];
+  float yaw   = yaws[side];
+
+  // Inner lambda-style macro to simplify coordinate mapping
+  #define SPAWN_WALL(s1, s2, y_l, y_h) { \
+      float _x1, _z1, _x2, _z2; \
+      if (is_horizontal) { _x1 = s1; _x2 = s2; _z1 = fixed_pos; _z2 = fixed_pos; } \
+      else { _z1 = s1; _z2 = s2; _x1 = fixed_pos; _x2 = fixed_pos; } \
+      create_wall_segment(s, _x1, _z1, _x2, _z2, y_l, y_h, norm, yaw); \
+  }
+
+  if (!n) {
+      // No neighbor: generate full solid wall
+      SPAWN_WALL(wall_start, wall_end, 0.0f, (float)s->ceiling_height);
+  } else {
+    float n_start = is_horizontal ? n->x : n->z;
+    float n_end   = is_horizontal ? n->x + n->w : n->z + n->d;
+
+    float overlap_1 = fmaxf(wall_start, n_start);
+    float overlap_2 = fminf(wall_end, n_end);
+
+    // left / bottom wing
+    if (overlap_1 > wall_start) SPAWN_WALL(wall_start, overlap_1, 0, (float)s->ceiling_height);
+
+    // right / top wing
+    if (overlap_2 < wall_end) SPAWN_WALL(overlap_2, wall_end, 0, (float)s->ceiling_height);
+
+    // header
+    if (s->ceiling_height > n->ceiling_height) SPAWN_WALL(overlap_1, overlap_2, (float)n->ceiling_height, (float)s->ceiling_height);
+    // footer
+    if (n->floor_height > s->floor_height) SPAWN_WALL(overlap_1, overlap_2, s->floor_height, n->floor_height);
+  }
+  #undef SPAWN_WALL
+}
+
+void finalize_world_geometry(world_t *world) {
+  for (sector_t *s = world->sectors; s != NULL; s = s->next) {
+    // Clean up existing wall heap memory
+    if (s->walls) {
+      free(s->walls);
+      s->walls = NULL;
+      s->num_walls = 0;
+    }
+
+    // Process all 4 sides using the solver
+    process_wall_side(world, s, DIR_NORTH, s->x, s->x + s->w, s->z + s->d, true);
+    process_wall_side(world, s, DIR_SOUTH, s->x, s->x + s->w, s->z, true);
+    process_wall_side(world, s, DIR_EAST,  s->z, s->z + s->d, s->x + s->w, false);
+    process_wall_side(world, s, DIR_WEST,  s->z, s->z + s->d, s->x, false);
   }
 }
 
@@ -128,6 +207,7 @@ void render_world(renderer_t *renderer, world_t *world, transform_t *camera) {
         render_model(renderer, camera, &sector->walls[i], world->lights, world->num_lights);
       }
     }
+
     sector = sector->next;
   }
 }
