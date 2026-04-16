@@ -18,10 +18,11 @@ typedef struct {
   float bob_timer;
   bool is_moving;
   float current_fov_height;
+  float vertical_velocity;
+  bool is_grounded;
 
   sector_t *current_sector;
 } fps_controller_t;
 
-void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, bool *mouse_captured);
-void update_player_sector(transform_t *p, fps_controller_t *controller, world_t *world);
+void update_controller(renderer_t *renderer, fps_controller_t *controller, transform_t *camera, bool *mouse_captured, world_t *world);
 #endif // __CONRTOLLER_H__

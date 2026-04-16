@@ -90,8 +90,7 @@ int main(int argc, char const *argv[]) {
     sdl_consume_events(&running, &mouse_captured, window);
 
     // tick world
-    update_controller(&renderer_state, &controller, &camera, &mouse_captured);
-    update_player_sector(&camera, &controller, &world);
+    update_controller(&renderer_state, &controller, &camera, &mouse_captured, &world);
     update_camera(&renderer_state, &camera);
 
     // clear framebuffer and depthbuffer
