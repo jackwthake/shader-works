@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <SDL3/SDL.h>
 #include <shader-works/maths.h>
 
 #include "world.h"
@@ -15,6 +16,8 @@ void init_world(world_t *world) {
   world->num_sectors = 0;
   world->lights = calloc(MAX_LIGHTS, sizeof(light_t));
   world->num_lights = 0;
+  world->entities = calloc(MAX_ENTITIES, sizeof(entity_t));
+  world->num_entities = 0;
 }
 
 void delete_world(world_t *world) {
@@ -32,6 +35,11 @@ void delete_world(world_t *world) {
   if (world->lights) {
     free(world->lights);
     world->num_lights = 0;
+  }
+
+  if (world->entities) {
+    free(world->entities);
+    world->num_entities = 0;
   }
 }
 
@@ -69,8 +77,8 @@ static sector_t *add_sector(world_t *world, int x, int z, int w, int d, int ceil
   new_sector->ceiling.vertex_shader = &default_vertex_shader;
   new_sector->ceiling.frag_shader = &ground_frag;
 
-  // add one light in the center of the sector
-  if (world->num_lights < MAX_LIGHTS) {
+  // add one light in the center of the sector, only sometimes to avoid overkill
+  if (world->num_lights < MAX_LIGHTS && rand() % 2 == 0) {
     world->lights[world->num_lights].position = (float3){ x + w * 0.5f, (float)floor_height + 1.0f, z + d * 0.5f };
     world->lights[world->num_lights].color = rgb_to_u32(255, 255, 255);
     world->lights[world->num_lights].is_directional = false;
@@ -188,6 +196,30 @@ static void process_wall_side(world_t *world, sector_t *s, direction_t side, flo
   #undef SPAWN_WALL
 }
 
+static void add_entities(world_t *world) {
+  sector_t *head = world->sectors;
+  while (head) {
+    if (world->num_entities < MAX_ENTITIES && rand() % 2 == 0) {
+      entity_t *new_entity = &world->entities[world->num_entities];
+
+      int x_off = (rand() % (head->w - 2)) + 1;
+      int z_off = (rand() % (head->d - 2)) + 1;
+
+      new_entity->current_sector = head;
+      new_entity->transform.position = (float3){ head->x + x_off, head->floor_height + 1, head->z + z_off };
+      generate_cube(&new_entity->mesh, new_entity->transform.position, (float3){1, 2, 1});
+
+      new_entity->mesh.vertex_shader = &default_vertex_shader;
+      new_entity->mesh.frag_shader = &default_lighting_frag_shader;
+      new_entity->mesh.flat_color = rgb_to_u32(255, 0, 0);
+
+      world->num_entities++;
+    }
+
+    head = head->next;
+  }
+}
+
 void generate_random_map(world_t *world, int room_count) {
   // Start at origin
   int cur_x = 0;
@@ -223,6 +255,7 @@ void generate_random_map(world_t *world, int room_count) {
   }
 
   finalize_world_geometry(world);
+  add_entities(world);
 }
 
 void finalize_world_geometry(world_t *world) {
@@ -242,6 +275,12 @@ void finalize_world_geometry(world_t *world) {
   }
 }
 
+void tick_entities(world_t *world, f32 delta_time) {
+  for (usize i = 0; i < world->num_entities && world->num_entities > 0; i++) {
+    entity_t *e = &world->entities[i];
+  }
+}
+
 void render_world(renderer_t *renderer, world_t *world, transform_t *camera) {
   sector_t *sector = world->sectors;
   while (sector) {
@@ -252,6 +291,10 @@ void render_world(renderer_t *renderer, world_t *world, transform_t *camera) {
       if (sector->walls[i].num_vertices > 0) {
         render_model(renderer, camera, &sector->walls[i], world->lights, world->num_lights);
       }
+    }
+
+    for (usize i = 0; i < world->num_entities && world->num_entities > 0; i++) {
+      render_model(renderer, camera, &world->entities[i].mesh, world->lights, world->num_lights);
     }
 
     sector = sector->next;

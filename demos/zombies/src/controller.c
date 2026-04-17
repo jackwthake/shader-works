@@ -30,7 +30,7 @@ void update_controller(renderer_t *renderer, fps_controller_t *controller, trans
   float running_fov_height = BASE_SCREEN_HEIGHT_WORLD * 1.5f;
   const bool *keys = SDL_GetKeyboardState(NULL);
 
-  float gravity = -9.8f; // Strength of gravity
+  float gravity = -15.5f; // Strength of gravity
   float jump_force = 8.0f; // Height of the jump
 
   if (*mouse_captured) {
@@ -115,18 +115,22 @@ void update_controller(renderer_t *renderer, fps_controller_t *controller, trans
   controller->current_sector = s;
 
   controller->is_moving = (movement.x != 0 || movement.z != 0);
-  if (controller->is_moving && controller->is_grounded) {
-    controller->bob_timer += controller->delta_time * 11.0f;
-    controller->current_fov_height = lerp(controller->current_fov_height, running_fov_height, controller->delta_time * 5.0f);
-  } else if (controller->is_grounded) {
-    controller->bob_timer += controller->delta_time * 2.0f;
-    controller->current_fov_height = lerp(controller->current_fov_height, BASE_SCREEN_HEIGHT_WORLD, controller->delta_time * 5.0f);
+  if (controller->is_grounded) {
+    if (controller->is_moving) {
+      // Fast bob when walking
+      controller->bob_timer += controller->delta_time * 11.0f;
+      controller->current_fov_height = lerp(controller->current_fov_height, running_fov_height, controller->delta_time * 5.0f);
+    } else {
+      // Slow "breathing" when idle
+      controller->bob_timer += controller->delta_time * 2.0f;
+      controller->current_fov_height = lerp(controller->current_fov_height, BASE_SCREEN_HEIGHT_WORLD, controller->delta_time * 5.0f);
+    }
+
+    float bob_offset = sinf(controller->bob_timer) * 0.12f;
+    // We apply the bob offset to the visual height, not the physics position
+    float target_eye_level = (float)s->floor_height + 2.0f;
+    camera->position.y = lerp(camera->position.y, target_eye_level + bob_offset, controller->delta_time * 5.0f);
   }
 
-  // float bob_offset = sinf(controller->bob_timer) * 0.15f;
-  // float target_ground = camera->position.y;
-
-  // Smoothing the Y prevents the "glue" feel when dropping
-  // camera->position.y = lerp(camera->position.y, target_ground + bob_offset, controller->delta_time * 10.0f);
   renderer->screen_height_world = controller->current_fov_height;
 }

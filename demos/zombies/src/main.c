@@ -64,7 +64,7 @@ int main(int argc, char const *argv[]) {
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
   init_world(&world);
-  generate_random_map(&world, MAX_LIGHTS + 3);
+  generate_random_map(&world, MAX_LIGHTS + 10);
 
   transform_t camera = {0, 0, (float3){0, 2, 0}};
   fps_controller_t controller = {
