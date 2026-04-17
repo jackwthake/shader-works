@@ -16,7 +16,7 @@
   <img src="./examples/screenshots/02_textured_scene.gif" width="400"/>
 </p>
 <p align="center">
-  <img src="./demos/zombies/screenshots/ss-1.png" width="400"/>
+  <img src="./demos/zombies/screenshots/ss-3.png" width="400"/>
   <img src="./demos/microcraft/screenshots/embedded.jpeg" width="400"/>
 </p>
 
@@ -66,6 +66,7 @@ Benchmarked on Intel Core i5-8210Y (4 cores @ 3.6GHz) at 800×600 resolution wit
 - **Multi-threaded** — Optional POSIX threads for parallel rasterization (configurable at build time)
 - **Built-in Geometry** — Generators for cubes, spheres, planes, and quads
 
+![Level](./demos/zombies/screenshots/ss-2.png)
 # Technical Highlights
 
 **Barycentric Rasterization** — Implements scanline-free triangle filling using barycentric coordinates for pixel-perfect coverage testing and smooth attribute interpolation.
