@@ -76,7 +76,12 @@ int main(int argc, char const *argv[]) {
     .last_frame_time = SDL_GetPerformanceCounter(),
     .bob_timer = 0.0f,
     .is_moving = false,
-    .current_sector = world.sectors
+    .body = {
+      .current_sector = world.sectors,
+      .position = camera.position,
+      .radius = 0.15f,
+      .floor_offset = 2.0f
+    }
   };
 
   update_camera(&renderer_state, &camera);
@@ -92,6 +97,8 @@ int main(int argc, char const *argv[]) {
     // tick world
     update_controller(&renderer_state, &controller, &camera, &mouse_captured, &world);
     update_camera(&renderer_state, &camera);
+
+    tick_entities(&world, &camera, &controller, controller.delta_time);
 
     // clear framebuffer and depthbuffer
     u32 clear_col = rgb_to_u32(15, 10, 80);

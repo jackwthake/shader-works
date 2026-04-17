@@ -8,7 +8,7 @@
 #include <shader-works/renderer.h>
 
 void update_player_sector(transform_t *p, fps_controller_t *controller, world_t *world) {
-  sector_t *s = controller->current_sector;
+  sector_t *s = controller->body.current_sector;
 
   if (p->position.x < s->x || p->position.x > s->x + s->w || p->position.z < s->z || p->position.z > s->z + s->d) {
     // we exited the current sector, now check the 4 neighbors to find where we went
@@ -18,7 +18,7 @@ void update_player_sector(transform_t *p, fps_controller_t *controller, world_t 
       if (n) {
           // Is the player inside this neighbor?
         if (p->position.x >= n->x && p->position.x <= n->x + n->w && p->position.z >= n->z && p->position.z <= n->z + n->d) {
-          controller->current_sector = n; // Hand-off the new sector to the controller
+          controller->body.current_sector = n; // Hand-off the new sector to the controller
           return;
         }
       }
@@ -53,69 +53,34 @@ void update_controller(renderer_t *renderer, fps_controller_t *controller, trans
   if (keys[SDL_SCANCODE_A]) movement = float3_add(movement, float3_scale(right, speed));
   if (keys[SDL_SCANCODE_D]) movement = float3_add(movement, float3_scale(right, -speed));
 
-  sector_t *s = controller->current_sector;
+  sector_t *s = controller->body.current_sector;
 
-  controller->vertical_velocity += gravity * controller->delta_time;
-  camera->position.y += controller->vertical_velocity * controller->delta_time;
-
-  if (camera->position.y > s->ceiling_height - 1.0f) {
-    camera->position.y = s->ceiling_height - 1.0f;
-    controller->vertical_velocity = 0;
+  if (controller->body.position.y > s->ceiling_height - 1.0f) {
+    controller->body.position.y = s->ceiling_height - 1.0f;
+    controller->body.y_velocity = 0;
   }
 
-  float floor_y = (float)s->floor_height + 2.0f; // Eye level
+  float floor_y = (float)s->floor_height + controller->body.floor_offset; // Eye level
 
-  if (camera->position.y <= floor_y) {
-    camera->position.y = floor_y;
-    controller->vertical_velocity = 0;
-    controller->is_grounded = true;
+  if (controller->body.position.y <= floor_y) {
+    controller->body.position.y = floor_y;
+    controller->body.y_velocity = 0;
+    controller->body.is_grounded = true;
   } else {
-    controller->is_grounded = false;
+    controller->body.is_grounded = false;
   }
 
-  if (keys[SDL_SCANCODE_SPACE] && controller->is_grounded) {
-    controller->vertical_velocity = jump_force;
-    controller->is_grounded = false;
+  if (keys[SDL_SCANCODE_SPACE] && controller->body.is_grounded) {
+    controller->body.y_velocity = jump_force;
+    controller->body.is_grounded = false;
   }
 
-  float3 pos = camera->position;
-  float padding = 0.25f;
-
-  // Horizontal Collision (X)
-  float next_x = pos.x + movement.x;
-  if (next_x < s->x + padding || next_x > s->x + s->w - padding) {
-    direction_t dir = (next_x < s->x + padding) ? DIR_WEST : DIR_EAST;
-    sector_t *n = find_neighbor(world, s, dir);
-    // Allow if neighbor exists AND isn't a wall (step height check)
-    if (n && n->floor_height <= camera->position.y - 0.5f) {
-      // Transition potential - check if we actually crossed into the neighbor
-      if (next_x < n->x + n->w && next_x > n->x) s = n;
-    } else {
-      next_x = pos.x; // Blocked
-    }
-  }
-  pos.x = next_x;
-
-  // Vertical Collision (Z)
-  float next_z = pos.z + movement.z;
-  if (next_z < s->z + padding || next_z > s->z + s->d - padding) {
-    direction_t dir = (next_z < s->z + padding) ? DIR_SOUTH : DIR_NORTH;
-    sector_t *n = find_neighbor(world, s, dir);
-    if (n && n->floor_height <= camera->position.y - 0.5f) {
-      if (next_z < n->z + n->d && next_z > n->z) s = n;
-    } else {
-      next_z = pos.z; // Blocked
-    }
-  }
-  pos.z = next_z;
-
-  // Update State
-  camera->position.x = pos.x;
-  camera->position.z = pos.z;
-  controller->current_sector = s;
+  resolve_world_collision(world, &controller->body, movement, controller->delta_time);
+  camera->position = controller->body.position;
+  update_player_sector(camera, controller, world);
 
   controller->is_moving = (movement.x != 0 || movement.z != 0);
-  if (controller->is_grounded) {
+  if (controller->body.is_grounded) {
     if (controller->is_moving) {
       // Fast bob when walking
       controller->bob_timer += controller->delta_time * 11.0f;

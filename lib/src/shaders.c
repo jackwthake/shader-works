@@ -30,6 +30,9 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
     final_g = surface_g;
     final_b = surface_b;
   } else {
+    // Normalize surface normal once to avoid redundant calculations in the loop
+    float3 normalized_normal = float3_normalize(context->normal);
+
     // Start with ambient light (small amount of original color)
     final_r = surface_r * 0.45;
     final_g = surface_g * 0.45f;
@@ -39,7 +42,7 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
       float light_contribution;
       if (context->light[i].is_directional) {
         // Directional light
-        light_contribution = float3_dot(float3_normalize(context->light[i].direction), float3_normalize(context->normal));
+        light_contribution = float3_dot(float3_normalize(context->light[i].direction), normalized_normal);
       } else {
         // Point light - calculate direction from light to fragment
         float3 light_dir = float3_sub(context->world_pos, context->light[i].position);
@@ -47,7 +50,7 @@ static inline u32 default_lighting_frag_shader_func(u32 input_color, fragment_co
         light_dir = float3_divide(light_dir, distance); // normalize manually to reuse distance
 
         // Calculate lighting contribution
-        light_contribution = float3_dot(light_dir, float3_normalize(context->normal));
+        light_contribution = float3_dot(light_dir, normalized_normal);
 
         // Add distance falloff (gentler falloff)
         light_contribution = light_contribution / (1.0f + distance * 0.1f);
@@ -155,6 +158,9 @@ inline u32 apply_dither_u32(u32 color, float2 frag_coord, float steps) {
   u8 r_in, g_in, b_in;
   u32_to_rgb(color, &r_in, &g_in, &b_in);
 
+  // Precompute reciprocal to replace slow divisions with multiplications
+  float steps_inv = 1.0f / steps;
+
   // 1. Create the screen-space checkerboard pattern
   int ix = (int)frag_coord.x;
   int iy = (int)frag_coord.y;
@@ -167,9 +173,9 @@ inline u32 apply_dither_u32(u32 color, float2 frag_coord, float steps) {
   float b = (b_in / 255.0f) + dither;
 
   // 3. Quantize (Snap to steps)
-  r = floorf(r * steps) / steps;
-  g = floorf(g * steps) / steps;
-  b = floorf(b * steps) / steps;
+  r = floorf(r * steps) * steps_inv;
+  g = floorf(g * steps) * steps_inv;
+  b = floorf(b * steps) * steps_inv;
 
   // 4. Clamp and return
   u8 fr = (u8)(fmaxf(0.0f, fminf(1.0f, r)) * 255.0f);

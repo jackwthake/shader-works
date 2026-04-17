@@ -205,9 +205,11 @@ static void add_entities(world_t *world) {
       int x_off = (rand() % (head->w - 2)) + 1;
       int z_off = (rand() % (head->d - 2)) + 1;
 
-      new_entity->current_sector = head;
-      new_entity->transform.position = (float3){ head->x + x_off, head->floor_height + 1, head->z + z_off };
-      generate_cube(&new_entity->mesh, new_entity->transform.position, (float3){1, 2, 1});
+      new_entity->body.current_sector = head;
+      new_entity->body.radius = 0.15f;
+      new_entity->body.floor_offset = 1.0f; // Enemy center, not
+      new_entity->body.position = (float3){ head->x + x_off, head->floor_height + new_entity->body.floor_offset, head->z + z_off };
+      generate_cube(&new_entity->mesh, new_entity->body.position, (float3){1, new_entity->body.floor_offset * 2, 1});
 
       new_entity->mesh.vertex_shader = &default_vertex_shader;
       new_entity->mesh.frag_shader = &default_lighting_frag_shader;
@@ -217,6 +219,10 @@ static void add_entities(world_t *world) {
     }
 
     head = head->next;
+  }
+
+  if (world->num_entities != MAX_ENTITIES) {
+    add_entities(world); // Keep trying to add entities until we hit the max, since it's random
   }
 }
 
@@ -275,9 +281,105 @@ void finalize_world_geometry(world_t *world) {
   }
 }
 
-void tick_entities(world_t *world, f32 delta_time) {
-  for (usize i = 0; i < world->num_entities && world->num_entities > 0; i++) {
-    entity_t *e = &world->entities[i];
+void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, float delta_time) {
+  float gravity = -15.5f; // Strength of gravity
+
+  sector_t *s = b->current_sector;
+  float padding = b->radius;
+
+  b->y_velocity += gravity * delta_time;
+  b->position.y += fmaxf(b->y_velocity * delta_time, b->current_sector->floor_height + b->floor_offset - b->position.y);
+
+  float next_x = b->position.x + move.x;
+  if (next_x < s->x + padding || next_x > s->x + s->w - padding) {
+    direction_t dir = (next_x < s->x + padding) ? DIR_WEST : DIR_EAST;
+    sector_t *n = find_neighbor(world, s, dir);
+
+    if (n && n->floor_height <= b->position.y + 0.5f) {
+      if (next_x < n->x + n->w && next_x > n->x) s = n;
+    } else {
+      next_x = b->position.x;
+    }
+  }
+  b->position.x = next_x;
+
+  float next_z = b->position.z + move.z;
+  if (next_z < s->z + padding || next_z > s->z + s->d - padding) {
+    direction_t dir = (next_z < s->z + padding) ? DIR_SOUTH : DIR_NORTH;
+    sector_t *n = find_neighbor(world, s, dir);
+
+    if (n && n->floor_height <= b->position.y + 0.5f) {
+      // Check that we are within the neighbor's Z bounds
+      if (next_z < n->z + n->d && next_z > n->z) s = n;
+    } else {
+      next_z = b->position.z;
+    }
+  }
+  b->position.z = next_z;
+
+  b->current_sector = s;
+}
+
+void tick_entities(world_t *world, transform_t *camera, fps_controller_t *controller, float delta_time) {
+  for (usize i = 0; i < world->num_entities; i++) {
+    entity_t *ent = &world->entities[i];
+    // if (!ent->active) continue;
+
+    float3 target_pos = ent->body.position;
+    bool should_move = false;
+
+    // Ring 1: Same Sector
+    if (ent->body.current_sector == controller->body.current_sector) {
+      target_pos = camera->position;
+      should_move = true;
+    }
+    // Ring 2: Neighbor Sector (Full-Wall Logic)
+    else {
+      for (direction_t dir = 0; dir < 4; dir++) {
+        sector_t *n = find_neighbor(world, ent->body.current_sector, dir);
+        if (n == controller->body.current_sector) {
+          target_pos = ent->body.position; // Start with current pos
+
+          // If the portal is the whole wall, match the player's "slide" axis
+          // but push the "depth" axis into the next room.
+          float push_depth = 0.5f;
+
+          switch(dir) {
+            case DIR_NORTH:
+              target_pos.z = (float)(n->z + push_depth);
+              target_pos.x = camera->position.x; // Follow player's X
+              break;
+            case DIR_SOUTH:
+              target_pos.z = (float)(n->z + n->d - push_depth);
+              target_pos.x = camera->position.x;
+              break;
+            case DIR_EAST:
+              target_pos.x = (float)(n->x + push_depth);
+              target_pos.z = camera->position.z; // Follow player's Z
+              break;
+            case DIR_WEST:
+              target_pos.x = (float)(n->x + n->w - push_depth);
+              target_pos.z = camera->position.z;
+              break;
+          }
+          should_move = true;
+          break;
+        }
+      }
+    }
+
+    if (should_move) {
+      float3 dir_vec = float3_sub(target_pos, ent->body.position);
+      dir_vec.y = 0;
+
+      if (float3_magnitude(dir_vec) > 0.1f) {
+        dir_vec = float3_normalize(dir_vec);
+        float3 move_vec = float3_scale(dir_vec, 3.5f * delta_time);
+
+        resolve_world_collision(world, (physics_body_t*)ent, move_vec, delta_time);
+        ent->mesh.transform.position = ent->body.position;
+      }
+    }
   }
 }
 
