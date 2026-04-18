@@ -5,6 +5,7 @@ add_library(demos-common STATIC
     chunk_map.c
     config.c
     noise.c
+    util.c
 )
 
 # Public include directory for other demos to use
