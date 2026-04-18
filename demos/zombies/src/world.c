@@ -226,7 +226,7 @@ static void add_entities(world_t *world) {
       new_entity->body.radius = 0.15f;
       new_entity->body.floor_offset = 1.0f; // Enemy center, not
       new_entity->body.position = (float3){ head->x + x_off, head->floor_height + new_entity->body.floor_offset, head->z + z_off };
-      generate_cube(&new_entity->mesh, new_entity->body.position, (float3){1, new_entity->body.floor_offset * 2, 1});
+      load_obj_model(&new_entity->mesh, "res/skeleton.obj", new_entity->body.position, 0.005f, false);
 
       new_entity->mesh.vertex_shader = &default_vertex_shader;
       new_entity->mesh.frag_shader = &default_lighting_frag_shader;

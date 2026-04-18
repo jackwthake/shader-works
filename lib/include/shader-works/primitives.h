@@ -80,6 +80,15 @@ int generate_sphere(model_t* model, f32 radius, int segments, int rings, float3 
 // Returns 0 on success, non-zero on failure
 int generate_quad(model_t* model, float2 size, float3 position);
 
+// Loads an OBJ model from file
+// model: pointer to model structure to populate
+// filename: path to the .OBJ file to load
+// position: center position to place the model at (x, y, z)
+// scale: scale multiplier for the model (1.0 = no scaling)
+// flip_winding: if true, reverses face winding order (useful for converting coordinate systems)
+// Returns 0 on success, non-zero on failure
+int load_obj_model(model_t* model, const char* filename, float3 position, float scale, bool flip_winding);
+
 // Model cleanup
 void delete_model(model_t* model);
 

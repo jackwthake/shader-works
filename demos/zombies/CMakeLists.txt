@@ -33,5 +33,14 @@ if(ZOMBIES_SOURCES)
         -Wpedantic
         -Wstrict-prototypes
         -Wshadow
+        -O3
+    )
+
+    # Copy res folder to build/bin directory
+    add_custom_command(TARGET zombies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/res"
+        "$<TARGET_FILE_DIR:zombies>/res"
+        COMMENT "Copying zombies resources to build directory"
     )
 endif()

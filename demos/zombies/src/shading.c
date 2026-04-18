@@ -37,8 +37,8 @@ inline float fast_hash(int x, int y, int seed) {
   return (float)(h & 0xFFFFFF) / 16777216.0f;
 }
 
-const int num_particles = 50, particle_radius = 32;
-static float3 particles[50] = { 0 };
+const int num_particles = 32, particle_radius = 16;
+static float3 particles[32] = { 0 };
 
 float3 get_particle_pos(world_t *world, transform_t *cam) {
   float x, y = 0.0f, z, sector_floor = 0.0f;

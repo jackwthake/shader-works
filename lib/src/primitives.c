@@ -4,6 +4,9 @@
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <float.h>
 
 int generate_plane(model_t* model, float2 size, float2 segment_size, float3 position) {
   return generate_plane_with_norm(model, size, segment_size, position, (float3){0.0f, -1.0f, 0.0f});
@@ -481,4 +484,392 @@ void delete_model(model_t* model) {
   model->vertex_shader = NULL;
 
   model->use_textures = false;
+}
+
+// ============================================================================
+// OBJ Model Loader
+// ============================================================================
+
+#define OBJ_INITIAL_CAPACITY 1024
+
+typedef struct {
+  float3 *positions;
+  float2 *texcoords;
+  float3 *normals;
+  usize pos_count, tex_count, norm_count;
+  usize pos_capacity, tex_capacity, norm_capacity;
+} obj_buffers_t;
+
+static int obj_parse_face_vertex(const char* vert_str, int *v_idx, int *vt_idx, int *vn_idx) {
+  // Parse formats: v, v/vt, v//vn, v/vt/vn
+  int result = sscanf(vert_str, "%d/%d/%d", v_idx, vt_idx, vn_idx);
+
+  if (result == 1) {
+    // Format: v
+    *vt_idx = -1;
+    *vn_idx = -1;
+  } else if (result == 2) {
+    // Format: v/vt
+    *vn_idx = -1;
+  } else if (result != 3) {
+    // Try v//vn format
+    result = sscanf(vert_str, "%d//%d", v_idx, vn_idx);
+    if (result == 2) {
+      *vt_idx = -1;
+    } else {
+      return -1; // Parse error
+    }
+  }
+
+  return 0;
+}
+
+int load_obj_model(model_t* model, const char* filename, float3 position, float scale, bool flip_winding) {
+  if (!model || !filename) return -1;
+
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    return -1;
+  }
+
+  obj_buffers_t buffers = {0};
+  buffers.pos_capacity = OBJ_INITIAL_CAPACITY;
+  buffers.tex_capacity = OBJ_INITIAL_CAPACITY;
+  buffers.norm_capacity = OBJ_INITIAL_CAPACITY;
+
+  buffers.positions = malloc(buffers.pos_capacity * sizeof(float3));
+  buffers.texcoords = malloc(buffers.tex_capacity * sizeof(float2));
+  buffers.normals = malloc(buffers.norm_capacity * sizeof(float3));
+
+  if (!buffers.positions || !buffers.texcoords || !buffers.normals) {
+    free(buffers.positions);
+    free(buffers.texcoords);
+    free(buffers.normals);
+    fclose(file);
+    return -1;
+  }
+
+  // Dynamic array for face indices (each face can have 3+ vertices)
+  typedef struct { int v, vt, vn; } face_vertex_t;
+  face_vertex_t *face_vertices = malloc(OBJ_INITIAL_CAPACITY * sizeof(face_vertex_t));
+  usize face_vert_capacity = OBJ_INITIAL_CAPACITY;
+  usize face_vert_count = 0;
+
+  usize num_triangles = 0;
+  char line[512];
+  float3 default_normal = {0.0f, 1.0f, 0.0f};
+  float2 default_uv = {0.0f, 0.0f};
+
+  // First pass: parse all data
+  while (fgets(line, sizeof(line), file)) {
+    // Skip whitespace
+    char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+
+    if (p[0] == 'v' && (p[1] == ' ' || p[1] == '\t')) {
+      // Vertex position
+      float x, y, z;
+      if (sscanf(p + 1, "%f %f %f", &x, &y, &z) == 3) {
+        if (buffers.pos_count >= buffers.pos_capacity) {
+          buffers.pos_capacity *= 2;
+          float3 *temp = realloc(buffers.positions, buffers.pos_capacity * sizeof(float3));
+          if (!temp) goto cleanup_error;
+          buffers.positions = temp;
+        }
+        // Flip Z to convert from OBJ (+Z forward) to render system (-Z forward)
+        // Don't scale here - let transform.scale handle it
+        buffers.positions[buffers.pos_count++] = (float3){x, y, -z};
+      }
+    }
+    else if (p[0] == 'v' && p[1] == 't' && (p[2] == ' ' || p[2] == '\t')) {
+      // Texture coordinate
+      float u, v;
+      if (sscanf(p + 2, "%f %f", &u, &v) >= 1) {
+        if (buffers.tex_count >= buffers.tex_capacity) {
+          buffers.tex_capacity *= 2;
+          float2 *temp = realloc(buffers.texcoords, buffers.tex_capacity * sizeof(float2));
+          if (!temp) goto cleanup_error;
+          buffers.texcoords = temp;
+        }
+        float v_coord = (sscanf(p + 2, "%f %f", &u, &v) == 2) ? v : 0.0f;
+        buffers.texcoords[buffers.tex_count++] = (float2){u, v_coord};
+      }
+    }
+    else if (p[0] == 'v' && p[1] == 'n' && (p[2] == ' ' || p[2] == '\t')) {
+      // Vertex normal
+      float nx, ny, nz;
+      if (sscanf(p + 2, "%f %f %f", &nx, &ny, &nz) == 3) {
+        if (buffers.norm_count >= buffers.norm_capacity) {
+          buffers.norm_capacity *= 2;
+          float3 *temp = realloc(buffers.normals, buffers.norm_capacity * sizeof(float3));
+          if (!temp) goto cleanup_error;
+          buffers.normals = temp;
+        }
+        // Flip Z normal to match coordinate system
+        buffers.normals[buffers.norm_count++] = (float3){nx, ny, -nz};
+      }
+    }
+    else if (p[0] == 'f' && (p[1] == ' ' || p[1] == '\t')) {
+      // Face - can have 3+ vertices (triangulate n-gons)
+      face_vert_count = 0;
+      char *line_ptr = p + 2;  // Skip "f "
+
+      // Skip leading whitespace
+      while (*line_ptr && (*line_ptr == ' ' || *line_ptr == '\t')) line_ptr++;
+
+      // Parse all vertices in this face
+      while (*line_ptr && *line_ptr != '\n' && *line_ptr != '#') {
+        if (face_vert_count >= face_vert_capacity) {
+          face_vert_capacity *= 2;
+          face_vertex_t *temp = realloc(face_vertices, face_vert_capacity * sizeof(face_vertex_t));
+          if (!temp) goto cleanup_error;
+          face_vertices = temp;
+        }
+
+        int v, vt, vn;
+        int bytes_read;
+
+        // Try to parse vertex specification
+        if (sscanf(line_ptr, "%d/%d/%d%n", &v, &vt, &vn, &bytes_read) == 3) {
+          // Full format: v/vt/vn
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d//%d%n", &v, &vn, &bytes_read) == 2) {
+          // Format: v//vn
+          vt = -1;
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d/%d%n", &v, &vt, &bytes_read) == 2) {
+          // Format: v/vt
+          vn = -1;
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d%n", &v, &bytes_read) == 1) {
+          // Format: v
+          vt = -1;
+          vn = -1;
+          line_ptr += bytes_read;
+        } else {
+          // Parse error - skip this character and continue
+          line_ptr++;
+          continue;
+        }
+
+        // Convert to 0-indexed
+        face_vertices[face_vert_count].v = (v > 0) ? v - 1 : -1;
+        face_vertices[face_vert_count].vt = (vt > 0) ? vt - 1 : -1;
+        face_vertices[face_vert_count].vn = (vn > 0) ? vn - 1 : -1;
+        face_vert_count++;
+
+        // Skip whitespace to next vertex
+        while (*line_ptr && (*line_ptr == ' ' || *line_ptr == '\t')) line_ptr++;
+      }
+
+      // Triangulate n-gon using fan triangulation
+      if (face_vert_count >= 3) {
+        for (usize tri = 1; tri < face_vert_count - 1; tri++) {
+          num_triangles++;
+        }
+      }
+    }
+  }
+
+  fprintf(stderr, "[OBJ] First pass: counted %zu triangles\n", num_triangles);
+  fflush(stderr);
+
+  // Calculate model centroid to center it at origin
+  float3 min_bound = {FLT_MAX, FLT_MAX, FLT_MAX};
+  float3 max_bound = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+
+  for (usize i = 0; i < buffers.pos_count; i++) {
+    if (buffers.positions[i].x < min_bound.x) min_bound.x = buffers.positions[i].x;
+    if (buffers.positions[i].y < min_bound.y) min_bound.y = buffers.positions[i].y;
+    if (buffers.positions[i].z < min_bound.z) min_bound.z = buffers.positions[i].z;
+    if (buffers.positions[i].x > max_bound.x) max_bound.x = buffers.positions[i].x;
+    if (buffers.positions[i].y > max_bound.y) max_bound.y = buffers.positions[i].y;
+    if (buffers.positions[i].z > max_bound.z) max_bound.z = buffers.positions[i].z;
+  }
+
+  float3 centroid = {
+    (min_bound.x + max_bound.x) * 0.5f,
+    (min_bound.y + max_bound.y) * 0.5f,
+    (min_bound.z + max_bound.z) * 0.5f
+  };
+
+  // Center all vertices
+  for (usize i = 0; i < buffers.pos_count; i++) {
+    buffers.positions[i].x -= centroid.x;
+    buffers.positions[i].y -= centroid.y;
+    buffers.positions[i].z -= centroid.z;
+  }
+
+  // Allocate vertex and face data
+  usize total_vertices = num_triangles * 3;
+  model->vertex_data = malloc(total_vertices * sizeof(vertex_data_t));
+  model->face_normals = malloc(num_triangles * sizeof(float3));
+
+  if (!model->vertex_data || !model->face_normals) {
+    goto cleanup_error;
+  }
+
+  // Second pass: reconstruct vertex data with proper indexing
+  rewind(file);
+  usize vert_idx = 0;
+  usize face_idx = 0;
+
+  while (fgets(line, sizeof(line), file)) {
+    char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+
+    if (p[0] == 'f' && (p[1] == ' ' || p[1] == '\t')) {
+      face_vert_count = 0;
+      char *line_ptr = p + 2;  // Skip "f "
+
+      // Skip leading whitespace
+      while (*line_ptr && (*line_ptr == ' ' || *line_ptr == '\t')) line_ptr++;
+
+      // Parse all vertices in this face
+      while (*line_ptr && *line_ptr != '\n' && *line_ptr != '#') {
+        if (face_vert_count >= face_vert_capacity) break;
+
+        int v, vt, vn;
+        int bytes_read;
+
+        // Try to parse vertex specification
+        if (sscanf(line_ptr, "%d/%d/%d%n", &v, &vt, &vn, &bytes_read) == 3) {
+          // Full format: v/vt/vn
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d//%d%n", &v, &vn, &bytes_read) == 2) {
+          // Format: v//vn
+          vt = -1;
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d/%d%n", &v, &vt, &bytes_read) == 2) {
+          // Format: v/vt
+          vn = -1;
+          line_ptr += bytes_read;
+        } else if (sscanf(line_ptr, "%d%n", &v, &bytes_read) == 1) {
+          // Format: v
+          vt = -1;
+          vn = -1;
+          line_ptr += bytes_read;
+        } else {
+          // Parse error - skip this character and continue
+          line_ptr++;
+          continue;
+        }
+
+        // Convert to 0-indexed
+        face_vertices[face_vert_count].v = (v > 0) ? v - 1 : -1;
+        face_vertices[face_vert_count].vt = (vt > 0) ? vt - 1 : -1;
+        face_vertices[face_vert_count].vn = (vn > 0) ? vn - 1 : -1;
+        face_vert_count++;
+
+        // Skip whitespace to next vertex
+        while (*line_ptr && (*line_ptr == ' ' || *line_ptr == '\t')) line_ptr++;
+      }
+
+      // Triangulate and generate vertex data
+      for (usize tri = 1; tri < face_vert_count - 1; tri++) {
+        // Fan triangulation: vertex 0, tri, tri+1
+        usize tri_indices[3];
+        if (flip_winding) {
+          tri_indices[0] = 0;
+          tri_indices[1] = tri + 1;
+          tri_indices[2] = tri;
+        } else {
+          tri_indices[0] = 0;
+          tri_indices[1] = tri;
+          tri_indices[2] = tri + 1;
+        }
+
+        // Process three vertices of the triangle
+        for (int i = 0; i < 3; i++) {
+          usize face_vert_idx = tri_indices[i];
+          if (face_vert_idx >= face_vert_count) continue;
+
+          int v_idx = face_vertices[face_vert_idx].v;
+          int vt_idx = face_vertices[face_vert_idx].vt;
+          int vn_idx = face_vertices[face_vert_idx].vn;
+
+          if (v_idx < 0 || (usize)v_idx >= buffers.pos_count) {
+            goto cleanup_error;
+          }
+
+          // Don't bake position offset into vertices - store it in transform instead
+          float3 pos = buffers.positions[v_idx];
+
+          float2 uv = (vt_idx >= 0 && (usize)vt_idx < buffers.tex_count)
+                      ? buffers.texcoords[vt_idx]
+                      : default_uv;
+
+          float3 norm = (vn_idx >= 0 && (usize)vn_idx < buffers.norm_count)
+                        ? buffers.normals[vn_idx]
+                        : default_normal;
+
+          if (vert_idx < total_vertices) {
+            model->vertex_data[vert_idx] = (vertex_data_t){pos, uv, norm};
+            vert_idx++;
+          }
+        }
+
+        // Compute and store face normal (for back-face culling)
+        if (face_idx < num_triangles && vert_idx >= 3) {
+          float3 v0 = model->vertex_data[vert_idx - 3].position;
+          float3 v1 = model->vertex_data[vert_idx - 2].position;
+          float3 v2 = model->vertex_data[vert_idx - 1].position;
+
+          float3 e1 = {v1.x - v0.x, v1.y - v0.y, v1.z - v0.z};
+          float3 e2 = {v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
+
+          // Cross product: e1 × e2 (order matters for normal direction)
+          // Since we may have flipped winding and Z coordinates, this gives us the correct outward normal
+          float3 normal = {
+            e1.y * e2.z - e1.z * e2.y,
+            e1.z * e2.x - e1.x * e2.z,
+            e1.x * e2.y - e1.y * e2.x
+          };
+
+          // Normalize
+          float len = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+          if (len > 0.0001f) {
+            normal.x /= len;
+            normal.y /= len;
+            normal.z /= len;
+          } else {
+            // Degenerate triangle, use default
+            normal = (float3){0.0f, 1.0f, 0.0f};
+          }
+
+          model->face_normals[face_idx] = normal;
+          face_idx++;
+        }
+      }
+    }
+  }
+
+  model->num_vertices = vert_idx;
+  model->num_faces = face_idx;
+  model->scale = (float3){scale, scale, scale};
+  model->transform.position = position;
+  model->transform.yaw = 0.0f;
+  model->transform.pitch = 0.0f;
+  model->transform.roll = 0.0f;
+  model->use_textures = (buffers.tex_count > 0);
+  model->disable_behind_camera_culling = true;  // Disable back-face culling for OBJ models to debug
+  model->vertex_shader = NULL;
+  model->frag_shader = NULL;
+
+  // Cleanup
+  free(buffers.positions);
+  free(buffers.texcoords);
+  free(buffers.normals);
+  free(face_vertices);
+  fclose(file);
+
+  return 0;
+
+cleanup_error:
+  free(buffers.positions);
+  free(buffers.texcoords);
+  free(buffers.normals);
+  free(face_vertices);
+  fclose(file);
+  return -1;
 }

@@ -306,6 +306,17 @@ bool render_triangle(triangle_context_t *restrict ctx) {
   float3 transformed_a, transformed_b, transformed_c;
   apply_vertex_shader(ctx->model, ctx->vertex_shader, &ctx->vertex_ctx, ctx->tri, &transformed_a, &transformed_b, &transformed_c);
 
+  // Apply model scale (element-wise multiplication)
+  transformed_a.x *= ctx->model->scale.x;
+  transformed_a.y *= ctx->model->scale.y;
+  transformed_a.z *= ctx->model->scale.z;
+  transformed_b.x *= ctx->model->scale.x;
+  transformed_b.y *= ctx->model->scale.y;
+  transformed_b.z *= ctx->model->scale.z;
+  transformed_c.x *= ctx->model->scale.x;
+  transformed_c.y *= ctx->model->scale.y;
+  transformed_c.z *= ctx->model->scale.z;
+
   // Transform vertices from model space to world space, then to view space
   float3 world_a = transform_to_world(&ctx->model->transform, transformed_a);
   float3 world_b = transform_to_world(&ctx->model->transform, transformed_b);
