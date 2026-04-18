@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 
 #include <SDL3/SDL.h>
 
@@ -7,6 +8,8 @@
 #include <shader-works/shaders.h>
 
 #include "common/noise.h"
+
+#include "world.h"
 
 u32 rgb_to_u32(u8 r, u8 g, u8 b) {
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
@@ -32,6 +35,65 @@ inline float fast_hash(int x, int y, int seed) {
   h ^= h >> 16;
   // Map to 0.0 - 1.0 range
   return (float)(h & 0xFFFFFF) / 16777216.0f;
+}
+
+const int num_particles = 50, particle_radius = 32;
+static float3 particles[50] = { 0 };
+
+float3 get_particle_pos(world_t *world, transform_t *cam) {
+  float x, y = 0.0f, z, sector_floor = 0.0f;
+  bool valid = false;
+
+  while (!valid) {
+    // generate in a radius around the player camera
+    float angle = (rand() / (float)RAND_MAX) * 2.0f * PI;
+    float radius = (rand() / (float)RAND_MAX) * particle_radius + 1.0f; // 1 to 10 units away
+    x = cam->position.x + cosf(angle) * radius;
+    z = cam->position.z + sinf(angle) * radius;
+
+    if (point_in_sector(world, (float3){x, y, z}, &sector_floor))
+      valid = true;
+  }
+
+  y = sector_floor + (rand() % 100) / 100.0f * 2.0f; // Random height above floor (0 to 2)
+
+  return (float3){
+    x, y, z
+  };
+}
+
+void init_particles(world_t *world, transform_t *cam) {
+  for (int i = 0; i < num_particles; i++) {
+    particles[i] = get_particle_pos(world, cam);
+  }
+}
+
+void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam) {
+  for (int i = 0; i < num_particles; i++) {
+    float3 *p = &particles[i];
+    p->y += 0.01f; // Move up
+    p->x += (fast_hash((int)(p->x * 10), (int)(p->y * 10), 123) - 0.5f) * 0.02f; // Small random horizontal movement
+    p->z += (fast_hash((int)(p->z * 10), (int)(p->y * 10), 321) - 0.5f) * 0.02f;
+
+    // If particle goes above a certain height, reset it to the bottom
+    float floor_height;
+    point_in_sector(world, (float3){p->x, p->y, p->z}, &floor_height);
+
+    if (p->y > floor_height + 2.0f) {
+      *p = get_particle_pos(world, cam);
+    }
+
+    // regenerate if too far from camera to avoid rendering overhead, simple distance check
+    float dx = p->x - cam->position.x;
+    float dy = p->y - cam->position.y;
+    float dz = p->z - cam->position.z;
+    float dist_sq = dx*dx + dy*dy + dz*dz;
+    if (dist_sq > particle_radius) { // If more than 10 units away, reset
+      *p = get_particle_pos(world, cam);
+    }
+
+    render_point(state, cam, *p, rgb_to_u32(200, 200, 200));
+  }
 }
 
 u32 ground_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {

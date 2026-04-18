@@ -63,6 +63,7 @@ void init_world(world_t *world);
 void delete_world(world_t *world);
 
 sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side);
+sector_t *point_in_sector(world_t *world, float3 position, float *floor_height);
 
 void generate_random_map(world_t *world, int room_count);
 void finalize_world_geometry(world_t *world);

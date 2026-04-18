@@ -17,6 +17,9 @@
 
 renderer_t renderer_state = { 0 };
 
+void init_particles(world_t *world, transform_t *cam);
+void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam);
+
 void sys_init(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **framebuffer_tex, bool *mouse_captured) {
   SDL_Init(SDL_INIT_VIDEO);
   SDL_CreateWindowAndRenderer(WIN_TITLE, WIN_WIDTH * WIN_SCALE, WIN_HEIGHT * WIN_SCALE, 0, window, renderer);
@@ -85,6 +88,7 @@ int main(int argc, char const *argv[]) {
   };
 
   update_camera(&renderer_state, &camera);
+  init_particles(&world, &camera);
 
   bool running = true;
   while (running) {
@@ -101,14 +105,14 @@ int main(int argc, char const *argv[]) {
     tick_entities(&world, &controller, controller.delta_time);
 
     // clear framebuffer and depthbuffer
-    u32 clear_col = rgb_to_u32(15, 10, 80);
     for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; i++) {
-      framebuffer[i] =  clear_col;
+      framebuffer[i] =  0xFF000000; // Opaque black
       depthbuffer[i] = MAX_DEPTH;
     }
 
     render_world(&renderer_state, &world, &camera);
-    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 50, 20, 60);
+    apply_dust_particles(&renderer_state, &world, &camera);
+    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 55, 20, 60);
 
     sdl_present(&renderer_state, renderer, fb_tex);
     SDL_Delay(1);

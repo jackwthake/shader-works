@@ -128,6 +128,23 @@ sector_t* find_neighbor(world_t *world, sector_t *self, direction_t side) {
   return NULL;
 }
 
+sector_t *point_in_sector(world_t *world, float3 position, float *floor_height) {
+  // Brute-force search all sectors for one that contains the point
+  sector_t *s = world->sectors;
+  while (s) {
+    if (position.x >= s->x && position.x <= s->x + s->w) {
+      if (position.z >= s->z && position.z <= s->z + s->d) {
+        if (floor_height) {
+          *floor_height = (float)s->floor_height;
+        }
+        return s;
+      }
+    }
+    s = s->next;
+  }
+  return NULL;
+}
+
 // mallocs a new wall model and sets transforms
 static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float z2, float y_low, float y_high, float yaw) {
   s->num_walls++;
@@ -360,13 +377,13 @@ int ai_path_find_sector(world_t *world, sector_t *s, physics_body_t *body, secto
 }
 
 void tick_entities(world_t *world, fps_controller_t *controller, float delta_time) {
+  static sector_t *paths[MAX_ENTITIES][MAX_PATH_DEPTH] = { 0 };
+
   for (usize i = 0; i < world->num_entities; i++) {
     entity_t *ent = &world->entities[i];
     // if (!ent->active) continue;
 
-    sector_t **path = calloc(MAX_PATH_DEPTH, sizeof(sector_t*));
-
-    int depth = ai_path_find_sector(world, ent->body.current_sector, (physics_body_t *)controller, path, 0);
+    int depth = ai_path_find_sector(world, ent->body.current_sector, (physics_body_t *)controller, paths[i], 0);
 
     // Clear visited flags for all sectors
     sector_t *s = world->sectors;
@@ -381,7 +398,7 @@ void tick_entities(world_t *world, fps_controller_t *controller, float delta_tim
         // Player is in the same sector as the entity, so target the player position
         ent->target_pos = ((physics_body_t *)controller)->position;
       } else {
-        sector_t *target = path[1];
+        sector_t *target = paths[i][1];
         ent->target_pos = (float3){
           target->x + (target->w / 2),
           ent->body.current_sector->floor_height + 1,
@@ -400,8 +417,6 @@ void tick_entities(world_t *world, fps_controller_t *controller, float delta_tim
       resolve_world_collision(world, (physics_body_t*)ent, move_vec, delta_time);
       ent->mesh.transform.position = ent->body.position;
     }
-
-    free(path);
   }
 }
 
