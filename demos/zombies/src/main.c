@@ -6,6 +6,8 @@
 
 #include <shader-works/renderer.h>
 
+#include "common/util.h"
+
 #include "controller.h"
 #include "world.h"
 
@@ -92,6 +94,11 @@ int main(int argc, char const *argv[]) {
     }
   };
 
+  u32 w, h;
+  load_bmp_texture("res/base.bmp", &w, &h, &renderer_state.texture_atlas);
+  renderer_state.atlas_dim.x = (float)w;
+  renderer_state.atlas_dim.y = (float)h;
+
   update_camera(&renderer_state, &camera);
   init_particles(&world, &camera);
 
@@ -117,7 +124,7 @@ int main(int argc, char const *argv[]) {
 
     render_world(&renderer_state, &world, &camera);
     apply_dust_particles(&renderer_state, &world, &camera);
-    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 55, 20, 60);
+    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH * 0.25, 55, 20, 60);
 
     sdl_present(&renderer_state, renderer, fb_tex);
     SDL_Delay(1);

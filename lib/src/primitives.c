@@ -605,8 +605,8 @@ int load_obj_model(model_t* model, const char* filename, float3 position, float 
           if (!temp) goto cleanup_error;
           buffers.normals = temp;
         }
-        // Flip Z normal to match coordinate system
-        buffers.normals[buffers.norm_count++] = (float3){nx, ny, -nz};
+        // Flip all normal components for correct lighting with -Z forward camera
+        buffers.normals[buffers.norm_count++] = (float3){-nx, -ny, -nz};
       }
     }
     else if (p[0] == 'f' && (p[1] == ' ' || p[1] == '\t')) {
@@ -852,7 +852,7 @@ int load_obj_model(model_t* model, const char* filename, float3 position, float 
   model->transform.pitch = 0.0f;
   model->transform.roll = 0.0f;
   model->use_textures = (buffers.tex_count > 0);
-  model->disable_behind_camera_culling = true;  // Disable back-face culling for OBJ models to debug
+  model->disable_behind_camera_culling = false;
   model->vertex_shader = NULL;
   model->frag_shader = NULL;
 
