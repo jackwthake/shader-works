@@ -88,11 +88,21 @@ void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam) {
     float dy = p->y - cam->position.y;
     float dz = p->z - cam->position.z;
     float dist_sq = dx*dx + dy*dy + dz*dz;
-    if (dist_sq > particle_radius) { // If more than 10 units away, reset
+    if (dist_sq > particle_radius * particle_radius) { // If more than 10 units away, reset
       *p = get_particle_pos(world, cam);
     }
 
-    render_point(state, cam, *p, rgb_to_u32(200, 200, 200));
+    // pass particle color through lighting shader to blend in with world
+    u32 out = default_lighting_frag_shader.func(rgb_to_u32(200, 200, 200), &(fragment_context_t){
+      .world_pos = *p,
+      .normal = (float3){0, 1, 0}, // Upward facing normal for lighting
+      .view_dir = float3_normalize(float3_sub(cam->position, *p)),
+      .time = state->time,
+      .light = world->lights,
+      .light_count = world->num_lights
+    }, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
+
+    render_point(state, cam, *p, out);
   }
 }
 
