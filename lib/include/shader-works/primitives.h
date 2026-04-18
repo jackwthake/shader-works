@@ -8,6 +8,7 @@
 typedef struct {
   f32 yaw;
   f32 pitch;
+  f32 roll;  // rotation around forward axis (Z-axis in view space)
   float3 position;
 } transform_t;
 

@@ -121,26 +121,28 @@ static inline float3 transform_vector(float3 ihat, float3 jhat, float3 khat, flo
   };
 }
 
-// Extracts the basis vectors (right, up, forward) from a transform's yaw and pitch
+// Extracts the basis vectors (right, up, forward) from a transform's yaw, pitch, and roll
 void transform_get_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat) {
   assert(t != NULL);
   assert(ihat != NULL);
   assert(jhat != NULL);
   assert(khat != NULL);
 
-  // Apply pitch first, then yaw (standard FPS rotation order)
+  // Apply yaw, then pitch, then roll (standard FPS rotation order)
   float cy = cosf(t->yaw);
   float sy = sinf(t->yaw);
   float cp = cosf(t->pitch);
   float sp = sinf(t->pitch);
+  float cr = cosf(t->roll);
+  float sr = sinf(t->roll);
 
-  // Combined rotation matrix (pitch * yaw) - standard FPS order
-  *ihat = make_float3(cy, 0, -sy);           // Right vector (no coupling)
-  *jhat = make_float3(sy * sp, cp, cy * sp); // Up vector
-  *khat = make_float3(sy * cp, -sp, cy * cp); // Forward vector
+  // Combined rotation matrix (roll * pitch * yaw) - standard FPS order
+  *ihat = make_float3(cr * cy - sr * sy * sp, -sr * cp, -cr * sy - sr * cy * sp);
+  *jhat = make_float3(sr * cy + cr * sy * sp, cr * cp, -sr * sy + cr * cy * sp);
+  *khat = make_float3(sy * cp, -sp, cy * cp);
 }
 
-// Extracts the inverse basis vectors (right, up, forward) from a transform's yaw and pitch
+// Extracts the inverse basis vectors (right, up, forward) from a transform's yaw, pitch, and roll
 void transform_get_inverse_basis_vectors(transform_t *restrict t, float3 *restrict ihat, float3 *restrict jhat, float3 *restrict khat) {
   assert(t != NULL);
   assert(ihat != NULL);
@@ -152,11 +154,13 @@ void transform_get_inverse_basis_vectors(transform_t *restrict t, float3 *restri
   float sy = sinf(t->yaw);
   float cp = cosf(t->pitch);
   float sp = sinf(t->pitch);
+  float cr = cosf(t->roll);
+  float sr = sinf(t->roll);
 
-  // Transposed matrix (transpose of the new FPS matrix)
-  *ihat = make_float3(cy, sy * sp, sy * cp);      // Transpose of right vector
-  *jhat = make_float3(0, cp, -sp);                // Transpose of up vector
-  *khat = make_float3(-sy, cy * sp, cy * cp);     // Transpose of forward vector
+  // Transposed matrix (transpose of the combined rotation matrix)
+  *ihat = make_float3(cr * cy - sr * sy * sp, sr * cy + cr * sy * sp, sy * cp);
+  *jhat = make_float3(-sr * cp, cr * cp, -sp);
+  *khat = make_float3(-cr * sy - sr * cy * sp, -sr * sy + cr * cy * sp, cy * cp);
 }
 
 // Transform a point from local space to world space using the transform's basis vectors and position
