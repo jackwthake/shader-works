@@ -462,6 +462,41 @@ bool render_triangle(triangle_context_t *restrict ctx) {
   }
 }
 
+// Renders a single point in 3D space, applying transformations, projection, frustum culling, and depth testing.
+bool render_point(renderer_t *restrict state, transform_t *restrict cam, float3 point, u32 color) {
+  // Transform point from world space to view space
+  float3 view_point = transform_to_local_point(cam, point);
+
+  // Basic frustum culling: skip if point is behind camera or outside frustum
+  if (view_point.z > 0 || fabsf(view_point.x) > fabsf(view_point.z) * state->frustum_bound || fabsf(view_point.y) > fabsf(view_point.z) * state->frustum_bound) {
+    return false; // Point is outside the view frustum
+  }
+
+  // Project to screen space using pre-computed projection constants
+  float pixels_per_world_unit = state->projection_scale / view_point.z;
+  float2 pixel_offset = float2_scale(make_float2(view_point.x, view_point.y), pixels_per_world_unit);
+  float2 screen_pos = float2_add(float2_scale(state->screen_dim, 0.5f), pixel_offset);
+
+  int x = (int)screen_pos.x;
+  int y = (int)screen_pos.y;
+
+  // Check if the projected point is within screen bounds
+  if (x < 0 || x >= (int)state->screen_dim.x || y < 0 || y >= (int)state->screen_dim.y) {
+    return false; // Point is outside the screen boundaries
+  }
+
+  int pixel_idx = y * (int)state->screen_dim.x + x;
+
+  // Z-buffering: check if this point is closer than what's already drawn at this position
+  if (-view_point.z < state->depthbuffer[pixel_idx]) {
+    state->framebuffer[pixel_idx] = color; // Draw the point
+    state->depthbuffer[pixel_idx] = -view_point.z; // Update depth buffer
+    return true;
+  }
+
+  return false; // Point was occluded by something closer
+}
+
 /**
 * Renders a 3D model onto a 2D buffer using a basic rasterization pipeline.
 * Applies transformations, projects vertices to screen space, performs simple frustum culling,

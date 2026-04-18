@@ -88,6 +88,14 @@ void update_camera(renderer_t *restrict state, transform_t *restrict cam);
 // Returns the number of triangles rendered
 usize render_model(renderer_t *state, transform_t *cam, model_t *model, light_t *lights, usize light_count);
 
+// Render a single point in world space, applying transformations and depth testing
+// Returns true if the point was drawn (not occluded), false if it was behind something
+// state: pointer to renderer state
+// cam: pointer to camera transform
+// point: 3D position of the point in world space
+// color: color of the point as a packed u32
+bool render_point(renderer_t *restrict state, transform_t *restrict cam, float3 point, u32 color);
+
 // Built-in effects
 
 // TODO: Implement post processing shaders and convert this to new format
