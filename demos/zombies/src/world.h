@@ -49,6 +49,12 @@ typedef struct {
   float bob_timer;
   bool is_moving;
   float current_fov_height;
+  // Dash mechanics
+  bool dash_available;
+  float dash_timer;
+  bool dash_active;
+  float dash_duration;
+  float3 dash_direction;
 } fps_controller_t;
 
 typedef struct {

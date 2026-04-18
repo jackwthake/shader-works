@@ -69,7 +69,7 @@ int main(int argc, char const *argv[]) {
   init_world(&world);
   generate_random_map(&world, MAX_LIGHTS + 10);
 
-  transform_t camera = {0, 0, (float3){0, 2, 0}};
+  transform_t camera = {0, 0, 0, (float3){0, 2, 0}};
   fps_controller_t controller = {
     .move_speed = 8.0f,
     .mouse_sensitivity = 0.0015f,
@@ -79,6 +79,11 @@ int main(int argc, char const *argv[]) {
     .last_frame_time = SDL_GetPerformanceCounter(),
     .bob_timer = 0.0f,
     .is_moving = false,
+    .dash_available = true,
+    .dash_timer = 0.0f,
+    .dash_active = false,
+    .dash_duration = 0.3f,
+    .dash_direction = {0, 0, 0},
     .body = {
       .current_sector = world.sectors,
       .position = camera.position,

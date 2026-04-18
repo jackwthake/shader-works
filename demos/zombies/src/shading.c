@@ -84,11 +84,11 @@ void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam) {
     }
 
     // regenerate if too far from camera to avoid rendering overhead, simple distance check
-    float dx = p->x - cam->position.x;
-    float dy = p->y - cam->position.y;
-    float dz = p->z - cam->position.z;
-    float dist_sq = dx*dx + dy*dy + dz*dz;
-    if (dist_sq > particle_radius * particle_radius) { // If more than 10 units away, reset
+    int dx = p->x - cam->position.x;
+    int dy = p->y - cam->position.y;
+    int dz = p->z - cam->position.z;
+    int dist_sq = dx*dx + dy*dy + dz*dz;
+    if (dist_sq > (int)particle_radius * (int)particle_radius) { // If more than 10 units away, reset
       *p = get_particle_pos(world, cam);
     }
 
