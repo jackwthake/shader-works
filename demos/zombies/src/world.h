@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
   physics_body_t body;
   model_t mesh;
+  float3 target_pos;
 } entity_t;
 
 typedef struct {
@@ -67,7 +68,7 @@ void generate_random_map(world_t *world, int room_count);
 void finalize_world_geometry(world_t *world);
 
 void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, float delta_time);
-void tick_entities(world_t *world, transform_t *camera, fps_controller_t *controller, f32 delta_time);
+void tick_entities(world_t *world, fps_controller_t *controller, f32 delta_time);
 void render_world(renderer_t *renderer, world_t *world, transform_t *camera);
 
 #endif // __WORLD_H__

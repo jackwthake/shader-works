@@ -98,7 +98,7 @@ int main(int argc, char const *argv[]) {
     update_controller(&renderer_state, &controller, &camera, &mouse_captured, &world);
     update_camera(&renderer_state, &camera);
 
-    tick_entities(&world, &camera, &controller, controller.delta_time);
+    tick_entities(&world, &controller, controller.delta_time);
 
     // clear framebuffer and depthbuffer
     u32 clear_col = rgb_to_u32(15, 10, 80);
@@ -108,7 +108,7 @@ int main(int argc, char const *argv[]) {
     }
 
     render_world(&renderer_state, &world, &camera);
-    // apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 50, 20, 60);
+    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH / 2, 50, 20, 60);
 
     sdl_present(&renderer_state, renderer, fb_tex);
     SDL_Delay(1);

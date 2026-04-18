@@ -214,6 +214,7 @@ static void add_entities(world_t *world) {
       new_entity->mesh.vertex_shader = &default_vertex_shader;
       new_entity->mesh.frag_shader = &default_lighting_frag_shader;
       new_entity->mesh.flat_color = rgb_to_u32(255, 0, 0);
+      new_entity->target_pos = new_entity->body.position;
 
       world->num_entities++;
     }
@@ -320,66 +321,87 @@ void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, flo
   b->current_sector = s;
 }
 
-void tick_entities(world_t *world, transform_t *camera, fps_controller_t *controller, float delta_time) {
+#define MAX_PATH_DEPTH 4
+int ai_path_find_sector(world_t *world, sector_t *s, physics_body_t *body, sector_t **built_path, int depth) {
+  if (!s || !body || !built_path || depth >= MAX_PATH_DEPTH || s->visited) return -1;
+
+  float3 pos = body->position;
+
+  // Mark this sector as visited in this search
+  s->visited = true;
+
+  // add ourselves to our prospective path
+  built_path[depth] = s;
+
+  // check if the player is in this sector (match controller.c sector detection bounds)
+  if (pos.x >= s->x && pos.x <= s->x + s->w) {
+    if (pos.z >= s->z && pos.z <= s->z + s->d) {
+      return depth;
+    }
+  }
+
+  // not a hit, check neighbors at next depth level
+  int ret;
+  int next_depth = depth + 1;
+
+  if ((ret = ai_path_find_sector(world, find_neighbor(world, s, DIR_NORTH), body, built_path, next_depth)) != -1)
+    return ret;
+
+  if ((ret = ai_path_find_sector(world, find_neighbor(world, s, DIR_EAST), body, built_path, next_depth)) != -1)
+    return ret;
+
+  if ((ret = ai_path_find_sector(world, find_neighbor(world, s, DIR_SOUTH), body, built_path, next_depth)) != -1)
+    return ret;
+
+  if ((ret = ai_path_find_sector(world, find_neighbor(world, s, DIR_WEST), body, built_path, next_depth)) != -1)
+    return ret;
+
+  return -1;
+}
+
+void tick_entities(world_t *world, fps_controller_t *controller, float delta_time) {
   for (usize i = 0; i < world->num_entities; i++) {
     entity_t *ent = &world->entities[i];
     // if (!ent->active) continue;
 
-    float3 target_pos = ent->body.position;
-    bool should_move = false;
+    sector_t **path = calloc(MAX_PATH_DEPTH, sizeof(sector_t*));
 
-    // Ring 1: Same Sector
-    if (ent->body.current_sector == controller->body.current_sector) {
-      target_pos = camera->position;
-      should_move = true;
+    int depth = ai_path_find_sector(world, ent->body.current_sector, (physics_body_t *)controller, path, 0);
+
+    // Clear visited flags for all sectors
+    sector_t *s = world->sectors;
+    while (s) {
+      s->visited = false;
+      s = s->next;
     }
-    // Ring 2: Neighbor Sector (Full-Wall Logic)
-    else {
-      for (direction_t dir = 0; dir < 4; dir++) {
-        sector_t *n = find_neighbor(world, ent->body.current_sector, dir);
-        if (n == controller->body.current_sector) {
-          target_pos = ent->body.position; // Start with current pos
 
-          // If the portal is the whole wall, match the player's "slide" axis
-          // but push the "depth" axis into the next room.
-          float push_depth = 0.5f;
-
-          switch(dir) {
-            case DIR_NORTH:
-              target_pos.z = (float)(n->z + push_depth);
-              target_pos.x = camera->position.x; // Follow player's X
-              break;
-            case DIR_SOUTH:
-              target_pos.z = (float)(n->z + n->d - push_depth);
-              target_pos.x = camera->position.x;
-              break;
-            case DIR_EAST:
-              target_pos.x = (float)(n->x + push_depth);
-              target_pos.z = camera->position.z; // Follow player's Z
-              break;
-            case DIR_WEST:
-              target_pos.x = (float)(n->x + n->w - push_depth);
-              target_pos.z = camera->position.z;
-              break;
-          }
-          should_move = true;
-          break;
-        }
+    // Update target only when we find a path
+    if (depth != -1) {
+      if (depth == 0) {
+        // Player is in the same sector as the entity, so target the player position
+        ent->target_pos = ((physics_body_t *)controller)->position;
+      } else {
+        sector_t *target = path[1];
+        ent->target_pos = (float3){
+          target->x + (target->w / 2),
+          ent->body.current_sector->floor_height + 1,
+          target->z + (target->d / 2)
+        };
       }
     }
 
-    if (should_move) {
-      float3 dir_vec = float3_sub(target_pos, ent->body.position);
-      dir_vec.y = 0;
+    // Always move toward the target
+    float3 dir_vec = float3_sub(ent->target_pos, ent->body.position);
+    dir_vec.y = 0;
 
-      if (float3_magnitude(dir_vec) > 0.1f) {
-        dir_vec = float3_normalize(dir_vec);
-        float3 move_vec = float3_scale(dir_vec, 3.5f * delta_time);
-
-        resolve_world_collision(world, (physics_body_t*)ent, move_vec, delta_time);
-        ent->mesh.transform.position = ent->body.position;
-      }
+    if (float3_magnitude(dir_vec) > 0.1f) {
+      dir_vec = float3_normalize(dir_vec);
+      float3 move_vec = float3_scale(dir_vec, 3.5f * delta_time);
+      resolve_world_collision(world, (physics_body_t*)ent, move_vec, delta_time);
+      ent->mesh.transform.position = ent->body.position;
     }
+
+    free(path);
   }
 }
 
