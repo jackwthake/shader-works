@@ -239,6 +239,33 @@ static bool frustum_cull_triangle(float3 a, float3 b, float3 c, f32 frustum_boun
   return outside_left || outside_right || outside_top || outside_bottom;
 }
 
+u32 apply_fog_to_pixel(renderer_t *restrict state, u32 input, int screen_x, int screen_y, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
+  u32 fog_color = rgb_to_u32(fog_r, fog_g, fog_b);
+  if (depth >= fog_end) return fog_color;
+  if (depth <= fog_start) return input;
+
+  int i = (int)(screen_y * state->screen_dim.x + screen_x);
+  if (i < 0 || i >= (int)(state->screen_dim.x * state->screen_dim.y)) return fog_color; // Out of bounds check
+
+  f32 d = depth;
+
+  f32 inv_range = 1.0f / (fog_end - fog_start);
+  f32 fog_factor = (d - fog_start) * inv_range;
+  if (fog_factor <= 0.0f) return input;
+  if (fog_factor > 1.0f) fog_factor = 1.0f;
+
+  // Access the pixel as 4 separate bytes to avoid shift confusion
+  f32 inv_fog = 1.0f - fog_factor;
+
+  u8 r, g, b;
+  u32_to_rgb(input, &r, &g, &b);
+  r = (u8)(r * inv_fog + fog_r * fog_factor);
+  g = (u8)(g * inv_fog + fog_g * fog_factor);
+  b = (u8)(b * inv_fog + fog_b * fog_factor);
+
+  return rgb_to_u32(r, g, b);
+}
+
 void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b) {
   int total_pixels = (int)(state->screen_dim.x * state->screen_dim.y);
   f32 inv_range = 1.0f / (fog_end - fog_start);
@@ -252,14 +279,15 @@ void apply_fog_to_screen(renderer_t *restrict state, f32 fog_start, f32 fog_end,
     if (fog_factor > 1.0f) fog_factor = 1.0f;
 
     // Access the pixel as 4 separate bytes to avoid shift confusion
-    u8 *pixel = (u8*)&state->framebuffer[i];
     f32 inv_fog = 1.0f - fog_factor;
 
-    // Assuming Standard Little-Endian order (BGRA or RGBA)
-    // We update each byte individually based on its index
-    pixel[0] = (u8)(pixel[0] * inv_fog + fog_b * fog_factor); // Blue usually at index 0
-    pixel[1] = (u8)(pixel[1] * inv_fog + fog_g * fog_factor); // Green at index 1
-    pixel[2] = (u8)(pixel[2] * inv_fog + fog_r * fog_factor); // Red at index 2
+    u8 r, g, b;
+    u32_to_rgb(state->framebuffer[i], &r, &g, &b);
+    r = (u8)(r * inv_fog + fog_r * fog_factor);
+    g = (u8)(g * inv_fog + fog_g * fog_factor);
+    b = (u8)(b * inv_fog + fog_b * fog_factor);
+
+    state->framebuffer[i] = rgb_to_u32(r, g, b);
   }
 }
 

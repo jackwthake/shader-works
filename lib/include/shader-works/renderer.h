@@ -98,6 +98,12 @@ bool render_point(renderer_t *restrict state, transform_t *restrict cam, float3 
 
 // Built-in effects
 
+// Apply fog effect to the entire screen based on depth values
+// fog_start: distance at which fog starts
+// fog_end: distance at which fog fully obscures
+// fog_r, fog_g, fog_b: RGB color of the fog
+u32 apply_fog_to_pixel(renderer_t *restrict state, u32 input, int screen_x, int screen_y, f32 depth, f32 fog_start, f32 fog_end, u8 fog_r, u8 fog_g, u8 fog_b);
+
 // TODO: Implement post processing shaders and convert this to new format
 // Apply fog effect to the entire screen based on depth values
 // fog_start: distance at which fog starts
