@@ -6,6 +6,7 @@ add_library(demos-common STATIC
     config.c
     noise.c
     util.c
+    state.c
 )
 
 # Public include directory for other demos to use

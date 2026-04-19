@@ -33,6 +33,10 @@ int fsm_start(state_machine_t *sm) {
 void fsm_free(state_machine_t *sm) {
   if (!sm) return;
 
+  if (sm->cleanup) {
+    sm->cleanup();
+  }
+
   free(sm->states);
   sm->states = NULL;
   sm->num_states = 0;
@@ -62,7 +66,7 @@ int fsm_update_internal_state(state_machine_t *sm, void *state, size_t size) {
 
 // Transition between states, calling exit and enter callbacks
 int fsm_change_state(state_machine_t *sm, unsigned new_state) {
-  if (!sm) return -1;
+  if (!sm || !sm->states) return -1;
   if (new_state >= sm->num_states) return -1;
 
   if (sm->states[sm->current_state].exit)

@@ -20,6 +20,7 @@ typedef struct {
   size_t game_state_size;
 
   int default_state, current_state;
+  void (*cleanup)(void);                      // Optional cleanup function for game_state
 } state_machine_t;
 
 // Initialize state machine with default state and total number of states
