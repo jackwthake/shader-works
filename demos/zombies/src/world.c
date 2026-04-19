@@ -8,7 +8,43 @@
 
 #include "world.h"
 
-extern fragment_shader_t ground_frag;
+extern fragment_shader_t light_and_dither;
+extern fragment_shader_t ground_shader;
+extern renderer_t renderer_state;
+
+void get_uv_from_atlas(float2 *uv, float2 atlas_dim, float2 sprite_pos, float2 sprite_dim) {
+  uv->x = sprite_pos.x / atlas_dim.x;
+  uv->y = sprite_pos.y / atlas_dim.y;
+  uv->x += 0.5f / atlas_dim.x; // Add half-pixel offset to sample center of texel
+  uv->y += 0.5f / atlas_dim.y;
+}
+
+// Generate UV coordinates for a model to use a specific region of the sprite atlas
+// This function remaps all UV coordinates in a model to a specific sprite region.
+//
+// model: The model whose UVs will be remapped
+// atlas_dim: Full dimensions of the sprite atlas in pixels (e.g., {256, 128})
+// sprite_pos: Top-left corner of the sprite region in pixels (e.g., {0, 0})
+// sprite_dim: Size of the sprite region in pixels (e.g., {32, 32})
+void generate_model_uvs_from_atlas(model_t *model, float2 atlas_dim, float2 sprite_pos, float2 sprite_dim) {
+  if (!model || model->num_vertices == 0) return;
+
+  // Calculate normalized sprite bounds (0 to 1 in atlas space)
+  float sprite_uv_min_x = sprite_pos.x / atlas_dim.x;
+  float sprite_uv_min_y = sprite_pos.y / atlas_dim.y;
+  float sprite_uv_max_x = (sprite_pos.x + sprite_dim.x) / atlas_dim.x;
+  float sprite_uv_max_y = (sprite_pos.y + sprite_dim.y) / atlas_dim.y;
+
+  // Remap all model UVs from [0,1] to the sprite region
+  for (usize i = 0; i < model->num_vertices; i++) {
+    float u = model->vertex_data[i].uv.x;
+    float v = model->vertex_data[i].uv.y;
+
+    // Map from [0,1] to sprite region bounds
+    model->vertex_data[i].uv.x = sprite_uv_min_x + u * (sprite_uv_max_x - sprite_uv_min_x);
+    model->vertex_data[i].uv.y = sprite_uv_min_y + v * (sprite_uv_max_y - sprite_uv_min_y);
+  }
+}
 
 void init_world(world_t *world) {
   world->sectors = NULL;
@@ -18,6 +54,7 @@ void init_world(world_t *world) {
   world->num_lights = 0;
   world->entities = calloc(MAX_ENTITIES, sizeof(entity_t));
   world->num_entities = 0;
+  world->entity_bodies = calloc(MAX_ENTITIES + 1, sizeof(physics_body_t *));
 }
 
 void delete_world(world_t *world) {
@@ -40,6 +77,10 @@ void delete_world(world_t *world) {
   if (world->entities) {
     free(world->entities);
     world->num_entities = 0;
+  }
+
+  if (world->entity_bodies) {
+    free(world->entity_bodies);
   }
 }
 
@@ -70,12 +111,17 @@ static sector_t *add_sector(world_t *world, int x, int z, int w, int d, int ceil
   // generate floor plane for sector
   generate_plane_with_norm(&new_sector->floor, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, (float)floor_height, z + d * 0.5f}, (float3){0.0f, -1.0f, 0.0f});
   new_sector->floor.vertex_shader = &default_vertex_shader;
-  new_sector->floor.frag_shader = &ground_frag;
+  new_sector->floor.frag_shader = &ground_shader;
+  new_sector->floor.use_textures = false;
+
+  // Set UVs for floor to grab first 32x32 pixels of atlas (the "base" texture)
+  generate_model_uvs_from_atlas(&new_sector->floor, renderer_state.atlas_dim, make_float2(32.0f, 32.0f), make_float2(16.0f, 16.0f));
 
   // generate ceiling plane for sector
   generate_plane_with_norm(&new_sector->ceiling, (float2){w, d}, (float2){1.0f, 1.0f}, (float3){x + w * 0.5f, (float)ceiling_height, z + d * 0.5f}, (float3){0.0f, 1.0f, 0.0f});
   new_sector->ceiling.vertex_shader = &default_vertex_shader;
-  new_sector->ceiling.frag_shader = &ground_frag;
+  new_sector->ceiling.frag_shader = &ground_shader;
+  new_sector->ceiling.use_textures = false;
 
   // add one light in the center of the sector, only sometimes to avoid overkill
   if (world->num_lights < MAX_LIGHTS && rand() % 2 == 0) {
@@ -168,7 +214,8 @@ static void create_wall_segment(sector_t *s, float x1, float z1, float x2, float
   m->transform.yaw = yaw;         // Face it inward
 
   m->vertex_shader = &default_vertex_shader;
-  m->frag_shader = &ground_frag;
+  m->frag_shader = &ground_shader;
+  m->use_textures = false;
 }
 
 // Determines if a wall is solid, split, or has a header
@@ -223,16 +270,19 @@ static void add_entities(world_t *world) {
       int z_off = (rand() % (head->d - 2)) + 1;
 
       new_entity->body.current_sector = head;
-      new_entity->body.radius = 0.15f;
+      new_entity->body.radius = 0.5f;
       new_entity->body.floor_offset = 1.0f; // Enemy center, not
       new_entity->body.position = (float3){ head->x + x_off, head->floor_height + new_entity->body.floor_offset, head->z + z_off };
-      load_obj_model(&new_entity->mesh, "res/skeleton.obj", new_entity->body.position, 0.005f, false);
+      load_obj_model(&new_entity->mesh, "res/skeleton.obj", new_entity->body.position, 0.5f, true);
+
+      generate_model_uvs_from_atlas(&new_entity->mesh, renderer_state.atlas_dim, make_float2(32.0f, 0.0f), make_float2(32.0f, 32.0f));
 
       new_entity->mesh.vertex_shader = &default_vertex_shader;
-      new_entity->mesh.frag_shader = &default_lighting_frag_shader;
-      new_entity->mesh.flat_color = rgb_to_u32(255, 0, 0);
+      new_entity->mesh.frag_shader = &light_and_dither;
       new_entity->target_pos = new_entity->body.position;
+      new_entity->body.active = true;
 
+      world->entity_bodies[world->num_entities] = &new_entity->body;
       world->num_entities++;
     }
 
@@ -300,15 +350,50 @@ void finalize_world_geometry(world_t *world) {
 }
 
 void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, float delta_time) {
-  float gravity = -15.5f; // Strength of gravity
-
+  float gravity = -15.5f;
   sector_t *s = b->current_sector;
   float padding = b->radius;
 
+  // 1. Vertical Physics
   b->y_velocity += gravity * delta_time;
   b->position.y += fmaxf(b->y_velocity * delta_time, b->current_sector->floor_height + b->floor_offset - b->position.y);
 
+  // 2. Initial Horizontal Movement
   float next_x = b->position.x + move.x;
+  float next_z = b->position.z + move.z;
+
+  // 3. Entity-to-Entity Collision (XZ Plane)
+  // We check MAX_ENTITIES + 1 because the player is at the last index.
+  for (usize i = 0; i < MAX_ENTITIES + 1; i++) {
+    physics_body_t *other = world->entity_bodies[i];
+
+    // Skip if the body is null, inactive, or is the current body we are processing
+    if (!other || !other->active || other == b) continue;
+
+    // Calculate distance between centers on the XZ plane
+    float dx = next_x - other->position.x;
+    float dz = next_z - other->position.z;
+    float distance_sq = (dx * dx) + (dz * dz);
+    float min_dist = b->radius + other->radius;
+
+    if (distance_sq < (min_dist * min_dist)) {
+      // Collision detected! Resolve by pushing 'b' away from 'other'
+      float distance = sqrtf(distance_sq);
+
+      // Prevent division by zero if they are exactly on top of each other
+      if (distance == 0.0f) {
+        next_x += 0.01f; // Slight nudge
+      } else {
+        float overlap = min_dist - distance;
+        // Push the moving body out of the other body
+        next_x += (dx / distance) * overlap;
+        next_z += (dz / distance) * overlap;
+      }
+    }
+  }
+
+  // 4. Sector/Wall Collision (Using the updated next_x/next_z)
+  // X-Axis Wall/Sector Check
   if (next_x < s->x + padding || next_x > s->x + s->w - padding) {
     direction_t dir = (next_x < s->x + padding) ? DIR_WEST : DIR_EAST;
     sector_t *n = find_neighbor(world, s, dir);
@@ -316,21 +401,20 @@ void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, flo
     if (n && n->floor_height <= b->position.y + 0.5f) {
       if (next_x < n->x + n->w && next_x > n->x) s = n;
     } else {
-      next_x = b->position.x;
+      next_x = b->position.x; // Block movement
     }
   }
   b->position.x = next_x;
 
-  float next_z = b->position.z + move.z;
+  // Z-Axis Wall/Sector Check
   if (next_z < s->z + padding || next_z > s->z + s->d - padding) {
     direction_t dir = (next_z < s->z + padding) ? DIR_SOUTH : DIR_NORTH;
     sector_t *n = find_neighbor(world, s, dir);
 
     if (n && n->floor_height <= b->position.y + 0.5f) {
-      // Check that we are within the neighbor's Z bounds
       if (next_z < n->z + n->d && next_z > n->z) s = n;
     } else {
-      next_z = b->position.z;
+      next_z = b->position.z; // Block movement
     }
   }
   b->position.z = next_z;

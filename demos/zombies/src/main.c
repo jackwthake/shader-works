@@ -15,7 +15,7 @@
 #define WIN_HEIGHT 155
 #define WIN_SCALE 6
 #define WIN_TITLE "zombies"
-#define MAX_DEPTH 64.f
+#define MAX_DEPTH 32.f
 
 renderer_t renderer_state = { 0 };
 
@@ -68,6 +68,12 @@ int main(int argc, char const *argv[]) {
   sys_init(&window, &renderer, &fb_tex, &mouse_captured);
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
 
+  // Load texture atlas before creating world so UVs can be generated
+  u32 atlas_w, atlas_h;
+  load_bmp_texture("res/base.bmp", &atlas_w, &atlas_h, &renderer_state.texture_atlas);
+  renderer_state.atlas_dim.x = (float)atlas_w;
+  renderer_state.atlas_dim.y = (float)atlas_h;
+
   init_world(&world);
   generate_random_map(&world, MAX_LIGHTS + 10);
 
@@ -94,13 +100,10 @@ int main(int argc, char const *argv[]) {
     }
   };
 
-  u32 w, h;
-  load_bmp_texture("res/base.bmp", &w, &h, &renderer_state.texture_atlas);
-  renderer_state.atlas_dim.x = (float)w;
-  renderer_state.atlas_dim.y = (float)h;
-
   update_camera(&renderer_state, &camera);
   init_particles(&world, &camera);
+
+  world.entity_bodies[MAX_ENTITIES] = &controller.body; // Last body is the player for collision checks
 
   bool running = true;
   while (running) {
@@ -117,17 +120,18 @@ int main(int argc, char const *argv[]) {
     tick_entities(&world, &controller, controller.delta_time);
 
     // clear framebuffer and depthbuffer
+    u32 clear = rgb_to_u32(27, 5, 30);
     for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; i++) {
-      framebuffer[i] =  0xFF000000; // Opaque black
+      framebuffer[i] = clear; // Opaque black
       depthbuffer[i] = MAX_DEPTH;
     }
 
     render_world(&renderer_state, &world, &camera);
     apply_dust_particles(&renderer_state, &world, &camera);
-    apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH * 0.25, 55, 20, 60);
+    // apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH * 0.25, 55, 20, 60);
 
     sdl_present(&renderer_state, renderer, fb_tex);
-    SDL_Delay(1);
+    // SDL_Delay(1);
   }
 
   delete_world(&world);

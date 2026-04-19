@@ -93,7 +93,7 @@ void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam) {
     }
 
     // pass particle color through lighting shader to blend in with world
-    u32 out = default_lighting_frag_shader.func(rgb_to_u32(200, 200, 200), &(fragment_context_t){
+    u32 out = default_lighting_frag_shader.func(rgb_to_u32(200, 150, 150), &(fragment_context_t){
       .world_pos = *p,
       .normal = (float3){0, 1, 0}, // Upward facing normal for lighting
       .view_dir = float3_normalize(float3_sub(cam->position, *p)),
@@ -104,6 +104,17 @@ void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam) {
 
     render_point(state, cam, *p, out);
   }
+}
+
+extern renderer_t renderer_state;
+
+u32 light_and_dither_frag(u32 input, fragment_context_t *ctx, void *args, usize argc) {
+  UNUSED(args); UNUSED(argc);
+
+  // Lighting and Dither
+  u32 lit = default_lighting_frag_shader.func(input, ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
+  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 0, renderer_state.max_depth * 0.75f, 47, 20, 60);
+  return apply_dither_u32(lit, ctx->screen_pos, 8.0f);
 }
 
 u32 ground_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc) {
@@ -136,16 +147,21 @@ u32 ground_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc)
   u8 g = 0;
   u8 b = (u8)(160.0f * intensity);
 
-  u32 base_color = rgb_to_u32(r, g, b);
-
-  // Lighting and Dither
-  u32 lit = default_lighting_frag_shader.func(base_color, ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
+  u32 lit = default_lighting_frag_shader.func(rgb_to_u32(r, g, b), ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
+  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 0, renderer_state.max_depth * 0.75f, 47, 20, 60);
   return apply_dither_u32(lit, ctx->screen_pos, 8.0f);
 }
 
-fragment_shader_t ground_frag = {
+fragment_shader_t ground_shader = {
   .valid = true,
   .argc = 0,
   .argv = NULL,
   .func = ground_frag_func
+};
+
+fragment_shader_t light_and_dither = {
+  .valid = true,
+  .argc = 0,
+  .argv = NULL,
+  .func = light_and_dither_frag
 };

@@ -61,6 +61,7 @@ typedef struct {
   sector_t *sectors, *tail;
   light_t *lights;
   entity_t *entities;
+  physics_body_t **entity_bodies;
 
   usize num_sectors, num_lights, num_entities;
 } world_t;
@@ -77,5 +78,13 @@ void finalize_world_geometry(world_t *world);
 void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, float delta_time);
 void tick_entities(world_t *world, fps_controller_t *controller, f32 delta_time);
 void render_world(renderer_t *renderer, world_t *world, transform_t *camera);
+
+// Generate UV coordinates for a model to use a specific region of the sprite atlas
+// This function remaps all UV coordinates in a model to a specific sprite region.
+// model: The model whose UVs will be remapped
+// atlas_dim: Full dimensions of the sprite atlas in pixels (e.g., {256, 128})
+// sprite_pos: Top-left corner of the sprite region in pixels (e.g., {0, 0})
+// sprite_dim: Size of the sprite region in pixels (e.g., {32, 32})
+void generate_model_uvs_from_atlas(model_t *model, float2 atlas_dim, float2 sprite_pos, float2 sprite_dim);
 
 #endif // __WORLD_H__
