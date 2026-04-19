@@ -13,6 +13,12 @@ typedef enum {
   DIR_WEST
 } direction_t;
 
+typedef enum {
+  TYPE_INACTIVE,
+  TYPE_PLAYER,
+  TYPE_ENEMY
+} type_t;
+
 typedef struct sector_t {
   int x, z, w, d, ceiling_height, floor_height;
   model_t *walls;
@@ -30,6 +36,8 @@ typedef struct {
   float floor_offset; // 2.0 for player eye-level, 1.0 for enemy center
   float y_velocity;
   bool active, is_grounded;
+  type_t type;
+  u8 health;
 } physics_body_t;
 
 typedef struct {
@@ -74,6 +82,7 @@ sector_t *point_in_sector(world_t *world, float3 position, float *floor_height);
 
 void generate_random_map(world_t *world, int room_count);
 void finalize_world_geometry(world_t *world);
+void regenerate_map(world_t *world, fps_controller_t *controller);
 
 void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, float delta_time);
 void tick_entities(world_t *world, fps_controller_t *controller, f32 delta_time);

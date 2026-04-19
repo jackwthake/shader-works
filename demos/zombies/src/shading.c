@@ -113,7 +113,7 @@ u32 light_and_dither_frag(u32 input, fragment_context_t *ctx, void *args, usize 
 
   // Lighting and Dither
   u32 lit = default_lighting_frag_shader.func(input, ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
-  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 0, renderer_state.max_depth * 0.75f, 47, 20, 60);
+  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 5, renderer_state.max_depth, 47, 20, 60);
   return apply_dither_u32(lit, ctx->screen_pos, 8.0f);
 }
 
@@ -148,7 +148,7 @@ u32 ground_frag_func(u32 input, fragment_context_t *ctx, void *args, usize argc)
   u8 b = (u8)(160.0f * intensity);
 
   u32 lit = default_lighting_frag_shader.func(rgb_to_u32(r, g, b), ctx, default_lighting_frag_shader.argv, default_lighting_frag_shader.argc);
-  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 0, renderer_state.max_depth * 0.75f, 47, 20, 60);
+  lit = apply_fog_to_pixel(&renderer_state, lit, (int)ctx->screen_pos.x, (int)ctx->screen_pos.y, ctx->depth, 5, renderer_state.max_depth, 47, 20, 60);
   return apply_dither_u32(lit, ctx->screen_pos, 8.0f);
 }
 

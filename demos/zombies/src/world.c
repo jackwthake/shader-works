@@ -55,6 +55,8 @@ void init_world(world_t *world) {
   world->entities = calloc(MAX_ENTITIES, sizeof(entity_t));
   world->num_entities = 0;
   world->entity_bodies = calloc(MAX_ENTITIES + 1, sizeof(physics_body_t *));
+  world->entity_bodies[MAX_ENTITIES] = NULL; // Last body reserved for player
+  world->entity_bodies[MAX_ENTITIES]->type = TYPE_PLAYER;
 }
 
 void delete_world(world_t *world) {
@@ -281,6 +283,7 @@ static void add_entities(world_t *world) {
       new_entity->mesh.frag_shader = &light_and_dither;
       new_entity->target_pos = new_entity->body.position;
       new_entity->body.active = true;
+      new_entity->body.type = TYPE_ENEMY;
 
       world->entity_bodies[world->num_entities] = &new_entity->body;
       world->num_entities++;
@@ -332,6 +335,17 @@ void generate_random_map(world_t *world, int room_count) {
   add_entities(world);
 }
 
+void regenerate_map(world_t *world, fps_controller_t *controller) {
+  delete_world(world);
+  init_world(world);
+  generate_random_map(world, MAX_LIGHTS + 10);
+  finalize_world_geometry(world);
+
+  world->entity_bodies[MAX_ENTITIES] = &controller->body; // Last body is the player for collision checks
+  controller->body.current_sector = world->sectors; // Put player back in the first sector (should always be at 0,0)
+  controller->body.position = (float3){ world->sectors->x + world->sectors->w * 0.5f, world->sectors->floor_height + controller->body.floor_offset, world->sectors->z + world->sectors->d * 0.5f };
+}
+
 void finalize_world_geometry(world_t *world) {
   for (sector_t *s = world->sectors; s != NULL; s = s->next) {
     // Clean up existing wall heap memory
@@ -377,6 +391,16 @@ void resolve_world_collision(world_t *world, physics_body_t *b, float3 move, flo
     float min_dist = b->radius + other->radius;
 
     if (distance_sq < (min_dist * min_dist)) {
+      if (b->type == TYPE_PLAYER && other->type == TYPE_ENEMY || b->type == TYPE_ENEMY && other->type == TYPE_PLAYER) {
+        if (b->type == TYPE_PLAYER) {
+          other->health = (other->health > 0) ? other->health - 1 : 0;
+          other->active = false;//other->health > 0; // Deactivate if health drops to 0
+        } else {
+          b->health = (b->health > 0) ? b->health - 1 : 0;
+          b->active = false;//b->health > 0; // Deactivate if health drops to 0
+        }
+      }
+
       // Collision detected! Resolve by pushing 'b' away from 'other'
       float distance = sqrtf(distance_sq);
 
@@ -465,7 +489,7 @@ void tick_entities(world_t *world, fps_controller_t *controller, float delta_tim
 
   for (usize i = 0; i < world->num_entities; i++) {
     entity_t *ent = &world->entities[i];
-    // if (!ent->active) continue;
+    if (!ent->body.active) continue;
 
     int depth = ai_path_find_sector(world, ent->body.current_sector, (physics_body_t *)controller, paths[i], 0);
 

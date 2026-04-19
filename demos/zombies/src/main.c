@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdio.h>
 
 #include <SDL3/SDL.h>
 
@@ -8,6 +9,7 @@
 
 #include "common/util.h"
 
+#include "state_management.h"
 #include "controller.h"
 #include "world.h"
 
@@ -18,9 +20,7 @@
 #define MAX_DEPTH 32.f
 
 renderer_t renderer_state = { 0 };
-
-void init_particles(world_t *world, transform_t *cam);
-void apply_dust_particles(renderer_t *state, world_t *world, transform_t *cam);
+bool mouse_captured = true;
 
 void sys_init(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **framebuffer_tex, bool *mouse_captured) {
   SDL_Init(SDL_INIT_VIDEO);
@@ -35,14 +35,14 @@ void sys_init(SDL_Window **window, SDL_Renderer **renderer, SDL_Texture **frameb
   srand(time(NULL));
 }
 
-void sdl_consume_events(bool *running, bool *mouse_captured, SDL_Window *window) {
+void sdl_consume_events(bool *running, bool *captured, SDL_Window *window) {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) *running = false;
     if (event.type == SDL_EVENT_KEY_DOWN) {
         if (event.key.key == SDLK_ESCAPE) {
-          *mouse_captured = !*mouse_captured;
-          SDL_SetWindowRelativeMouseMode(window, *mouse_captured);
+          *captured = !*captured;
+          SDL_SetWindowRelativeMouseMode(window, *captured);
         }
     }
   }
@@ -57,16 +57,21 @@ void sdl_present(renderer_t *renderer, SDL_Renderer *sdl_renderer, SDL_Texture *
 
 int main(int argc, char const *argv[]) {
   UNUSED(argc); UNUSED(argv);
+  extern world_t world;
+  extern fps_controller_t controller;
+  extern transform_t camera;
 
   SDL_Window *window; SDL_Renderer *renderer; SDL_Texture *fb_tex;
   u32 framebuffer[WIN_WIDTH * WIN_HEIGHT];
   f32 depthbuffer[WIN_WIDTH * WIN_HEIGHT];
-  bool mouse_captured = false;
-
-  world_t world;
 
   sys_init(&window, &renderer, &fb_tex, &mouse_captured);
   init_renderer(&renderer_state, WIN_WIDTH, WIN_HEIGHT, 0, 0, framebuffer, depthbuffer, NULL, MAX_DEPTH);
+
+  fsm_init(&game_state, STATE_GENERATE_MAP, STATE_NUM_STATES);
+  fsm_set_state_interface(&game_state, STATE_GENERATE_MAP, &generate_map_state);
+  fsm_set_state_interface(&game_state, STATE_NORMAL, &normal_state);
+  fsm_set_state_interface(&game_state, STATE_MAP_REGENERATION, &regenerate_map_state);
 
   // Load texture atlas before creating world so UVs can be generated
   u32 atlas_w, atlas_h;
@@ -75,35 +80,9 @@ int main(int argc, char const *argv[]) {
   renderer_state.atlas_dim.y = (float)atlas_h;
 
   init_world(&world);
-  generate_random_map(&world, MAX_LIGHTS + 10);
 
-  transform_t camera = {0, 0, 0, (float3){0, 2, 0}};
-  fps_controller_t controller = {
-    .move_speed = 8.0f,
-    .mouse_sensitivity = 0.0015f,
-    .min_pitch = -PI/2 + 0.1f,
-    .max_pitch = PI/2 - 0.1f,
-    .ground_height = 2.0f,
-    .last_frame_time = SDL_GetPerformanceCounter(),
-    .bob_timer = 0.0f,
-    .is_moving = false,
-    .dash_available = true,
-    .dash_timer = 0.0f,
-    .dash_active = false,
-    .dash_duration = 0.3f,
-    .dash_direction = {0, 0, 0},
-    .body = {
-      .current_sector = world.sectors,
-      .position = camera.position,
-      .radius = 0.15f,
-      .floor_offset = 2.0f
-    }
-  };
-
-  update_camera(&renderer_state, &camera);
-  init_particles(&world, &camera);
-
-  world.entity_bodies[MAX_ENTITIES] = &controller.body; // Last body is the player for collision checks
+  fsm_start(&game_state);
+  fsm_change_state(&game_state, STATE_NORMAL);
 
   bool running = true;
   while (running) {
@@ -113,28 +92,26 @@ int main(int argc, char const *argv[]) {
 
     sdl_consume_events(&running, &mouse_captured, window);
 
-    // tick world
-    update_controller(&renderer_state, &controller, &camera, &mouse_captured, &world);
-    update_camera(&renderer_state, &camera);
+    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_R]) {
+      fsm_change_state(&game_state, STATE_MAP_REGENERATION);
+    }
 
-    tick_entities(&world, &controller, controller.delta_time);
+    // tick world
+    fsm_tick_state(&game_state, controller.delta_time);
 
     // clear framebuffer and depthbuffer
     u32 clear = rgb_to_u32(27, 5, 30);
     for (int i = 0; i < WIN_WIDTH * WIN_HEIGHT; i++) {
-      framebuffer[i] = clear; // Opaque black
+      framebuffer[i] = clear;
       depthbuffer[i] = MAX_DEPTH;
     }
 
-    render_world(&renderer_state, &world, &camera);
-    apply_dust_particles(&renderer_state, &world, &camera);
-    // apply_fog_to_screen(&renderer_state, 0, MAX_DEPTH * 0.25, 55, 20, 60);
-
+    fsm_render_state(&game_state);
     sdl_present(&renderer_state, renderer, fb_tex);
-    // SDL_Delay(1);
   }
 
-  delete_world(&world);
+  fsm_free(&game_state);
+
   SDL_Quit();
   return 0;
 }
