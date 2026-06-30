@@ -52,9 +52,9 @@ float3 float3_cross(float3 a, float3 b) {
 
 float3 float3_lerp(float3 start, float3 end, float t) {
   return (float3) {
-    start.x, + t * (end.x, start.x),
-    start.y, + t * (end.y, start.y),
-    start.z, + t * (end.z, start.z)
+    start.x + t * (end.x, start.x),
+    start.y + t * (end.y, start.y),
+    start.z + t * (end.z, start.z)
   };
 }
 
